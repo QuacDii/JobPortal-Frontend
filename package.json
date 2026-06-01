@@ -13,9 +13,11 @@
     "@ant-design/icons": "^6.2.3",
     "antd": "^6.4.3",
     "axios": "^1.16.1",
+    "jwt-decode": "^4.0.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-router-dom": "^7.15.1"
+    "react-router-dom": "^7.15.1",
+    "react-toastify": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
