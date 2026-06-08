@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from 'antd';
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import paymentService from '../../services/paymentService';
 import { toast } from 'react-toastify';
 import { jwtDecode } from 'jwt-decode'; // Import thư viện giải mã
@@ -63,12 +65,12 @@ const Wallet = () => {
 
         setIsLoading(true);
         try {
-            // Gửi maUser (lấy từ JWT) và soTien xuống Payment API
             const response = await paymentService.createPaymentUrl(maUser, soTien);
-            
             if (response && response.url) {
+                // LƯU VẾT: Ghi nhớ rằng user đang đứng ở trang Wallet
+                localStorage.setItem('payment_redirect', '/employer/wallet');
+
                 toast.info("Đang chuyển hướng đến cổng thanh toán MoMo...");
-                // Chuyển hướng sang giao diện MoMo
                 window.location.href = response.url;
             }
         } catch (error) {
@@ -86,6 +88,14 @@ const Wallet = () => {
 
     return (
         <div style={{ maxWidth: '400px', margin: '50px auto', padding: '25px', border: '1px solid #e0e0e0', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', backgroundColor: '#fff' }}>
+            <Button 
+                type="link" 
+                icon={<ArrowLeftOutlined />} 
+                onClick={() => navigate('/employer/dashboard')}
+                style={{ marginBottom: '15px', padding: 0 }}
+            >
+                Quay lại
+            </Button>
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
                 <h2 style={{ color: '#D82D8B', margin: '0 0 10px 0' }}>Ví Điện Tử TKVL</h2>
                 <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>Hệ thống thanh toán qua MoMo Sandbox</p>
