@@ -25,8 +25,8 @@ const ResetPassword = () => {
                 newPassword: values.password
             });
 
-            if (response.data.success) {
-                message.success(response.data.message);
+            if (response.success) {
+                message.success(response.message);
                 navigate('/login'); // Đổi xong đá về trang Login ngay
             }
         } catch (error) {

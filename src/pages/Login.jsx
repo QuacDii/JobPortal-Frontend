@@ -40,10 +40,10 @@ const Login = () => {
                 matKhau: values.matKhau 
             });
 
-            if (response.data.success) {
-                message.success(response.data.message);
-                localStorage.setItem('token', response.data.token);
-                handleRoleNavigation(response.data.token);
+            if (response.success) {
+                message.success(response.message);
+                localStorage.setItem('token', response.token);
+                handleRoleNavigation(response.token);
             }
         } catch (error) {
             const errorMsg = error.response?.data?.message || 'Đăng nhập thất bại, vui lòng thử lại!';
@@ -60,10 +60,10 @@ const Login = () => {
                     accessToken: tokenResponse.access_token 
                 });
 
-                if (response.data.success) {
-                    message.success(response.data.message);
-                    localStorage.setItem('token', response.data.token);
-                    handleRoleNavigation(response.data.token);
+                if (response.success) {
+                    message.success(response.message);
+                    localStorage.setItem('token', response.token);
+                    handleRoleNavigation(response.token);
                 }
             } catch (error) {
                 const errorMsg = error.response?.data?.message || 'Đăng nhập Google thất bại!';
@@ -169,10 +169,10 @@ const Login = () => {
                                             const res = await apiClient.post('/auth/facebook-login', {
                                                 accessToken: response.accessToken
                                             });
-                                            if (res.data.success) {
-                                                message.success(res.data.message);
-                                                localStorage.setItem('token', res.data.token);
-                                                handleRoleNavigation(res.data.token); 
+                                            if (res.success) {
+                                                message.success(res.message);
+                                                localStorage.setItem('token', res.token);
+                                                handleRoleNavigation(res.token); 
                                             }
                                         } catch (error) {
                                             message.error('Đăng nhập Facebook thất bại tại Server!');

@@ -47,7 +47,7 @@ const CvTemplateLibrary = () => {
 
         axios.get(apiUrl)
             .then(response => {
-                setCvTemplates(response.data);
+                setCvTemplates(response);
                 setLoading(false);
             })
             .catch(error => {

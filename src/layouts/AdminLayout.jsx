@@ -3,7 +3,7 @@ import { Layout, Menu, Button, Avatar, Space } from 'antd';
 import { 
     UserOutlined, LogoutOutlined, MenuUnfoldOutlined, MenuFoldOutlined, 
     DashboardOutlined, TeamOutlined, FileSearchOutlined, 
-    WalletOutlined, ShoppingCartOutlined 
+    WalletOutlined, ShoppingCartOutlined, BuildOutlined, AppstoreOutlined
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -12,71 +12,105 @@ const { Header, Sider, Content } = Layout;
 const AdminLayout = ({ children, user }) => {
     const [collapsed, setCollapsed] = useState(false);
     const navigate = useNavigate();
-    const location = useLocation(); // Lấy đường dẫn hiện tại để highlight menu
+    const location = useLocation();
 
     const handleLogout = () => {
         localStorage.clear();
         window.location.href = '/login';
     };
 
-    // Hàm xử lý khi click vào Menu
     const handleMenuClick = (e) => {
-        navigate(e.key); // Chuyển hướng đến đường dẫn được lưu trong 'key'
+        navigate(e.key); 
     };
 
-    // Tự động đổi danh mục menu dựa vào vai trò của tài khoản
-    // Đã thay đổi 'key' thành đường dẫn thực tế
+    // PHÂN CHIA LẠI CẤU TRÚC MENU CHUẨN XÁC
     const menuItems = user?.vaiTro === "0" ? [
         { key: '/admin/dashboard', icon: <DashboardOutlined />, label: 'Tổng quan Admin' },
         { key: '/admin/users', icon: <TeamOutlined />, label: 'Quản lý Người dùng' },
         { key: '/admin/news', icon: <FileSearchOutlined />, label: 'Phê duyệt Tin tức' },
     ] : [
-        { key: '/employer/dashboard', icon: <DashboardOutlined />, label: 'Bảng tin tuyển dụng' },
-        { key: '/employer/post-job', icon: <FileSearchOutlined />, label: 'Đăng tin mới' },
-        { key: '/employer/candidates', icon: <TeamOutlined />, label: 'Quản lý Ứng viên' },
+        { 
+            key: '/employer/dashboard', 
+            icon: <DashboardOutlined />, 
+            label: 'Bảng điều khiển' 
+        },
+        { type: 'divider' },
+        {
+            key: 'sub-recruitment',
+            icon: <AppstoreOutlined />,
+            label: 'Quản lý Tuyển dụng',
+            children: [
+                { key: '/employer/post-job', label: 'Đăng tin tuyển dụng' }, // Cập nhật tên cho dễ hiểu
+                { key: '/employer/jobs', label: 'Danh sách tin đã đăng' },
+                { key: '/employer/cv-hunter', label: 'Săn ứng viên (CV Hunt)' },
+            ]
+        },
+        {
+            key: 'sub-company',
+            icon: <BuildOutlined />,
+            label: 'Hồ sơ Doanh nghiệp',
+            children: [
+                { key: '/employer/company-profile', label: 'Thông tin Công ty' } 
+            ]
+        },
         { type: 'divider' }, 
-        { key: '/employer/wallet', icon: <WalletOutlined />, label: 'Ví MoMo & Nạp tiền' },
-        { key: '/employer/service-package', icon: <ShoppingCartOutlined />, label: 'Bảng giá & Dịch vụ' },
+        {
+            key: 'sub-finance',
+            icon: <WalletOutlined />,
+            label: 'Tài chính & Dịch vụ',
+            children: [
+                { key: '/employer/service-package', icon: <ShoppingCartOutlined />, label: 'Cửa hàng Dịch vụ' },
+                { key: '/employer/wallet', label: 'Ví điện tử MoMo' },
+            ]
+        }
     ];
+
+    // Mẹo nhỏ: Mở sẵn các SubMenu dựa trên URL hiện tại (Đã tối ưu)
+    const defaultOpenKeys = ['sub-recruitment', 'sub-company', 'sub-finance'].filter(key => {
+        if (key === 'sub-recruitment' && (location.pathname.includes('/post-job') || location.pathname.includes('/jobs') || location.pathname.includes('/cv-hunter'))) return true;
+        if (key === 'sub-recruitment' && (location.pathname.includes('/post-job') || location.pathname.includes('/candidate-funnel'))) return true;
+        if (key === 'sub-company' && location.pathname.includes('/company-profile')) return true; 
+        if (key === 'sub-finance' && (location.pathname.includes('/wallet') || location.pathname.includes('/service-package'))) return true;
+        return false;
+    });
 
     return (
         <Layout style={{ minHeight: '100vh' }}>
-            {/* Thanh Menu dọc bên trái */}
-            <Sider trigger={null} collapsible collapsed={collapsed} theme="dark">
-                <div style={{ height: 64, display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff', fontSize: 18, fontWeight: 'bold', background: '#002140' }}>
-                    {collapsed ? 'JN' : 'PANEL CONTROL'}
+            <Sider width={250} trigger={null} collapsible collapsed={collapsed} theme="dark">
+                <div style={{ height: 64, display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff', fontSize: 20, fontWeight: '900', background: '#002140', letterSpacing: '1px' }}>
+                    {collapsed ? 'JN' : 'JOBSNOW PANEL'}
                 </div>
                 <Menu 
                     theme="dark" 
                     mode="inline" 
-                    // Tự động bôi sáng menu item dựa vào URL hiện tại
                     selectedKeys={[location.pathname]} 
+                    defaultOpenKeys={defaultOpenKeys} 
                     items={menuItems} 
                     onClick={handleMenuClick}
                 />
             </Sider>
 
             <Layout>
-                {/* Thanh Header bên trên */}
-                <Header style={{ background: '#fff', padding: '0 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 4px rgba(0,21,41,.08)' }}>
+                <Header style={{ background: '#fff', padding: '0 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 4px rgba(0,21,41,.08)', zIndex: 1 }}>
                     <Button 
                         type="text" 
                         icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} 
                         onClick={() => setCollapsed(!collapsed)} 
-                        style={{ fontSize: '16px', width: 64, height: 64 }} 
+                        style={{ fontSize: '18px', width: 64, height: 64 }} 
                     />
                     
-                    <Space size="middle">
-                        <span style={{ color: '#595959' }}>Xin chào, <b>{user?.hoTen || 'Quản trị viên'}</b> ({user?.vaiTro === "0" ? "Admin" : "Nhà tuyển dụng"})</span>
-                        <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#87d068' }} />
-                        <Button type="primary" danger ghost icon={<LogoutOutlined />} onClick={handleLogout}>
+                    <Space size="large">
+                        <span style={{ color: '#595959', fontSize: '15px' }}>
+                            Xin chào, <b style={{ color: '#1890ff' }}>{user?.hoTen || 'Quản trị viên'}</b>
+                        </span>
+                        <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#1890ff' }} />
+                        <Button type="primary" danger ghost icon={<LogoutOutlined />} onClick={handleLogout} style={{ borderRadius: '6px' }}>
                             Đăng xuất
                         </Button>
                     </Space>
                 </Header>
 
-                {/* Nội dung hiển thị của từng trang */}
-                <Content style={{ margin: '24px 16px', padding: 24, background: '#fff', minHeight: 280, borderRadius: 8, position: 'relative' }}>
+                <Content style={{ margin: '24px 24px', padding: 0, minHeight: 280, position: 'relative' }}>
                     {children}
                 </Content>
             </Layout>

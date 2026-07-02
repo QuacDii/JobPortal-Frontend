@@ -27,6 +27,14 @@ import Wallet from './pages/Wallet/Wallet';
 import PaymentSuccess from './pages/Payment/PaymentSuccess';
 import PaymentFailed from './pages/Payment/PaymentFailed';
 
+import CompanyProfile from './pages/Employer/CompanyProfile';
+import PostJob from './pages/Employer/PostJob';
+import CandidateFunnel from './pages/Employer/CandidateFunnel';
+import EmployerJobs from './components/EmployerJobs';
+
+import CvHunter from './pages/Employer/CvHunter';
+
+
 import ServicePackage from './pages/Employer/ServicePackage';
 
 const App = () => {
@@ -125,7 +133,19 @@ const App = () => {
           path="/employer/dashboard" 
           element={user && user.vaiTro === "1" ? <AdminLayout user={user}><EmployerDashboard /></AdminLayout> : <Navigate to="/login" replace />} 
         />
-        
+
+        {/* Danh sách tin đã đăng */}
+        <Route 
+          path="/employer/jobs" 
+          element={user?.vaiTro === "1" ? <AdminLayout user={user}><EmployerJobs /></AdminLayout> : <Navigate to="/login" replace />} 
+        />
+
+        {/* Quản lý phễu ứng viên của 1 tin cụ thể (Chú ý có :maViTri ở cuối) */}
+        <Route 
+          path="/employer/candidate-funnel/:maViTri" 
+          element={user?.vaiTro === "1" ? <AdminLayout user={user}><CandidateFunnel /></AdminLayout> : <Navigate to="/login" replace />} 
+        />
+
         {/* Đưa Ví và Gói dịch vụ vào Layout của Nhà tuyển dụng */}
         <Route 
           path="/employer/wallet" 
@@ -134,6 +154,23 @@ const App = () => {
         <Route 
           path="/employer/service-package" 
           element={user && user.vaiTro === "1" ? <AdminLayout user={user}><ServicePackage /></AdminLayout> : <Navigate to="/login" replace />} 
+        />
+
+        {/* Quản lý hồ sơ công ty */}
+        <Route 
+          path="/employer/company-profile" 
+          element={user && user.vaiTro === "1" ? <AdminLayout user={user}><CompanyProfile /></AdminLayout> : <Navigate to="/login" replace />} 
+        />
+
+        {/* Quản lý tuyển dụng */}
+        <Route 
+          path="/employer/post-job" 
+          element={user && user.vaiTro === "1" ? <AdminLayout user={user}><PostJob /></AdminLayout> : <Navigate to="/login" replace />}
+        />
+
+        <Route 
+          path="/employer/cv-hunter" 
+          element={user && user.vaiTro === "1" ? <AdminLayout user={user}><CvHunter /></AdminLayout> : <Navigate to="/login" replace />} 
         />
 
         {/* ================= TRANG ỨNG VIÊN ================= */}

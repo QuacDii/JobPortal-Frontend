@@ -33,7 +33,7 @@ const Register = () => {
                 vaiTro: finalRoleValue
             });
 
-            if (response.data.success) {
+            if (response.success) {
                 message.success('Đăng ký tài khoản thành công! Hãy đăng nhập ngay.');
                 navigate('/login');
             }
@@ -55,8 +55,8 @@ const Register = () => {
                     vaiTro: finalRoleValue,          // Gửi kèm quyền 1 hoặc 2
                 });
 
-                if (response.data.success) {
-                    localStorage.setItem('token', response.data.token);
+                if (response.success) {
+                    localStorage.setItem('token', response.token);
                     message.success('Xác thực tài khoản Google thành công!');
                     window.location.href = '/'; 
                 }
@@ -144,10 +144,10 @@ const Register = () => {
                     const res = await apiClient.post('/auth/facebook-login', {
                         accessToken: response.accessToken
                     });
-                    if (res.data.success) {
-                        message.success(res.data.message);
-                        localStorage.setItem('token', res.data.token);
-                        handleRoleNavigation(res.data.token); 
+                    if (res.success) {
+                        message.success(res.message);
+                        localStorage.setItem('token', res.token);
+                        handleRoleNavigation(res.token); 
                     }
                 } catch (error) {
                     message.error('Đăng nhập Facebook thất bại tại Server!');
