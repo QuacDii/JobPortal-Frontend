@@ -14,14 +14,21 @@ apiClient.interceptors.request.use((config) => {
     return config;  
 }, (error) => Promise.reject(error));
 
+// Bộ lọc chặn dữ liệu trả về từ Server
 apiClient.interceptors.response.use(
     (response) => response, 
     async (error) => {
         const originalRequest = error.config;
 
-        // Nếu lỗi 401 (Hết hạn token) và request này chưa từng thử refresh
-        if (error.response?.status === 401 && !originalRequest._retry) {
-            originalRequest._retry = true; // Đánh dấu đã thử thách thức refresh
+        // 👉 FIX CHÍ MẠNG: Kiểm tra xem request bị lỗi có phải là luồng đăng nhập/đăng ký hay không
+        const isAuthEndpoint = originalRequest.url.includes('/auth/login') || 
+                               originalRequest.url.includes('/auth/google-login') || 
+                               originalRequest.url.includes('/auth/facebook-login') ||
+                               originalRequest.url.includes('/auth/register');
+
+        // Chỉ cố gắng Refresh Token nếu lỗi 401 KHÔNG PHẢI xuất phát từ các trang đăng nhập/đăng ký
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
+            originalRequest._retry = true; // Đánh dấu đã thử refresh
             
             try {
                 const oldRefreshToken = localStorage.getItem('refreshToken');
@@ -33,22 +40,29 @@ apiClient.interceptors.response.use(
                 });
 
                 if (res.data.success) {
-                    // Lưu cặp mã mới vào máy
-                    localStorage.setItem('token', res.data.accessToken);
-                    localStorage.setItem('refreshToken', res.data.refreshToken);
+                    // ⚠️ ÔNG LƯU Ý: Check xem Backend trả về tên biến là 'token' hay 'accessToken' nhé.
+                    // Tui tạm để đồng bộ theo kiểu code cũ của ông:
+                    const newAccessToken = res.data.token || res.data.accessToken;
+                    const newRefreshToken = res.data.refreshToken;
+
+                    localStorage.setItem('token', newAccessToken);
+                    localStorage.setItem('refreshToken', newRefreshToken);
 
                     // Đính kèm token mới vào request cũ và chạy lại
-                    originalRequest.headers.Authorization = `Bearer ${res.data.accessToken}`;
+                    originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
                     return apiClient(originalRequest);
                 }
             } catch (refreshError) {
-                // Nếu cả RefreshToken cũng hết hạn vĩnh viễn -> Xóa sạch và sút user ra màn login
+                // Nếu cả RefreshToken cũng hỏng vĩnh viễn -> Sút user ra ngoài đăng nhập lại
+                console.error("Phiên đăng nhập hết hạn vĩnh viễn:", refreshError);
                 localStorage.removeItem('token');
                 localStorage.removeItem('refreshToken');
                 window.location.href = '/login';
                 return Promise.reject(refreshError);
             }
         }
+        
+        // Trả lỗi về đúng file Component (.jsx) để xử lý hiện thông báo Toast Antd
         return Promise.reject(error);
     }
 );

@@ -1,25 +1,22 @@
 import React, { useState } from 'react';
 import { Form, Input, Button, Card, message, Typography, Divider } from 'antd';
-import { UserOutlined, LockOutlined, MailOutlined, ArrowLeftOutlined, ShopOutlined, GoogleOutlined } from '@ant-design/icons';
+import { UserOutlined, LockOutlined, MailOutlined, ArrowLeftOutlined, ShopOutlined, GoogleOutlined, FacebookFilled } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google'; 
 import apiClient from '../api/apiClient';
-import { FacebookFilled } from '@ant-design/icons';
 import FacebookLoginRaw from 'react-facebook-login/dist/facebook-login-render-props';
 
-// 2. Thêm dòng này ngay bên dưới để bóc tách Object (nếu bị bọc)
 const FacebookLogin = FacebookLoginRaw.default || FacebookLoginRaw;
-
 const { Title, Text } = Typography;
 
 const Register = () => {
     const navigate = useNavigate();
-    const { roleType } = useParams(); // Lấy 'candidate' hoặc 'employer' từ URL thanh địa chỉ
+    const { roleType } = useParams(); 
     const [loading, setLoading] = useState(false);
 
-    // Tự động cấu hình Vai Trò dựa theo URL
+    // Tự động cấu hình Vai Trò dựa theo URL (/register/employer hoặc /register/candidate)
     const isEmployer = roleType === 'employer';
-    const finalRoleValue = isEmployer ? 1 : 2; // Số 1: Nhà tuyển dụng, Số 2: Ứng viên
+    const finalRoleValue = isEmployer ? 1 : 2; // 1: Nhà tuyển dụng, 2: Ứng viên
     const themeColor = isEmployer ? '#52c41a' : '#1890ff';
 
     // 1. Hàm xử lý Đăng ký bằng Form truyền thống
@@ -45,20 +42,20 @@ const Register = () => {
         }
     };
 
-    // 2. HÀM XỬ LÝ ĐĂNG KÝ / ĐĂNG NHẬP NGẦM BẰNG GOOGLE (Dùng Hook)
+    // 2. Hàm xử lý Đăng ký / Đăng nhập bằng Google
     const loginWithGoogle = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
             setLoading(true);
             try {
                 const response = await apiClient.post('/auth/google-login', {
-                    accessToken: tokenResponse.access_token, // Bắn access_token xuống Backend
-                    vaiTro: finalRoleValue,          // Gửi kèm quyền 1 hoặc 2
+                    accessToken: tokenResponse.access_token,
+                    vaiTro: finalRoleValue
                 });
 
                 if (response.data.success) {
                     localStorage.setItem('token', response.data.token);
                     message.success('Xác thực tài khoản Google thành công!');
-                    window.location.href = '/'; 
+                    window.location.href = '/'; // Chuyển hướng về trang chủ để cập nhật lại Header component
                 }
             } catch (error) {
                 message.error('Xác thực Google thất bại. Vui lòng thử lại sau.');
@@ -83,7 +80,7 @@ const Register = () => {
                 </div>
 
                 <Form name="register_form" layout="vertical" onFinish={onFinish} autoComplete="off">
-                    {/* Các ô nhập Form truyền thống */}
+                    
                     <Form.Item name="hoTen" rules={[{ required: true, message: isEmployer ? 'Vui lòng nhập tên công ty/đại diện!' : 'Vui lòng nhập họ tên của bạn!' }]}>
                         <Input prefix={isEmployer ? <ShopOutlined style={{ color: '#bfbfbf' }} /> : <UserOutlined style={{ color: '#bfbfbf' }} />} placeholder={isEmployer ? "Nhập tên công ty hoặc người đại diện" : "Nhập họ và tên đầy đủ"} size="large" style={{ background: '#141414', color: '#fff' }} />
                     </Form.Item>
@@ -106,27 +103,25 @@ const Register = () => {
                     </Form.Item>
 
                     <Form.Item style={{ marginTop: 20, marginBottom: 0 }}>
-                        <Button type="primary" htmlType="submit" size="large" block loading={loading} style={{ fontWeight: 'bold', background: themeColor, borderColor: themeColor }}>
+                        <Button type="primary" htmlType="submit" size="large" block loading={loading} style={{ background: themeColor, borderColor: themeColor }}>
                             Xác Nhận Đăng Ký Form
                         </Button>
                     </Form.Item>
 
-                    {/* DẢI PHÂN CÁCH ĐĂNG NHẬP MXH */}
                     <Divider plain style={{ color: '#8c8c8c', borderColor: '#303030', fontSize: 13, margin: '24px 0' }}>
                         Hoặc đăng ký nhanh bằng
                     </Divider>
                     
-                    {/* NÚT BẤM GOOGLE CUSTOM */}
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '16px' }}>
+                        {/* BUTTON GOOGLE */}
                         <Button 
                             size="large" 
                             icon={<GoogleOutlined style={{ fontSize: 18 }} />} 
                             style={{ 
-                                flex:1,
+                                flex: 1,
                                 backgroundColor: '#EE0000', 
                                 color: '#fff', 
                                 border: 'none',
-                                width: '100%', 
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center'
@@ -135,41 +130,55 @@ const Register = () => {
                         >
                             Google
                         </Button>
-                        <FacebookLogin
-        appId="1594501296013131" 
-        fields="name,email,picture"
-        callback={async (response) => {
-            if (response.accessToken) {
-                try {
-                    const res = await apiClient.post('/auth/facebook-login', {
-                        accessToken: response.accessToken
-                    });
-                    if (res.data.success) {
-                        message.success(res.data.message);
-                        localStorage.setItem('token', res.data.token);
-                        handleRoleNavigation(res.data.token); 
-                    }
-                } catch (error) {
-                    message.error('Đăng nhập Facebook thất bại tại Server!');
-                }
-            } else {
-                message.error('Hủy kết nối Facebook!');
-            }
-        }}
-        render={renderProps => (
-            <Button 
-                size="large" 
-                icon={<FacebookFilled style={{ fontSize: 18 }} />} 
-                style={{ flex: 1, backgroundColor: '#1877f2', color: '#fff', border: 'none'}}
-                onClick={renderProps.onClick}
-            >
-                Facebook
-            </Button>
-        )}
-    />
-                    </div>
 
+                        {/* COMPONENT FACEBOOK LOGIN */}
+                        <FacebookLogin
+                            appId="1594501296013131" 
+                            fields="name,email,picture"
+                            callback={async (response) => {
+                                if (response.accessToken) {
+                                    try {
+                                        // 👉 ĐÃ SỬA: Gửi kèm cả vaiTro giống y chang bên Google
+                                        const res = await apiClient.post('/auth/facebook-login', {
+                                            accessToken: response.accessToken,
+                                            vaiTro: finalRoleValue
+                                        });
+                                        
+                                        if (res.data.success) {
+                                            message.success(res.data.message || 'Xác thực tài khoản Facebook thành công!');
+                                            localStorage.setItem('token', res.data.token);
+                                            
+                                            // 👉 ĐÃ SỬA CHÍ MẠNG: Thay thế hàm không tồn tại bằng điều hướng chuẩn
+                                            window.location.href = '/'; 
+                                        }
+                                    } catch (error) {
+                                        console.error("Lỗi crash logic Frontend trong khối then:", error);
+                                        message.error('Đăng nhập Facebook thất bại tại Server!');
+                                    }
+                                } else {
+                                    message.error('Hủy kết nối Facebook!');
+                                }
+                            }}
+                            render={renderProps => (
+                                <Button 
+                                    size="large" 
+                                    icon={<FacebookFilled style={{ fontSize: 18 }} />} 
+                                    style={{ flex: 1, backgroundColor: '#1877f2', color: '#fff', border: 'none'}}
+                                    onClick={renderProps.onClick}
+                                >
+                                    Facebook
+                                </Button>
+                            )}
+                        />
+                    </div>
                 </Form>
+
+                <div style={{ textAlign: 'center', marginTop: '24px', color: '#a6a6a6', fontSize: '14px' }}>
+                    Bạn đã có tài khoản?{' '}
+                    <span style={{ color: '#1890ff', cursor: 'pointer' }} onClick={() => navigate('/login')}>
+                        Đăng nhập ngay
+                    </span>
+                </div>
 
                 <div style={{ textAlign: 'center', marginTop: 20 }}>
                     <Button type="link" icon={<ArrowLeftOutlined />} onClick={() => navigate('/register')} style={{ color: '#8c8c8c', padding: 0 }}>

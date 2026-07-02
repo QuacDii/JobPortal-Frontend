@@ -13,12 +13,14 @@ const { Title, Text } = Typography;
 const Login = () => {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const [form] = Form.useForm();
 
-    // CẬP NHẬT LẠI HỆ MÀU SẮC LIGHT MODE
+    // HỆ MÀU SẮC LIGHT MODE
     const primaryColor = '#1890ff'; 
-    const textColor = '#595959'; // Xám đậm thay vì xám nhạt
-    const headingColor = '#262626'; // Đen xám cho tiêu đề
+    const textColor = '#595959'; 
+    const headingColor = '#262626'; 
 
+    // Hàm điều hướng thông minh dựa vào Quyền (Role) trong Token
     const handleRoleNavigation = (token) => {
         const decoded = jwtDecode(token);
         const role = decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"];
@@ -32,27 +34,43 @@ const Login = () => {
         }
     };
 
-    const onFinish = async (values) => {
-        setLoading(true);
+    // 👉 HÀM XỬ LÝ ĐĂNG NHẬP CHUẨN (Dùng Async/Await quản lý thủ công)
+    const handleLogin = async () => {
         try {
+            // 1. Ép Antd quét kiểm tra các ô dữ liệu xem điền đúng/đủ chưa
+            const values = await form.validateFields();
+            
+            console.log("🚀 [DEBUG] Form hợp lệ! Đang bắn API đăng nhập với data:", values);
+            setLoading(true);
+
+            // 2. Gọi API xuống Backend
             const response = await apiClient.post('/auth/login', {
                 email: values.email,
                 matKhau: values.matKhau 
             });
 
-            if (response.data.success) {
-                message.success(response.data.message);
-                localStorage.setItem('token', response.data.token);
-                handleRoleNavigation(response.data.token);
+            // 3. Nếu Backend xử lý thành công
+            if (response.data && response.data.success) {
+                message.success(response.data.message || 'Đăng nhập thành công!');
+                localStorage.setItem('token', response.data.token); // Lưu token cứng vào máy
+                handleRoleNavigation(response.data.token); // Điều hướng phân quyền
             }
         } catch (error) {
-            const errorMsg = error.response?.data?.message || 'Đăng nhập thất bại, vui lòng thử lại!';
+            // Nếu là lỗi do người dùng điền thiếu Form thì dừng lại, không báo lỗi API
+            if (error.errorFields) {
+                console.warn("❌ Người dùng chưa điền đủ Form:", error);
+                return;
+            }
+            
+            console.error("❌ Lỗi từ API Backend:", error);
+            const errorMsg = error.response?.data?.message || 'Tài khoản hoặc mật khẩu không chính xác!';
             message.error(errorMsg);
         } finally {
             setLoading(false);
         }
     };
 
+    // Hàm đăng nhập bằng Google
     const loginWithGoogle = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
             try {
@@ -76,10 +94,8 @@ const Login = () => {
     });
 
     return (
-        // Đổi màu nền ngoài cùng thành xám nhạt của Ant Design (#f0f2f5)
         <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
             
-            {/* Tạo Card trắng bọc form đăng nhập để tạo điểm nhấn 3D */}
             <div style={{ width: '100%', maxWidth: 480, backgroundColor: '#ffffff', padding: '40px', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.05)' }}>
                 
                 <div style={{ marginBottom: 32, textAlign: 'center' }}>
@@ -91,15 +107,16 @@ const Login = () => {
                     </Text>
                 </div>
 
-                <Form layout="vertical" onFinish={onFinish}>
+                {/* 👉 ĐÃ SỬA: Form chỉ làm nhiệm vụ giữ trạng thái, không tham gia vào hành vi submit của HTML */}
+                <Form form={form} layout="vertical">
                     
+                    {/* Ô NHẬP EMAIL */}
                     <Form.Item
                         label={<span style={{ color: headingColor, fontWeight: 500 }}>Email</span>}
                         name="email"
-                        rules={[{ required: true, type: 'email', message: 'Vui lòng nhập đúng định dạng Email!' }]}
+                        rules={[{ required: true, message: 'Vui lòng nhập tài khoản Email!' }, { type: 'email', message: 'Email không đúng định dạng!' }]}
                         style={{ marginBottom: 20 }}
                     >
-                        {/* Xóa border màu #333 và nền tối để Ant Design dùng giao diện sáng mặc định */}
                         <Input
                             size="large"
                             placeholder="Nhập email của bạn"
@@ -108,6 +125,7 @@ const Login = () => {
                         />
                     </Form.Item>
 
+                    {/* Ô NHẬP MẬT KHẨU */}
                     <Form.Item
                         label={<span style={{ color: headingColor, fontWeight: 500 }}>Mật khẩu</span>}
                         name="matKhau"
@@ -116,7 +134,7 @@ const Login = () => {
                     >
                         <Input.Password
                             size="large"
-                            placeholder="••••••••••••"
+                            placeholder="Nhập mật khẩu của bạn" 
                             prefix={<LockOutlined style={{ color: '#bfbfbf', marginRight: 8, fontSize: 18 }} />}
                             style={{ borderRadius: 6, padding: '10px 14px' }}
                         />
@@ -126,14 +144,15 @@ const Login = () => {
                         <a href="/forgot-password" style={{ color: primaryColor, fontSize: 14, fontWeight: 500 }}>Quên mật khẩu?</a>
                     </div>
 
+                    {/* NÚT ĐĂNG NHẬP THỦ CÔNG CHỐNG RELOAD */}
                     <Form.Item style={{ marginBottom: 24 }}>
                         <Button
                             type="primary"
-                            htmlType="submit"
                             size="large"
                             loading={loading}
                             block
                             style={{ backgroundColor: primaryColor, borderColor: primaryColor, fontWeight: 'bold', height: 44, fontSize: 16, borderRadius: 6 }}
+                            onClick={handleLogin} // 👉 Gọi đích danh hàm điều khiển bằng tay
                         >
                             Đăng nhập
                         </Button>
@@ -141,23 +160,24 @@ const Login = () => {
 
                     <div style={{ textAlign: 'center', color: textColor, marginBottom: 16, fontSize: 13, position: 'relative' }}>
                         <span style={{ backgroundColor: '#fff', padding: '0 10px', position: 'relative', zIndex: 1 }}>Hoặc đăng nhập bằng</span>
-                        {/* Đường kẻ ngang đi qua chữ "Hoặc đăng nhập bằng" */}
                         <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', backgroundColor: '#e8e8e8', zIndex: 0 }}></div>
                     </div>
                     
                     <Row gutter={16} style={{ marginBottom: 24 }}>
+                        {/* NÚT GOOGLE */}
                         <Col span={12}>
                             <Button 
                                 size="large" 
                                 block 
                                 icon={<GoogleOutlined />} 
                                 onClick={() => loginWithGoogle()}
-                                style={{ backgroundColor: '#fff', color: '#ea4335', borderColor: '#e8e8e8', fontWeight: '600', borderRadius: 6 }}
+                                style={{ backgroundColor: '#ea4335', color: '#fff', border: 'none', fontWeight: '600', borderRadius: 6 }}
                             >
                                 Google
                             </Button>
                         </Col>
                         
+                        {/* NÚT FACEBOOK */}
                         <Col span={12}>
                             <FacebookLogin
                                 appId="1594501296013131" 
@@ -170,7 +190,7 @@ const Login = () => {
                                                 accessToken: response.accessToken
                                             });
                                             if (res.data.success) {
-                                                message.success(res.data.message);
+                                                message.success(res.data.message || 'Đăng nhập Facebook thành công!');
                                                 localStorage.setItem('token', res.data.token);
                                                 handleRoleNavigation(res.data.token); 
                                             }
@@ -185,8 +205,8 @@ const Login = () => {
                                     <Button 
                                         size="large" 
                                         block
-                                        icon={<FacebookFilled style={{ color: '#1877f2' }} />} 
-                                        style={{ backgroundColor: '#fff', color: '#1877f2', borderColor: '#e8e8e8', fontWeight: '600', borderRadius: 6 }}
+                                        icon={<FacebookFilled />} 
+                                        style={{ backgroundColor: '#1877f2', color: '#fff', border: 'none', fontWeight: '600', borderRadius: 6 }}
                                         onClick={renderProps.onClick}
                                     >
                                         Facebook
@@ -196,10 +216,9 @@ const Login = () => {
                         </Col>
                     </Row>
 
-                    {/* Sửa lại màu viền bottom thành màu xám nhạt */}
                     <div style={{ textAlign: 'center', marginBottom: 30, borderBottom: '1px solid #e8e8e8', paddingBottom: 24 }}>
                         <span style={{ color: textColor }}>Bạn chưa có tài khoản? </span>
-                        <a href="/register" style={{ color: primaryColor, fontWeight: 'bold' }}>Đăng ký ngay</a>
+                        <a href="/register" style={{ color: primaryColor }}>Đăng ký ngay</a>
                     </div>
 
                     <div style={{ textAlign: 'center', color: textColor, fontSize: 13, lineHeight: '1.8' }}>
