@@ -49,11 +49,10 @@ const Login = () => {
                 matKhau: values.matKhau 
             });
 
-            // 3. Nếu Backend xử lý thành công
-            if (response.data && response.data.success) {
-                message.success(response.data.message || 'Đăng nhập thành công!');
-                localStorage.setItem('token', response.data.token); // Lưu token cứng vào máy
-                handleRoleNavigation(response.data.token); // Điều hướng phân quyền
+            if (response.success) {
+                message.success(response.message);
+                localStorage.setItem('token', response.token);
+                handleRoleNavigation(response.token);
             }
         } catch (error) {
             // Nếu là lỗi do người dùng điền thiếu Form thì dừng lại, không báo lỗi API
@@ -78,10 +77,10 @@ const Login = () => {
                     accessToken: tokenResponse.access_token 
                 });
 
-                if (response.data.success) {
-                    message.success(response.data.message);
-                    localStorage.setItem('token', response.data.token);
-                    handleRoleNavigation(response.data.token);
+                if (response.success) {
+                    message.success(response.message);
+                    localStorage.setItem('token', response.token);
+                    handleRoleNavigation(response.token);
                 }
             } catch (error) {
                 const errorMsg = error.response?.data?.message || 'Đăng nhập Google thất bại!';
@@ -189,10 +188,10 @@ const Login = () => {
                                             const res = await apiClient.post('/auth/facebook-login', {
                                                 accessToken: response.accessToken
                                             });
-                                            if (res.data.success) {
-                                                message.success(res.data.message || 'Đăng nhập Facebook thành công!');
-                                                localStorage.setItem('token', res.data.token);
-                                                handleRoleNavigation(res.data.token); 
+                                            if (res.success) {
+                                                message.success(res.message);
+                                                localStorage.setItem('token', res.token);
+                                                handleRoleNavigation(res.token); 
                                             }
                                         } catch (error) {
                                             message.error('Đăng nhập Facebook thất bại tại Server!');

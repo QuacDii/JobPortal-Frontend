@@ -60,7 +60,10 @@ const CvTemplateLibrary = () => {
     useEffect(() => {
         apiClient.get('/MauCv')
             .then(response => {
-                setCvTemplates(response.data || []);
+
+                const data = response.data !== undefined ? response.data : response;
+                
+                setCvTemplates(data || []);
                 setLoading(false);
             })
             .catch(error => {
@@ -111,9 +114,10 @@ const CvTemplateLibrary = () => {
         onSuccess: async (tokenResponse) => {
             try {
                 const response = await apiClient.post('/auth/google-login', { accessToken: tokenResponse.access_token });
-                if (response.data.success) {
+                const result = response.data !== undefined ? response.data : response;
+                if (result && result.success) {
                     message.success('Đăng nhập Google thành công!');
-                    localStorage.setItem('token', response.data.token);
+                    localStorage.setItem('token', result.token);
                     setIsModalOpen(false);
                     window.location.reload();
                 }

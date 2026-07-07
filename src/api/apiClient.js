@@ -15,8 +15,27 @@ apiClient.interceptors.request.use((config) => {
 }, (error) => Promise.reject(error));
 
 // Bộ lọc chặn dữ liệu trả về từ Server
+// Xử lý Response trả về từ Server
 apiClient.interceptors.response.use(
-    (response) => response, 
+    (response) => {
+        // Bước 1: Lột lớp vỏ mặc định của Axios
+        const resData = response.data;
+
+        // Bước 2: Tự động lột lớp vỏ của Backend (nếu có)
+        if (resData && typeof resData === 'object') {
+            // Trường hợp Backend bọc dữ liệu trong thuộc tính 'data' 
+            // (Ví dụ: { success: true, data: [...] })
+            if ('data' in resData && Object.keys(resData).length <= 3) {
+                return resData.data;
+            }
+            
+            // Trường hợp dữ liệu trực tiếp (ví dụ: { url: "..." } của MoMo)
+            return resData;
+        }
+
+        // Trường hợp trả về mảng trực tiếp [...] hoặc chuỗi/số
+        return resData;
+    }, 
     async (error) => {
         const originalRequest = error.config;
 

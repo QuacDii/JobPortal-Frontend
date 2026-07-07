@@ -28,13 +28,16 @@ const ServicePackage = () => {
     const [missingAmount, setMissingAmount] = useState(0);
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
+        // Đồng bộ cách lấy token giống hệt như bên Wallet.jsx
+        const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
         if (token) {
             try {
                 const decoded = jwtDecode(token);
                 const userId = decoded['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] || decoded.nameid || decoded.sub;
                 setMaUser(parseInt(userId, 10));
-            } catch (error) {}
+            } catch (error) {
+                console.error("Lỗi giải mã token:", error);
+            }
         }
         fetchData();
     }, []);
@@ -46,26 +49,38 @@ const ServicePackage = () => {
                 servicePackage.getHistory(),
                 servicePackage.getBalance()
             ]);
-            setPackages(pkgRes);
-            setHistory(histRes);
-            setBalance(balRes.soDuVi);
-            setNgayHetHan(balRes.ngayHetHanGoi);
-            setLuotXemCv(balRes.luotXemCvConLai || 0);
-            setTenGoiHienTai(balRes.tenGoiHienTai || 'Miễn phí');
-            setNgayMua(balRes.ngayMua || null);
+            
+            // Xử lý linh hoạt: Nếu có .data thì lấy, không thì lấy trực tiếp
+            const actualPkg = pkgRes?.data ? pkgRes.data : pkgRes;
+            const actualHist = histRes?.data ? histRes.data : histRes;
+            const actualBal = balRes?.data ? balRes.data : balRes;
+
+            setPackages(Array.isArray(actualPkg) ? actualPkg : []); 
+            setHistory(Array.isArray(actualHist) ? actualHist : []);
+            
+            // ÉP KIỂU VỀ NUMBER ĐỂ CHỐNG LỖI NaN
+            setBalance(Number(actualBal?.soDuVi) || 0);
+            setNgayHetHan(actualBal?.ngayHetHanGoi);
+            setLuotXemCv(Number(actualBal?.luotXemCvConLai) || 0);
+            setTenGoiHienTai(actualBal?.tenGoiHienTai || 'Miễn phí');
+            setNgayMua(actualBal?.ngayMua || null);
         } catch (error) {
             console.error("Lỗi lấy dữ liệu:", error);
+            setPackages([]);
         }
     };
 
-const handlePurchaseClick = (pkg) => {
-        const giaThucTe = (pkg.giaKhuyenMai && pkg.giaKhuyenMai > 0) ? pkg.giaKhuyenMai : pkg.giaTien;
+    const [selectedPkgId, setSelectedPkgId] = useState(null);
 
-        if (balance >= giaThucTe) {
-            // Kiểm tra xem khách có đang dùng gói VIP không
+    const handlePurchaseClick = (pkg) => {
+        // Ép kiểu chắc chắn là số
+        const giaGoc = Number(pkg.giaTien) || 0;
+        const giaKM = Number(pkg.giaKhuyenMai) || 0;
+        const giaThucTe = (giaKM > 0) ? giaKM : giaGoc;
+        const soDuHienTai = Number(balance) || 0;
+
+        if (soDuHienTai >= giaThucTe) {
             const isVipActive = ngayHetHan && new Date(ngayHetHan) > new Date();
-            
-            // Nếu đang dùng VIP, cảnh báo rõ ràng về việc thay đổi cấu trúc gói
             const contentMsg = isVipActive 
                 ? `LƯU Ý: Bạn đang sử dụng [${tenGoiHienTai}]. Nếu tiếp tục, hệ thống sẽ trừ ${giaThucTe.toLocaleString()}đ để kích hoạt [${pkg.tenGoi}]. Lượt xem CV sẽ được CỘNG DỒN và Hạn sử dụng sẽ được thay đổi theo quy định của gói mới. Bạn có chắc chắn?`
                 : `Hệ thống sẽ trừ ${giaThucTe.toLocaleString()} đ từ số dư ví để kích hoạt ${pkg.tenGoi}.`;
@@ -76,7 +91,7 @@ const handlePurchaseClick = (pkg) => {
                 content: contentMsg,
                 okText: isVipActive ? 'Đồng ý chuyển đổi' : 'Mua ngay',
                 cancelText: 'Hủy',
-                okButtonProps: { danger: isVipActive }, // Nút đỏ nếu là chuyển đổi gói
+                okButtonProps: { danger: isVipActive },
                 onOk: async () => {
                     try {
                         setLoading(true);
@@ -91,27 +106,42 @@ const handlePurchaseClick = (pkg) => {
                 }
             });
         } else {
-            // TÍCH HỢP NẠP TIỀN TẠI CHỖ KHI THIẾU TIỀN
-            const thieu = giaThucTe - balance;
+            // Tính số tiền thiếu an toàn
+            const thieu = giaThucTe - soDuHienTai;
             setMissingAmount(thieu);
             setTopupAmount(thieu < 10000 ? 10000 : thieu); 
+            setSelectedPkgId(pkg.maGoi);
             setIsTopupModalVisible(true);
         }
     };
 
-const handleTopupSubmit = async () => {
-        if (topupAmount < 10000) return toast.warning("Tối thiểu 10.000đ");
+    const handleTopupSubmit = async () => {
+        if (!maUser) {
+            toast.error("Không tìm thấy thông tin tài khoản, vui lòng đăng nhập lại!");
+            return;
+        }
+
+        const soTienNap = Number(topupAmount) || 0;
+        if (soTienNap < 10000) return toast.warning("Tối thiểu 10.000đ");
+
         try {
             setLoading(true);
-            const response = await paymentService.createPaymentUrl(maUser, topupAmount);
+            const response = await paymentService.createPaymentUrl(maUser, soTienNap);
             if (response && response.url) {
-                // LƯU VẾT: Ghi nhớ rằng user đang đứng ở trang Service Package
+                // LƯU VẾT
                 localStorage.setItem('payment_redirect', '/employer/service-package');
+
+                if (selectedPkgId) {
+                    localStorage.setItem('pending_purchase_package_id', selectedPkgId);
+                }
                 
                 toast.info("Chuyển hướng an toàn sang MoMo...");
                 window.location.href = response.url;
+            } else {
+                toast.error("Không nhận được URL thanh toán từ server!");
             }
         } catch (error) {
+            console.error("Lỗi nạp tiền MoMo:", error);
             toast.error("Lỗi kết nối MoMo.");
         } finally {
             setLoading(false);

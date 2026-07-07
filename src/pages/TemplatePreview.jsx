@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Row, Col, Radio, Button, Space, Typography, Breadcrumb, Spin, message, Select } from 'antd';
-import { ArrowLeftOutlined, EditOutlined, LoadingOutlined } from '@ant-design/icons';
 import apiClient from '../api/apiClient';
+import { UploadOutlined, ArrowLeftOutlined, EditOutlined, LoadingOutlined } from '@ant-design/icons';
+import { Row, Col, Radio, Button, Space, Typography, Breadcrumb, Spin, message, Select, Upload } from 'antd';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -15,20 +15,23 @@ const TemplatePreview = () => {
     const [loading, setLoading] = useState(true);
 
     // Các state cấu hình theo hình mẫu
-    const [sourceOption, setSourceOption] = useState('suggested'); 
-    const [languageOption, setLanguageOption] = useState('vi');   
-    const [positionOption, setPositionOption] = useState(null);    
-    const [positionsList, setPositionsList] = useState([]);        
+    const [sourceOption, setSourceOption] = useState('suggested');
+    const [languageOption, setLanguageOption] = useState('vi');
+    const [positionOption, setPositionOption] = useState(null);
+    const [positionsList, setPositionsList] = useState([]);
 
     useEffect(() => {
         const fetchTemplateDetail = async () => {
             try {
                 setLoading(true);
                 const response = await apiClient.get(`/MauCv/${id}`);
-                if (response.data) {
-                    setTemplate(response.data);
-                    if (response.data.ngonNgu) {
-                        setLanguageOption(response.data.ngonNgu);
+
+                const result = response.data !== undefined ? response.data : response;
+
+                if (result) {
+                    setTemplate(result);
+                    if (result.ngonNgu) {
+                        setLanguageOption(result.ngonNgu);
                     }
                 }
             } catch (error) {
@@ -49,10 +52,13 @@ const TemplatePreview = () => {
         const fetchPositions = async () => {
             try {
                 const response = await apiClient.get('/NganhNghe/danh-sach');
-                setPositionsList(response.data);
-                
-                if (response.data && response.data.length > 0) {
-                    setPositionOption(response.data[0].maNganh);
+
+                const result = response.data !== undefined ? response.data : response;
+
+                setPositionsList(result || []);
+
+                if (result && result.length > 0) {
+                    setPositionOption(result[0].maNganh);
                 }
             } catch (error) {
                 console.error("❌ Lỗi khi tải danh sách vị trí:", error);
@@ -60,9 +66,10 @@ const TemplatePreview = () => {
         };
 
         fetchPositions();
+
+        fetchPositions();
     }, []);
 
-    // 🔥 ĐÃ SỬA TẠI ĐÂY: Chuyển đường dẫn từ /tao-cv sang /builder để trỏ đúng vào file CvBuilder.jsx
     const handleStartBuilding = () => {
         navigate(`/builder?templateId=${id}&source=${sourceOption}&lang=${languageOption}&position=${positionOption || ''}`);
     };
@@ -145,17 +152,45 @@ const TemplatePreview = () => {
                             onChange={(e) => setSourceOption(e.target.value)}
                             style={{ width: '100%' }}
                         >
+                            {/* TÙY CHỌN 1: MẪU GỢI Ý */}
                             <Radio value="suggested">
                                 <div className="custom-radio-inner-text">
                                     <Text strong style={{ color: '#fff', fontSize: '15px' }}>Nội dung CV mẫu JobsNow gợi ý</Text>
 
                                     {sourceOption === 'suggested' && (
                                         <div style={{ marginTop: '16px' }} onClick={(e) => e.stopPropagation()}>
-                                            
-                                            <div style={{ marginBottom: '8px' }}><Text style={{ color: '#a6a6a6', fontSize: '13px' }}>Ngôn ngữ thiết kế</Text></div>
-                                            <Space style={{ marginBottom: '16px' }}>
-                                                <div className="lang-pill-badge">
-                                                    {languageOption === 'vi' ? 'Tiếng Việt' : 'Tiếng Anh (English)'}
+                                            <div style={{ marginBottom: '8px' }}>
+                                                <Text style={{ color: '#a6a6a6', fontSize: '13px' }}>Ngôn ngữ thiết kế</Text>
+                                            </div>
+                                            <Space style={{ marginBottom: '16px' }} wrap>
+                                                {/* 👉 NÚT TIẾNG VIỆT */}
+                                                <div
+                                                    className="lang-pill-badge"
+                                                    style={{
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease-in-out',
+                                                        backgroundColor: languageOption === 'vi' ? '#1890ff' : 'transparent',
+                                                        borderColor: languageOption === 'vi' ? '#1890ff' : '#333',
+                                                        color: languageOption === 'vi' ? '#fff' : '#a6a6a6'
+                                                    }}
+                                                    onClick={() => setLanguageOption('vi')}
+                                                >
+                                                    Tiếng Việt
+                                                </div>
+
+                                                {/* 👉 NÚT TIẾNG ANH */}
+                                                <div
+                                                    className="lang-pill-badge"
+                                                    style={{
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s ease-in-out',
+                                                        backgroundColor: languageOption === 'en' ? '#1890ff' : 'transparent',
+                                                        borderColor: languageOption === 'en' ? '#1890ff' : '#333',
+                                                        color: languageOption === 'en' ? '#fff' : '#a6a6a6'
+                                                    }}
+                                                    onClick={() => setLanguageOption('en')}
+                                                >
+                                                    Tiếng Anh (English)
                                                 </div>
                                             </Space>
 
@@ -179,12 +214,25 @@ const TemplatePreview = () => {
                                 </div>
                             </Radio>
 
+                            {/* TÙY CHỌN 2: TẢI FILE LÊN */}
                             <Radio value="upload-linkedin">
                                 <div className="custom-radio-inner-text">
                                     <Text strong style={{ color: '#fff', fontSize: '15px' }}>Nội dung CV từ máy tính của bạn</Text>
+
+                                    {/* 👉 Bổ sung nút Upload khi người dùng chọn mục này */}
+                                    {sourceOption === 'upload-linkedin' && (
+                                        <div style={{ marginTop: '12px' }} onClick={(e) => e.stopPropagation()}>
+                                            <Upload accept=".pdf,.doc,.docx" maxCount={1} beforeUpload={() => false}>
+                                                <Button icon={<UploadOutlined />} style={{ backgroundColor: '#242424', color: '#fff', borderColor: '#333' }}>
+                                                    Tải file CV lên (PDF, DOCX)
+                                                </Button>
+                                            </Upload>
+                                        </div>
+                                    )}
                                 </div>
                             </Radio>
 
+                            {/* TÙY CHỌN 3: TẠO TỪ ĐẦU */}
                             <Radio value="scratch">
                                 <div className="custom-radio-inner-text">
                                     <Text strong style={{ color: '#fff', fontSize: '15px' }}>Tạo CV từ đầu</Text>

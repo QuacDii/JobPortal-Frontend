@@ -14,8 +14,8 @@ const ForgotPassword = () => {
         setLoading(true);
         try {
             const response = await apiClient.post('/auth/forgot-password', { email: values.email });
-            if (response.data.success) {
-                message.success(response.data.message);
+            if (response.success) {
+                message.success(response.message);
             }
         } catch (error) {
             message.error(error.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại!');

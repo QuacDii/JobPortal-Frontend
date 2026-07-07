@@ -1,17 +1,17 @@
-import axiosClient from './axiosClient';
+import apiClient from '../api/apiClient';
 
 const servicePackage = {
     getPackages: () => {
-        return axiosClient.get('/Service/packages');
+        return apiClient.get('/Service/packages');
     },
     purchasePackage: (maGoi) => {
-        return axiosClient.post('/Service/purchase', { maGoi });
+        return apiClient.post('/Service/purchase', { maGoi });
     },
     getHistory: () => {
-        return axiosClient.get('/Service/history');
+        return apiClient.get('/Service/history');
     },
     getBalance: () => {
-        return axiosClient.get('/Service/balance');
+        return apiClient.get('/Service/balance');
     }
 };
 

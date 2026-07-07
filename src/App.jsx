@@ -6,6 +6,7 @@ import { Spin } from 'antd';
 import Register from './pages/Register';
 import RegisterChoose from './pages/RegisterChoose';
 import ResetPassword from './pages/ResetPassword';
+import JobDetail from './pages/JobDetail';
 import ForgotPassword from './pages/ForgotPassword';
 import CvTemplateLibrary from './pages/CvTemplateLibrary';
 import CvBuilder from './pages/CvBuilder';
@@ -27,6 +28,15 @@ import AdminDashboard from './pages/Admin/AdminDashboard';
 import Wallet from './pages/Wallet/Wallet';
 import PaymentSuccess from './pages/Payment/PaymentSuccess';
 import PaymentFailed from './pages/Payment/PaymentFailed';
+
+import CompanyProfile from './pages/Employer/CompanyProfile';
+import PostJob from './pages/Employer/PostJob';
+import CandidateFunnel from './pages/Employer/CandidateFunnel';
+import EmployerJobs from './components/EmployerJobs';
+
+import CvHunter from './pages/Employer/CvHunter';
+
+
 import ServicePackage from './pages/Employer/ServicePackage';
 
 const App = () => {
@@ -131,8 +141,41 @@ const App = () => {
           element={user && user.vaiTro === "1" ? <AdminLayout user={user}><Wallet /></AdminLayout> : <Navigate to="/login" replace />}
         />
         <Route
+          path="/employer/jobs"
+          element={user?.vaiTro === "1" ? <AdminLayout user={user}><EmployerJobs /></AdminLayout> : <Navigate to="/login" replace />}
+        />
+
+        {/* Quản lý phễu ứng viên của 1 tin cụ thể (Chú ý có :maViTri ở cuối) */}
+        <Route
+          path="/employer/candidate-funnel/:maViTri"
+          element={user?.vaiTro === "1" ? <AdminLayout user={user}><CandidateFunnel /></AdminLayout> : <Navigate to="/login" replace />}
+        />
+
+        {/* Đưa Ví và Gói dịch vụ vào Layout của Nhà tuyển dụng */}
+        <Route
+          path="/employer/wallet"
+          element={user && user.vaiTro === "1" ? <AdminLayout user={user}><Wallet /></AdminLayout> : <Navigate to="/login" replace />}
+        />
+        <Route
           path="/employer/service-package"
           element={user && user.vaiTro === "1" ? <AdminLayout user={user}><ServicePackage /></AdminLayout> : <Navigate to="/login" replace />}
+        />
+
+        {/* Quản lý hồ sơ công ty */}
+        <Route
+          path="/employer/company-profile"
+          element={user && user.vaiTro === "1" ? <AdminLayout user={user}><CompanyProfile /></AdminLayout> : <Navigate to="/login" replace />}
+        />
+
+        {/* Quản lý tuyển dụng */}
+        <Route
+          path="/employer/post-job"
+          element={user && user.vaiTro === "1" ? <AdminLayout user={user}><PostJob /></AdminLayout> : <Navigate to="/login" replace />}
+        />
+
+        <Route
+          path="/employer/cv-hunter"
+          element={user && user.vaiTro === "1" ? <AdminLayout user={user}><CvHunter /></AdminLayout> : <Navigate to="/login" replace />}
         />
 
         {/* ================= TRANG ỨNG VIÊN ================= */}
@@ -140,6 +183,19 @@ const App = () => {
           path="/manage-cv"
           element={user ? <CandidateLayout user={user}><ManageCv /></CandidateLayout> : <Navigate to="/login" replace />}
         />
+
+        <Route path="/" element={<Home />} />
+        {/* Cấu hình đường dẫn động nhận maViTri làm tham số */}
+        <Route
+          path="/job/:id"
+          element={
+            <CandidateLayout user={user}> 
+              <JobDetail />
+            </CandidateLayout>
+          }
+        />
+        {/* Các route khác của bạn */}
+
         <Route path="/xem-cv/:id" element={<ViewCv />} />
 
         <Route path="/thu-vien-cv" element={<CandidateLayout user={user}><CvTemplateLibrary /></CandidateLayout>} />
