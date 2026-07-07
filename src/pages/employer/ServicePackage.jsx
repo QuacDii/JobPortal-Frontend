@@ -120,21 +120,14 @@ const ServicePackage = () => {
             toast.error("Không tìm thấy thông tin tài khoản, vui lòng đăng nhập lại!");
             return;
         }
-
         const soTienNap = Number(topupAmount) || 0;
         if (soTienNap < 10000) return toast.warning("Tối thiểu 10.000đ");
-
         try {
             setLoading(true);
-            const response = await paymentService.createPaymentUrl(maUser, soTienNap);
+            const response = await paymentService.createPaymentUrl(maUser, soTienNap, selectedPkgId);
             if (response && response.url) {
-                // LƯU VẾT
                 localStorage.setItem('payment_redirect', '/employer/service-package');
 
-                if (selectedPkgId) {
-                    localStorage.setItem('pending_purchase_package_id', selectedPkgId);
-                }
-                
                 toast.info("Chuyển hướng an toàn sang MoMo...");
                 window.location.href = response.url;
             } else {
