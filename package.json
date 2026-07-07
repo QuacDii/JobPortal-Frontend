@@ -16,6 +16,7 @@
     "antd": "^6.4.3",
     "axios": "^1.16.1",
     "html2canvas": "^1.4.1",
+    "html2pdf": "^0.0.11",
     "html2pdf.js": "^0.14.0",
     "jwt-decode": "^4.0.0",
     "react": "^19.2.6",
