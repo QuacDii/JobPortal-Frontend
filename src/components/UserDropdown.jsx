@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // 👉 ĐÃ THÊM: Import thư viện chuyển trang
 import { Popover, Avatar, Menu, Typography, Divider } from 'antd';
+import axios from 'axios'; 
 import {
     DownOutlined,
     SolutionOutlined,
@@ -12,11 +14,39 @@ import {
 const { Text } = Typography;
 
 const UserDropdown = ({ user, onLogout }) => {
-    const [isHovered, setIsHovered] = useState(false);
+    const navigate = useNavigate(); // 👉 ĐÃ THÊM: Khởi tạo hàm chuyển trang
+
+    // 1. STATE LƯU TRỮ LINK ẢNH REALTIME LẤY TỪ CV CHÍNH
+    const [liveAvatar, setLiveAvatar] = useState(null);
 
     const displayName = user?.hoTen || 'Người dùng';
     const displayEmail = user?.email || 'Chưa cập nhật email';
-    const displayAvatar = user?.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${displayName}`;
+
+    // 2. 🔄 TỰ ĐỘNG GỌI API LẤY ẢNH CV CHÍNH KHI ĐĂNG NHẬP THÀNH CÔNG
+    useEffect(() => {
+        if (user?.maUser) {
+            axios.get(`http://localhost:5279/api/Cv/primary-avatar/${user.maUser}`)
+                .then(res => {
+                    if (res.data && res.data.url) {
+                        setLiveAvatar(res.data.url); 
+                    }
+                })
+                .catch(err => {
+                    console.error("Lỗi đồng bộ ảnh đại diện từ CV:", err);
+                });
+        }
+    }, [user]);
+
+    const displayAvatar = liveAvatar || user?.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${displayName}`;
+
+    const handleLogout = () => {
+        if (onLogout) {
+            onLogout();
+        } else {
+            localStorage.clear();
+            window.location.href = '/';
+        }
+    };
 
     const menuItems = [
         {
@@ -26,8 +56,6 @@ const UserDropdown = ({ user, onLogout }) => {
             children: [
                 { key: 'viec-lam-da-luu', label: 'Việc làm đã lưu' },
                 { key: 'viec-lam-da-ung-tuyen', label: 'Việc làm đã ứng tuyển' },
-                { key: 'viec-lam-phu-hop', label: 'Việc làm phù hợp với bạn' },
-                { key: 'cai-dat-goi-y', label: 'Cài đặt gợi ý việc làm' },
             ],
         },
         {
@@ -35,27 +63,16 @@ const UserDropdown = ({ user, onLogout }) => {
             icon: <FilePdfOutlined style={{ fontSize: 18 }} />,
             label: <span style={{ fontWeight: 500 }}>Quản lý CV & Cover letter</span>,
             children: [
-                { key: 'cv-cua-toi', label: 'CV của tôi' },
-                { key: 'cover-letter', label: 'Cover Letter của tôi' },
-                { key: 'nha-tuyen-dung-ket-noi', label: 'Nhà tuyển dụng muốn kết nối với bạn' },
-                { key: 'nha-tuyen-dung-xem-ho-so', label: 'Nhà tuyển dụng xem hồ sơ' },
+                { 
+                    key: 'cv-cua-toi', 
+                    label: 'CV của tôi',
+                    onClick: () => navigate('/manage-cv')
+                },
+                { 
+                    key: 'cover-letter', 
+                    label: 'Cover Letter của tôi' 
+                },
             ],
-        },
-        {
-            key: 'cai-dat-email',
-            icon: <SettingOutlined style={{ fontSize: 18 }} />,
-            label: <span style={{ fontWeight: 500 }}>Cài đặt email & thông báo</span>,
-            children: [
-                { key: 'thong-bao-he-thong', label: 'Thông báo từ hệ thống' }
-            ]
-        },
-        {
-            key: 'ca-nhan-bao-mat',
-            icon: <SafetyOutlined style={{ fontSize: 18 }} />,
-            label: <span style={{ fontWeight: 500 }}>Cá nhân & Bảo mật</span>,
-            children: [
-                { key: 'doi-mat-khau', label: 'Đổi mật khẩu' }
-            ]
         },
         {
             type: 'divider',
@@ -66,63 +83,49 @@ const UserDropdown = ({ user, onLogout }) => {
             className: 'logout-item',
             icon: <LogoutOutlined style={{ fontSize: 18 }} />, 
             label: <span style={{ fontWeight: 500 }}>Đăng xuất</span>, 
-            onClick: onLogout
+            onClick: handleLogout
         }
     ];
 
     const popoverContent = (
         <div style={{ width: '340px', paddingBottom: '8px' }}>
-            {/* CSS BÚA TẠ: Đè bẹp mọi style ngầm của theme="dark" */}
             <style>{`
-               /* 1. Reset mọi thứ về màu xám */
                 .my-custom-menu.ant-menu-dark .ant-menu-item,
                 .my-custom-menu.ant-menu-dark .ant-menu-submenu-title,
                 .my-custom-menu.ant-menu-dark .ant-menu-item .anticon,
-                .my-custom-menu.ant-menu-dark .ant-menu-submenu-title .anticon,
                 .my-custom-menu.ant-menu-dark .ant-menu-item span,
                 .my-custom-menu.ant-menu-dark .ant-menu-submenu-title span {
                     color: #a6a6a6 !important;
                 }
-
-                /* 2. ĐÁNH BAY NỀN XANH ĐEN CỦA MENU CON */
-                .my-custom-menu.ant-menu-dark .ant-menu-sub,
-                .my-custom-menu.ant-menu-dark .ant-menu-sub .ant-menu-item {
+                
+                .my-custom-menu.ant-menu-dark .ant-menu-sub {
                     background-color: transparent !important;
                 }
-
-                /* 3. Hover menu (CHA VÀ CON): Xanh dương, Không nền */
-                .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover,
-                .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover .anticon,
-                .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover span,
+                
                 .my-custom-menu.ant-menu-dark .ant-menu-item:not(.logout-item):hover,
-                .my-custom-menu.ant-menu-dark .ant-menu-item:not(.logout-item):hover .anticon,
-                .my-custom-menu.ant-menu-dark .ant-menu-item:not(.logout-item):hover span {
+                .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover {
                     background-color: transparent !important;
+                }
+                .my-custom-menu.ant-menu-dark .ant-menu-item:not(.logout-item):hover span,
+                .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover span,
+                .my-custom-menu.ant-menu-dark .ant-menu-item:not(.logout-item):hover .anticon,
+                .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover .anticon {
                     color: #1890ff !important;
                 }
-
-                /* 4. CHỈ giữ màu xanh cho TIÊU ĐỀ CHA khi đang mở */
-                .my-custom-menu.ant-menu-dark .ant-menu-submenu-open > .ant-menu-submenu-title,
-                .my-custom-menu.ant-menu-dark .ant-menu-submenu-open > .ant-menu-submenu-title .anticon,
-                .my-custom-menu.ant-menu-dark .ant-menu-submenu-open > .ant-menu-submenu-title span {
-                    color: #1890ff !important;
-                }
-
-                /* 5. Nút Đăng xuất: Màu Đỏ mặc định (Tăng sức mạnh để không bị màu xám đè) */
+                
                 .my-custom-menu.ant-menu-dark .logout-item,
-                .my-custom-menu.ant-menu-dark .logout-item .anticon,
-                .my-custom-menu.ant-menu-dark .logout-item span {
+                .my-custom-menu.ant-menu-dark .logout-item span,
+                .my-custom-menu.ant-menu-dark .logout-item .anticon {
                     color: #ff4d4f !important;
                 }
-
-                /* 6. Hover Đăng xuất: CHỈ áp màu nền cho thẻ bọc ngoài cùng, các thẻ con chỉ đổi màu chữ */
+                
                 .my-custom-menu.ant-menu-dark .logout-item:hover {
-                    background-color: rgba(255, 77, 79, 0.1) !important;
+                    background-color: rgba(255, 77, 79, 0.08) !important;
                     border-radius: 6px !important;
                 }
-                .my-custom-menu.ant-menu-dark .logout-item:hover .anticon,
-                .my-custom-menu.ant-menu-dark .logout-item:hover span {
-                    background-color: transparent !important; /* Xóa nền thừa của các thẻ con */
+                .my-custom-menu.ant-menu-dark .logout-item:hover span,
+                .my-custom-menu.ant-menu-dark .logout-item:hover .anticon {
+                    background-color: transparent !important;
                     color: #ff7875 !important;
                 }
             `}</style>
@@ -130,12 +133,8 @@ const UserDropdown = ({ user, onLogout }) => {
             <div style={{ display: 'flex', alignItems: 'center', padding: '16px 20px', gap: '12px' }}>
                 <Avatar size={56} src={displayAvatar} style={{ border: '2px solid #00b14f' }} />
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>
-                        {displayName}
-                    </Text>
-                    <Text style={{ color: '#8c8c8c', fontSize: 12, marginTop: 2 }}>
-                        {displayEmail}
-                    </Text>
+                    <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>{displayName}</Text>
+                    <Text style={{ color: '#8c8c8c', fontSize: 12, marginTop: 2 }}>{displayEmail}</Text>
                 </div>
             </div>
 
@@ -157,27 +156,9 @@ const UserDropdown = ({ user, onLogout }) => {
             trigger="hover" 
             placement="bottomRight"
             arrow={false}
-            overlayInnerStyle={{ 
-                backgroundColor: '#212121', 
-                padding: 0, 
-                border: '1px solid #333', 
-                borderRadius: '8px',
-                boxShadow: '0 4px 24px rgba(0,0,0,0.4)'
-            }}
+            overlayInnerStyle={{ backgroundColor: '#212121', padding: 0, border: '1px solid #333', borderRadius: '8px' }}
         >
-            <div 
-                onMouseEnter={() => setIsHovered(true)} 
-                onMouseLeave={() => setIsHovered(false)}
-                style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    cursor: 'pointer', 
-                    gap: '8px',     
-                    padding: '4px 12px', 
-                    borderRadius: '20px',
-                    transition: 'all 0.3s ease'
-                }}
-            >
+            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px', padding: '4px 12px', borderRadius: '20px' }}>
                 <Avatar src={displayAvatar} />
                 <span style={{ color: '#fff', fontWeight: 500 }}>{displayName}</span>
                 <DownOutlined style={{ color: '#a6a6a6', fontSize: 12 }} />

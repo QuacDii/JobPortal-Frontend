@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Layout, Menu, Button, Avatar, Space } from 'antd';
 import { 
     UserOutlined, LogoutOutlined, MenuUnfoldOutlined, MenuFoldOutlined, 
-    DashboardOutlined, TeamOutlined, FileSearchOutlined, 
-    WalletOutlined, ShoppingCartOutlined, BuildOutlined, AppstoreOutlined
+    DashboardOutlined, TeamOutlined, BuildOutlined, AppstoreOutlined,
+    WalletOutlined, ShoppingCartOutlined, SafetyCertificateOutlined, 
+    DatabaseOutlined, CheckSquareOutlined, EnvironmentOutlined, 
+    TagOutlined, ApartmentOutlined
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -23,41 +25,61 @@ const AdminLayout = ({ children, user }) => {
         navigate(e.key); 
     };
 
-    // PHÂN CHIA LẠI CẤU TRÚC MENU CHUẨN XÁC
+    // 👉 PHÂN CHIA LẠI CẤU TRÚC MENU THEO YÊU CẦU HÌNH ẢNH
     const menuItems = user?.vaiTro === "0" ? [
-        { key: '/admin/dashboard', icon: <DashboardOutlined />, label: 'Tổng quan Admin' },
-        { key: '/admin/users', icon: <TeamOutlined />, label: 'Quản lý Người dùng' },
-        { key: '/admin/news', icon: <FileSearchOutlined />, label: 'Phê duyệt Tin tức' },
-    ] : [
         { 
-            key: '/employer/dashboard', 
+            key: '/admin/dashboard', 
             icon: <DashboardOutlined />, 
-            label: 'Bảng điều khiển' 
+            label: 'Tổng quan Admin' 
         },
         { type: 'divider' },
         {
-            key: 'sub-recruitment',
-            icon: <AppstoreOutlined />,
-            label: 'Quản lý Tuyển dụng',
+            key: 'sub-approval',
+            icon: <SafetyCertificateOutlined />,
+            label: 'Kiểm duyệt hệ thống',
             children: [
-                { key: '/employer/post-job', label: 'Đăng tin tuyển dụng' }, // Cập nhật tên cho dễ hiểu
+                { key: '/admin/approve-companies', icon: <ApartmentOutlined />, label: 'Duyệt Doanh nghiệp' },
+                { key: '/admin/approve-campaigns', icon: <CheckSquareOutlined />, label: 'Duyệt Chiến dịch' },
+            ]
+        },
+        {
+            key: 'sub-categories',
+            icon: <DatabaseOutlined />,
+            label: 'Quản lý Danh mục',
+            children: [
+                { key: '/admin/categories/industries', icon: <AppstoreOutlined />, label: 'Ngành nghề' },
+                { key: '/admin/categories/skills', icon: <TagOutlined />, label: 'Kỹ năng' },
+                { key: '/admin/categories/cities', icon: <EnvironmentOutlined />, label: 'Thành phố' },
+                { key: '/admin/categories/wards', icon: <EnvironmentOutlined />, label: 'Phường / Xã' },
+            ]
+        },
+        { type: 'divider' },
+        { 
+            key: '/admin/users', 
+            icon: <TeamOutlined />, 
+            label: 'Quản lý Người dùng' 
+        }
+    ] : [
+        // Menu dành cho Nhà tuyển dụng (Giữ nguyên)
+        { key: '/employer/dashboard', icon: <DashboardOutlined />, label: 'Bảng điều khiển' },
+        { type: 'divider' },
+        {
+            key: 'sub-recruitment', icon: <AppstoreOutlined />, label: 'Quản lý Tuyển dụng',
+            children: [
+                { key: '/employer/post-job', label: 'Đăng tin tuyển dụng' },
                 { key: '/employer/jobs', label: 'Danh sách tin đã đăng' },
                 { key: '/employer/cv-hunter', label: 'Săn ứng viên (CV Hunt)' },
             ]
         },
         {
-            key: 'sub-company',
-            icon: <BuildOutlined />,
-            label: 'Hồ sơ Doanh nghiệp',
+            key: 'sub-company', icon: <BuildOutlined />, label: 'Hồ sơ Doanh nghiệp',
             children: [
                 { key: '/employer/company-profile', label: 'Thông tin Công ty' } 
             ]
         },
         { type: 'divider' }, 
         {
-            key: 'sub-finance',
-            icon: <WalletOutlined />,
-            label: 'Tài chính & Dịch vụ',
+            key: 'sub-finance', icon: <WalletOutlined />, label: 'Tài chính & Dịch vụ',
             children: [
                 { key: '/employer/service-package', icon: <ShoppingCartOutlined />, label: 'Cửa hàng Dịch vụ' },
                 { key: '/employer/wallet', label: 'Ví điện tử MoMo' },
@@ -65,10 +87,11 @@ const AdminLayout = ({ children, user }) => {
         }
     ];
 
-    // Mẹo nhỏ: Mở sẵn các SubMenu dựa trên URL hiện tại (Đã tối ưu)
-    const defaultOpenKeys = ['sub-recruitment', 'sub-company', 'sub-finance'].filter(key => {
+    // Mở sẵn các SubMenu dựa trên URL hiện tại
+    const defaultOpenKeys = ['sub-approval', 'sub-categories', 'sub-recruitment', 'sub-company', 'sub-finance'].filter(key => {
+        if (key === 'sub-approval' && location.pathname.includes('/admin/approve-')) return true;
+        if (key === 'sub-categories' && location.pathname.includes('/admin/categories')) return true;
         if (key === 'sub-recruitment' && (location.pathname.includes('/post-job') || location.pathname.includes('/jobs') || location.pathname.includes('/cv-hunter'))) return true;
-        if (key === 'sub-recruitment' && (location.pathname.includes('/post-job') || location.pathname.includes('/candidate-funnel'))) return true;
         if (key === 'sub-company' && location.pathname.includes('/company-profile')) return true; 
         if (key === 'sub-finance' && (location.pathname.includes('/wallet') || location.pathname.includes('/service-package'))) return true;
         return false;
@@ -76,7 +99,7 @@ const AdminLayout = ({ children, user }) => {
 
     return (
         <Layout style={{ minHeight: '100vh' }}>
-            <Sider width={250} trigger={null} collapsible collapsed={collapsed} theme="dark">
+            <Sider width={260} trigger={null} collapsible collapsed={collapsed} theme="dark">
                 <div style={{ height: 64, display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff', fontSize: 20, fontWeight: '900', background: '#002140', letterSpacing: '1px' }}>
                     {collapsed ? 'JN' : 'JOBSNOW PANEL'}
                 </div>

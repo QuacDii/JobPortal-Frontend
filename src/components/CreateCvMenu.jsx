@@ -74,8 +74,12 @@ const CreateCvMenu = () => {
                     transition: all 0.2s ease;
                 }
                 .mega-menu-title:hover .anticon {
-                    transform: translateX(4px); /* Mũi tên nhích nhẹ sang phải khi hover */
+                    transform: translateX(4px); 
                     transition: transform 0.2s;
+                }
+
+                .mega-menu-title:hover {
+                    text-decoration: underline;
                 }
             `}</style>
 
@@ -90,7 +94,7 @@ const CreateCvMenu = () => {
                 <div className="mega-menu-item" onClick={() => handleMenuClick('/thu-vien-cv')}><StarOutlined style={{ fontSize: 16 }} /> Mẫu CV Chuyên nghiệp</div>
                 <div className="mega-menu-item" onClick={() => handleMenuClick('/thu-vien-cv')}><BankOutlined style={{ fontSize: 16 }} /> Mẫu CV Harvard</div>
 
-                <div style={{ height: '12px' }}></div> {/* Khoảng cách giữa 2 nhóm */}
+                <div style={{ height: '12px' }}></div>
 
                 {/* Nhóm 2 */}
                 <div className="mega-menu-title" onClick={() => handleMenuClick('/thu-vien-cv')}>

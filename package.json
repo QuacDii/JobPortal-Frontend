@@ -11,15 +11,19 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.2.3",
+    "@hello-pangea/dnd": "^18.0.1",
     "@react-oauth/google": "^0.13.5",
     "antd": "^6.4.3",
     "axios": "^1.16.1",
+    "html2canvas": "^1.4.1",
+    "html2pdf.js": "^0.14.0",
     "jwt-decode": "^4.0.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-toastify": "^11.1.0",
     "react-facebook-login": "^4.1.1",
-    "react-router-dom": "^7.15.1"
+    "react-router-dom": "^7.15.1",
+    "react-toastify": "^11.1.0",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
