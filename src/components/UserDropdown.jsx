@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom'; // 👉 ĐÃ THÊM: Import thư viện chuyển trang
 import { Popover, Avatar, Menu, Typography, Divider } from 'antd';
-import axios from 'axios'; 
+import apiClient from '../api/apiClient';
 import {
     DownOutlined,
     SolutionOutlined,
@@ -25,7 +25,7 @@ const UserDropdown = ({ user, onLogout }) => {
     // 2. 🔄 TỰ ĐỘNG GỌI API LẤY ẢNH CV CHÍNH KHI ĐĂNG NHẬP THÀNH CÔNG
     useEffect(() => {
         if (user?.maUser) {
-            axios.get(`http://localhost:5279/api/Cv/primary-avatar/${user.maUser}`)
+            apiClient.get(`/Cv/primary-avatar/${user.maUser}`)
                 .then(res => {
                     if (res.data && res.data.url) {
                         setLiveAvatar(res.data.url); 

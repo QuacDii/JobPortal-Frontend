@@ -59,8 +59,6 @@ apiClient.interceptors.response.use(
                 });
 
                 if (res.data.success) {
-                    // ⚠️ ÔNG LƯU Ý: Check xem Backend trả về tên biến là 'token' hay 'accessToken' nhé.
-                    // Tui tạm để đồng bộ theo kiểu code cũ của ông:
                     const newAccessToken = res.data.token || res.data.accessToken;
                     const newRefreshToken = res.data.refreshToken;
 

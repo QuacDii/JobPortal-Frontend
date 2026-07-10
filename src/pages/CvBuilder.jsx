@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import useCvStore from '../store/useCvStore';
-import axios from 'axios';
+import apiClient from '../api/apiClient';
 import LayoutManager from '../components/LayoutManager';
 import html2canvas from 'html2canvas';
 import html2pdf from 'html2pdf.js';
@@ -94,11 +94,23 @@ const CvBuilder = () => {
             try {
                 if (cvId && token) {
                     // KỊCH BẢN 1: CHỈNH SỬA CV ĐÃ LƯU
-                    const res = await axios.get(`http://localhost:5279/api/Cv/${cvId}`, { headers: { 'Authorization': `Bearer ${token}` } });
-                    if (res.data) {
-                        if (res.data.tieuDe) setCvTitle(res.data.tieuDe);
-                        const layoutJson = res.data.customLayoutJson ? (typeof res.data.customLayoutJson === 'string' ? JSON.parse(res.data.customLayoutJson) : res.data.customLayoutJson) : null;
-                        const contentData = res.data.duLieuCv ? (typeof res.data.duLieuCv === 'string' ? JSON.parse(res.data.duLieuCv) : res.data.duLieuCv) : null;
+                    const res = await apiClient.get(`/Cv/${cvId}`);
+                    
+                    // Giải pháp phòng vệ đa tầng: Tự động tương thích với mọi loại Interceptor bóc tách
+                    const actualCv = res?.data ? res.data : res;
+                    
+                    if (actualCv) {
+                        if (actualCv.tieuDe) setCvTitle(actualCv.tieuDe);
+                        
+                        // Tiến hành chuyển đổi chuỗi JSON thô sang Object cấu trúc bản vẽ
+                        const layoutJson = actualCv.customLayoutJson 
+                            ? (typeof actualCv.customLayoutJson === 'string' ? JSON.parse(actualCv.customLayoutJson) : actualCv.customLayoutJson) 
+                            : null;
+                            
+                        const contentData = actualCv.duLieuCv 
+                            ? (typeof actualCv.duLieuCv === 'string' ? JSON.parse(actualCv.duLieuCv) : actualCv.duLieuCv) 
+                            : null;
+                            
                         setInitialData(layoutJson, contentData);
                     }
                 } else {
@@ -165,9 +177,8 @@ const CvBuilder = () => {
                     // 👉 2. LẤY BẢN VẼ JSON TỪ DATABASE
                     if (templateId) {
                         try {
-                            const templateRes = await axios.get(`http://localhost:5279/api/MauCv/${templateId}`);
-                            let rawData = templateRes.data.layoutJson || templateRes.data.LayoutJson;
-
+                            const templateRes = await apiClient.get(`/MauCv/${templateId}`);
+                            let rawData = templateRes?.layoutJson || templateRes?.LayoutJson || templateRes?.data?.layoutJson;
                             if (rawData) {
                                 try {
                                     // BƯỚC 1: Dọn dẹp ký tự ẩn (BOM) và khoảng trắng thừa do Copy/Paste
@@ -277,8 +288,8 @@ const CvBuilder = () => {
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
                 const formData = new FormData();
                 formData.append('file', blob, 'cv_screenshot.png');
-                const uploadRes = await axios.post('http://localhost:5279/api/Upload/image', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-                uploadedImageUrl = uploadRes.data.url;
+                const uploadRes = await apiClient.post('/Upload/image', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                uploadedImageUrl = uploadRes?.url || uploadRes?.data?.url || uploadRes;
             }
 
             const layoutJsonData = useCvStore.getState().layoutSchema;
@@ -291,10 +302,12 @@ const CvBuilder = () => {
                 fontChu: fontFamily, ngonNgu: lang || 'vi'
             };
 
-            await axios.post('http://localhost:5279/api/Cv', payload, { headers: { 'Authorization': `Bearer ${token}` } });
+            await apiClient.post('/Cv', payload);
             hideLoading(); message.success('Lưu hồ sơ thành công!'); navigate('/manage-cv');
         } catch (err) {
-            hideLoading(); message.error('Lỗi khi lưu dữ liệu!');
+            hideLoading(); 
+            const errorMessage = err.response?.data?.message || err.data?.message || 'Lỗi hệ thống khi lưu dữ liệu CV!';
+            message.error(errorMessage);
         }
     };
 
@@ -432,8 +445,25 @@ const CvBuilder = () => {
                                 <Card title={<span style={{ color: '#fff' }}>Thông tin cá nhân</span>} size="small" bordered={false} style={{ backgroundColor: '#242424', borderRadius: '8px' }}>
                                     <Form layout="vertical" requiredMark={false}>
                                         <Form.Item label={<span className="custom-form-label">Ảnh đại diện</span>}>
-                                            <Upload name="file" listType="picture-card" showUploadList={false} action="http://localhost:5279/api/Upload/image" onChange={handleCvImageUpload}>
-                                                {cvData?.personalInfo?.avatar ? <img src={cvData.personalInfo.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} /> : <span style={{ color: '#a6a6a6' }}>{imageLoading ? <LoadingOutlined /> : <PlusOutlined />}<div style={{ marginTop: 8 }}>Tải ảnh</div></span>}
+                                            <Upload 
+                                                name="file" 
+                                                listType="picture-card" 
+                                                showUploadList={false} 
+                                                action="http://localhost:5279/api/Upload/image" 
+                                                headers={{
+                                                    Authorization: `Bearer ${localStorage.getItem('token')}`
+                                                }}
+                                                
+                                                onChange={handleCvImageUpload}
+                                            >
+                                                {cvData?.personalInfo?.avatar ? (
+                                                    <img src={cvData.personalInfo.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
+                                                ) : (
+                                                    <span style={{ color: '#a6a6a6' }}>
+                                                        {imageLoading ? <LoadingOutlined /> : <PlusOutlined />}
+                                                        <div style={{ marginTop: 8 }}>Tải ảnh</div>
+                                                    </span>
+                                                )}
                                             </Upload>
                                         </Form.Item>
                                         <Form.Item label={<span className="custom-form-label">Họ và Tên</span>}><Input name="fullName" value={cvData.personalInfo.fullName} onChange={handlePersonalInfoChange} className="custom-input" /></Form.Item>

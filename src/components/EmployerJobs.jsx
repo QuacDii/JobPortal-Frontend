@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Tag, Button, Space, message, Badge } from 'antd';
-import { FilterOutlined, EyeOutlined } from '@ant-design/icons';
+import { FilterOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 
@@ -13,18 +13,27 @@ const EmployerJobs = () => {
         fetchMyJobs();
     }, []);
 
+    // Lấy danh sách vị trí việc làm của công ty
     const fetchMyJobs = async () => {
         setLoading(true);
         try {
-            // Cập nhật đúng port 5279 của bạn
             const response = await apiClient.get('/employer/my-jobs');
-            setJobs(response);
+            
+            const resData = response?.data || response;
+            if (resData && resData.status === "SUCCESS") {
+                setJobs(resData.data || []);
+            } else if (Array.isArray(resData)) {
+                setJobs(resData);
+            } else if (resData && Array.isArray(resData.data)) {
+                setJobs(resData.data);
+            }
         } catch (error) {
             message.error("Lỗi khi tải danh sách tin tuyển dụng");
         }
         setLoading(false);
     };
 
+    // Định nghĩa các cột hiển thị trong bảng
     const columns = [
         {
             title: 'Chiến dịch / Vị trí',
@@ -42,10 +51,13 @@ const EmployerJobs = () => {
             title: 'Trạng thái',
             dataIndex: 'trangThai',
             key: 'trangThai',
-            render: (status) => (
-                status === 1 ? <Tag color="green">Đang hiển thị</Tag> 
-                             : <Tag color="orange">Chờ duyệt / Ẩn</Tag>
-            )
+            render: (status) => {
+                // Phân rã hiển thị nhãn theo từng mã trạng thái nghiệp vụ
+                if (status === 0) return <Tag color="orange">Chờ duyệt</Tag>;
+                if (status === 1) return <Tag color="green">Đang hiển thị</Tag>;
+                if (status === 2) return <Tag color="red">Bị từ chối / Đã đóng</Tag>;
+                return <Tag color="default">Ẩn</Tag>;
+            }
         },
         {
             title: 'Ứng viên',
@@ -60,14 +72,15 @@ const EmployerJobs = () => {
             key: 'action',
             render: (text, record) => (
                 <Space size="middle">
-                    <Button 
-                        type="primary" 
-                        icon={<FilterOutlined />} 
-                        // Điều hướng sang trang phễu ứng viên kèm theo tham số maViTri trên URL
-                        onClick={() => navigate(`/employer/candidate-funnel/${record.maViTri}`)}
-                    >
-                        Xem Phễu
-                    </Button>
+                    {record.trangThai === 1 && (
+                        <Button 
+                            type="primary" 
+                            icon={<FilterOutlined />} 
+                            onClick={() => navigate(`/employer/candidate-funnel/${record.maViTri}`)}
+                        >
+                            Xem Phễu
+                        </Button>
+                    )}
                 </Space>
             )
         }

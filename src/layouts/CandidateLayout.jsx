@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Layout, Space, Button, Modal, Form, Input } from 'antd';
 import { HomeOutlined, FileTextOutlined, LockOutlined, UserOutlined } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../api/apiClient';
 import UserDropdown from '../components/UserDropdown';
 import CreateCvMenu from '../components/CreateCvMenu';
 
@@ -30,7 +30,7 @@ const CandidateLayout = ({ children, user }) => {
     // 3. HÀM XỬ LÝ ĐĂNG NHẬP NHANH NGAY TRÊN POPUP
     const handlePopupLogin = (values) => {
         setLoginLoading(true);
-        axios.post('http://localhost:5279/api/Auth/login', values)
+        apiClient.post('/Auth/login', values)
             .then(res => {
                 localStorage.setItem('token', res.data.token);
                 setIsPopupOpen(false); // Đóng popup

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../api/apiClient';
 import { Row, Col, Card, Typography, Button, Space, Switch, Popconfirm, Spin, Empty, message, Avatar, Tooltip } from 'antd';
 import {
     EditOutlined,
@@ -48,17 +48,16 @@ const ManageCv = () => {
             navigate('/login');
             return;
         }
-
         setLoading(true);
-        axios.get(`http://localhost:5279/api/Cv/user/${userId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        })
+        apiClient.get(`/Cv/user/${userId}`)
             .then(res => {
-                setCvList(res.data);
+                const actualCvs = Array.isArray(res) ? res : (res?.data || []);
+                setCvList(actualCvs);
                 setLoading(false);
             })
             .catch(err => {
                 console.error("Lỗi lấy danh sách CV:", err);
+                setCvList([]); // Phòng vệ nếu lỗi thì mảng vẫn trống chứ không null
                 setLoading(false);
             });
     };
@@ -78,9 +77,11 @@ const ManageCv = () => {
         }
 
         if (userId) {
-            axios.get(`http://localhost:5279/api/Cv/primary-avatar/${userId}`)
+            apiClient.get(`/Cv/primary-avatar/${userId}`)
                 .then(res => {
-                    if (res.data && res.data.url) {
+                    if (res && res.url) {
+                        setLiveAvatar(res.url);
+                    } else if (res?.data?.url) {
                         setLiveAvatar(res.data.url);
                     }
                 })
@@ -97,7 +98,7 @@ const ManageCv = () => {
     };
 
     const handleDelete = (maCV) => {
-        axios.delete(`http://localhost:5279/api/Cv/${maCV}`, {
+        apiClient.delete(`/Cv/${maCV}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
             .then(() => {
@@ -108,7 +109,7 @@ const ManageCv = () => {
     };
 
     const handleSetPrimary = (maCV) => {
-        axios.put(`http://localhost:5279/api/Cv/set-primary/${maCV}?maUser=${userId}`, {}, {
+        apiClient.put(`/Cv/set-primary/${maCV}?maUser=${userId}`, {}, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
             .then(() => {
@@ -119,7 +120,7 @@ const ManageCv = () => {
     };
 
     const handleTogglePublic = (maCV, checked) => {
-        axios.put(`http://localhost:5279/api/Cv/toggle-public/${maCV}`, {}, {
+        apiClient.put(`/Cv/toggle-public/${maCV}`, {}, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
             .then(() => {
@@ -135,7 +136,7 @@ const ManageCv = () => {
             return;
         }
 
-        axios.put(`http://localhost:5279/api/Cv/rename/${maCV}`, { tieuDe: newTitle }, {
+        apiClient.put(`/Cv/rename/${maCV}`, { tieuDe: newTitle }, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
             .then(() => {
@@ -352,9 +353,9 @@ const ManageCv = () => {
                         <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid #333' }}>
                             <Title level={5} style={{ color: '#fff', marginBottom: '8px' }}>Cho phép NTD tìm kiếm hồ sơ</Title>
                             <Text style={{ color: '#8c8c8c', fontSize: '14px' }}>
-                                Có <strong style={{ color: '#1890ff' }}>{cvList.filter(cv => cv.isPublic).length} CV</strong> đang bật cho phép NTD tìm kiếm
+                                Có <strong style={{ color: '#1890ff' }}>{(cvList || []).filter(cv => cv.isPublic).length} CV</strong> đang bật cho phép NTD tìm kiếm
                             </Text>
-                            <Button type="default" style={{ marginTop: '16px', background: 'transparent', borderColor: '#1890ff', color: '#1890ff', borderRadius: '20px' }}>
+                                <Button type="default" style={{ marginTop: '16px', background: 'transparent', borderColor: '#1890ff', color: '#1890ff', borderRadius: '20px' }}>
                                 Quản lý danh sách
                             </Button>
                         </div>

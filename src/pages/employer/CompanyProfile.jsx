@@ -30,6 +30,7 @@ const CompanyProfile = () => {
                     quyMo: response.quyMo,
                     diaChi: response.diaChi,
                     moTa: response.moTa,
+                    mauEmailInterview: response.mauEmailInterview
                 });
                 setCompanyStatus(response.trangThai ? 1 : 0);
                 setCurrentLogo(response.logo);
@@ -51,6 +52,7 @@ const CompanyProfile = () => {
             formData.append('QuyMo', values.quyMo);
             formData.append('DiaChi', values.diaChi);
             formData.append('MoTa', values.moTa);
+            formData.append('MauEmailInterview', values.mauEmailInterview || '');
 
             // Nếu có chọn ảnh mới thì nhét vào FormData
             if (fileList.length > 0) {
@@ -143,6 +145,29 @@ const CompanyProfile = () => {
                             <Form.Item label="Giới thiệu về công ty" name="moTa">
                                 <TextArea rows={6} placeholder="Mô tả môi trường làm việc, văn hóa, và lĩnh vực hoạt động..." />
                             </Form.Item>
+                            <Form.Item 
+                                label="Mẫu Email mời phỏng vấn tùy chỉnh" 
+                                name="mauEmailInterview"
+                                // Di chuyển toàn bộ hướng dẫn xuống làm ghi chú chân dưới ô nhập liệu
+                                extra={
+                                    <div style={{ marginTop: 8, fontSize: '13px', color: '#595959', backgroundColor: '#f5f5f5', padding: '10px', borderRadius: '6px' }}>
+                                        <strong>💡 Hướng dẫn trộn dữ liệu động:</strong> Sao chép chuẩn xác các từ khóa dưới đây vào vị trí mong muốn trong thư:
+                                        <div style={{ marginTop: 6 }}>
+                                            <span style={{ color: '#c41d7f', fontWeight: 'bold', marginRight: 15 }}>{`{TenUngVien}`}</span>
+                                            <span style={{ color: '#c41d7f', fontWeight: 'bold', marginRight: 15 }}>{`{TenViTri}`}</span>
+                                            <span style={{ color: '#c41d7f', fontWeight: 'bold', marginRight: 15 }}>{`{ThoiGian}`}</span>
+                                            <span style={{ color: '#c41d7f', fontWeight: 'bold', marginRight: 15 }}>{`{DiaDiem}`}</span>
+                                            <span style={{ color: '#c41d7f', fontWeight: 'bold' }}>{`{TenCongTy}`}</span>
+                                        </div>
+                                    </div>
+                                }
+                            >
+                                {/* Placeholder lúc này chỉ cần ngắn gọn, sạch sẽ */}
+                                <TextArea 
+                                    rows={8} 
+                                    placeholder="Ví dụ: Chào {TenUngVien}, công ty {TenCongTy} trân trọng mời bạn phỏng vấn vị trí {TenViTri} vào lúc {ThoiGian} tại {DiaDiem}..." 
+                                />
+                            </Form.Item>
                         </Col>
 
                         <Col span={8} style={{ textAlign: 'center' }}>
@@ -179,6 +204,7 @@ const CompanyProfile = () => {
                         </Button>
                     </div>
                 </Form>
+
             </Card>
         </div>
     );

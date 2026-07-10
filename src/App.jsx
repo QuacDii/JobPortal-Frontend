@@ -33,6 +33,7 @@ import CompanyProfile from './pages/Employer/CompanyProfile';
 import PostJob from './pages/Employer/PostJob';
 import CandidateFunnel from './pages/Employer/CandidateFunnel';
 import EmployerJobs from './components/EmployerJobs';
+import CandidateAiDetail from './pages/Employer/CandidateAiDetail';
 
 import CvHunter from './pages/Employer/CvHunter';
 
@@ -150,7 +151,10 @@ const App = () => {
           path="/employer/candidate-funnel/:maViTri"
           element={user?.vaiTro === "1" ? <AdminLayout user={user}><CandidateFunnel /></AdminLayout> : <Navigate to="/login" replace />}
         />
-
+        <Route
+          path="/employer/applications/:maDon/ai-details"
+          element={user?.vaiTro === "1" ? <AdminLayout user={user}><CandidateAiDetail /></AdminLayout> : <Navigate to="/login" replace />}
+        />
         {/* Đưa Ví và Gói dịch vụ vào Layout của Nhà tuyển dụng */}
         <Route
           path="/employer/wallet"

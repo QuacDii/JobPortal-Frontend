@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../api/apiClient';
 import { Typography, Spin, Button, message } from 'antd';
 import { PrinterOutlined, PhoneFilled, MailFilled, EnvironmentFilled } from '@ant-design/icons';
 
@@ -16,7 +16,7 @@ const ViewCv = () => {
     useEffect(() => {
         const fetchCv = async () => {
             try {
-                const res = await axios.get(`http://localhost:5279/api/Cv/${id}`);
+                const res = await apiClient.get(`/Cv/${id}`);
                 if (res.data) {
                     setSettings({
                         themeColor: res.data.maHex || '#1890ff',
