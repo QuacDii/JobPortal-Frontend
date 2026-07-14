@@ -1,35 +1,38 @@
+
 import React, { useState, useEffect } from 'react';
 import useCvStore from '../store/useCvStore';
+<<<<<<< Updated upstream
 import apiClient from '../api/apiClient';
 import LayoutManager from '../components/LayoutManager';
+=======
+import axios from 'axios';
+>>>>>>> Stashed changes
 import html2canvas from 'html2canvas';
 import html2pdf from 'html2pdf.js';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Row, Col, Card, Form, Input, Typography, Divider, Button, Space, Upload, message, Spin, Select, Slider, Tooltip } from 'antd';
+import { ConfigProvider, theme, Input, Typography, Button, Space, message, Spin, Select, Slider, Tooltip } from 'antd';
 import {
-    PlusOutlined,
-    DeleteOutlined,
     DownloadOutlined,
     SaveOutlined,
     ArrowLeftOutlined,
     FileTextFilled,
     FormatPainterOutlined,
-    AppstoreAddOutlined,
+    PlusSquareOutlined,
     LayoutOutlined,
     SwapOutlined,
-    LoadingOutlined,
     CloseOutlined,
     UndoOutlined,
     RedoOutlined,
     EyeOutlined,
-    EditOutlined
+    BulbOutlined,
+    BookOutlined,
+    CheckOutlined
 } from '@ant-design/icons';
 
 import MasterTemplate from '../components/MasterTemplate';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 const { Option } = Select;
-const { TextArea } = Input;
 
 const getUserInfoFromToken = (token) => {
     if (!token) return null;
@@ -53,13 +56,14 @@ const getUserInfoFromToken = (token) => {
 
 const CvBuilder = () => {
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
 
     const templateId = searchParams.get('templateId') || '1';
     const cvId = searchParams.get('cvId');
     const source = searchParams.get('source');
-    const lang = searchParams.get('lang');
-    const positionId = searchParams.get('position');
+
+    // Quản lý ngôn ngữ chọn lựa trực tiếp
+    const [lang, setLang] = useState(searchParams.get('lang') || 'vi');
 
     const token = localStorage.getItem('token');
     const userInfo = getUserInfoFromToken(token);
@@ -67,25 +71,53 @@ const CvBuilder = () => {
 
     const [cvTitle, setCvTitle] = useState('CV chưa đặt tên');
     const [pageLoading, setPageLoading] = useState(false);
-    const [imageLoading, setImageLoading] = useState(false);
-
-    // Mặc định mở tab Nội dung để người dùng dễ nhập liệu
-    const [activeMenu, setActiveMenu] = useState('content');
+    const [activeMenu, setActiveMenu] = useState('design');
 
     const cvData = useCvStore(state => state.cvData);
-    const { fontFamily, fontSize, lineHeight, themeColor } = useCvStore(state => state.layoutSettings);
+    const { fontFamily, fontSize, lineHeight, themeColor, backgroundStyle } = useCvStore(state => state.layoutSettings || {});
 
     const setInitialData = useCvStore(state => state.setInitialData);
-    const updateCvData = useCvStore(state => state.updateCvData);
     const updateLayoutSetting = useCvStore(state => state.updateLayoutSetting);
 
-    // Bảng màu giống TopCV
-    const themeColors = ['#00b14f', '#1890ff', '#f5222d', '#fa8c16', '#722ed1', '#262626'];
+    // 🎨 Hệ thống tài nguyên cấu hình chuẩn giao diện TopCV
+    const themeColors = ['#574040', '#4e7b8b', '#4e8b7d', '#518b4e', '#6f4e8b', '#8b4e4e'];
+
     const fontOptions = [
+        { label: 'Be Vietnam Pro', value: '"Be Vietnam Pro", sans-serif' },
         { label: 'Roboto', value: 'Roboto, sans-serif' },
         { label: 'Arial', value: 'Arial, sans-serif' },
-        { label: 'Times New Roman', value: '"Times New Roman", serif' },
         { label: 'Nunito', value: 'Nunito, sans-serif' }
+    ];
+
+    // Khấc chia định vị kích thước chữ cố định chuẩn cấu trúc mẫu đồ họa
+    const fontSizeMarks = {
+        12: 'Nhỏ',
+        14: { style: { color: '#00b14f' }, label: 'Trung bình' },
+        17: 'Siêu lớn'
+    };
+
+    // Khấc chia tỷ lệ giãn dòng cố định
+    const lineHeightMarks = {
+        1.0: '1.0',
+        1.15: '',
+        1.3: '',
+        1.45: '',
+        1.6: '',
+        1.75: '',
+        1.9: '',
+        2.0: '2.0'
+    };
+
+    // Kho mẫu hình nền họa tiết trừu tượng cao cấp
+    const bgPatterns = [
+        { id: 'none', name: 'Mặc định', value: 'none', css: '#141414' },
+        { id: 'pt1', name: 'Gradient Classic', value: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)', css: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)' },
+        { id: 'pt2', name: 'Dark Abstract', value: 'linear-gradient(to right, #243b55, #141e30)', css: 'linear-gradient(to right, #243b55, #141e30)' },
+        { id: 'pt3', name: 'Deep Purple', value: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)', css: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)' },
+        { id: 'pt4', name: 'Premium Mesh', value: 'linear-gradient(45deg, #859398 0%, #283048 100%)', css: 'linear-gradient(45deg, #859398 0%, #283048 100%)' },
+        { id: 'pt5', name: 'Cyberpunk Dark', value: 'linear-gradient(60deg, #29323c 0%, #485563 100%)', css: 'linear-gradient(60deg, #29323c 0%, #485563 100%)' },
+        { id: 'pt6', name: 'Luxury Wine', value: 'linear-gradient(135deg, #e65245 0%, #240b36 100%)', css: 'linear-gradient(135deg, #e65245 0%, #240b36 100%)' },
+        { id: 'pt7', name: 'Soft Dark', value: 'linear-gradient(to top, #1e3c72 0%, #1e3c72 1%, #111111 100%)', css: 'linear-gradient(to top, #1e3c72 0%, #1e3c72 1%, #111111 100%)' }
     ];
 
     useEffect(() => {
@@ -93,6 +125,7 @@ const CvBuilder = () => {
             setPageLoading(true);
             try {
                 if (cvId && token) {
+<<<<<<< Updated upstream
                     // KỊCH BẢN 1: CHỈNH SỬA CV ĐÃ LƯU
                     const res = await apiClient.get(`/Cv/${cvId}`);
                     
@@ -111,104 +144,74 @@ const CvBuilder = () => {
                             ? (typeof actualCv.duLieuCv === 'string' ? JSON.parse(actualCv.duLieuCv) : actualCv.duLieuCv) 
                             : null;
                             
+=======
+                    // 1. LUỒNG TẢI LẠI CV ĐÃ LƯU
+                    const res = await axios.get(`http://localhost:5279/api/Cv/${cvId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (res.data) {
+                        if (res.data.tieuDe) setCvTitle(res.data.tieuDe);
+
+                        if (res.data.maHex) {
+                            updateLayoutSetting('themeColor', res.data.maHex);
+                        }
+
+                        const layoutJson = res.data.customLayoutJson ? (typeof res.data.customLayoutJson === 'string' ? JSON.parse(res.data.customLayoutJson) : res.data.customLayoutJson) : null;
+                        const contentData = res.data.duLieuCv ? (typeof res.data.duLieuCv === 'string' ? JSON.parse(res.data.duLieuCv) : res.data.duLieuCv) : null;
+>>>>>>> Stashed changes
                         setInitialData(layoutJson, contentData);
                     }
                 } else {
-                    let initialContent = {};
-
-                    // ⚡ KIỂM TRA LỰA CHỌN CỦA NGƯỜI DÙNG TỪ URL
-                    if (source === 'scratch') {
-                        // LỰA CHỌN 1: TỜ GIẤY TRẮNG TINH
-                        initialContent = {
-                            personalInfo: { fullName: '', jobTitle: '', email: '', phone: '', address: '', avatar: '' },
-                            summary: '', skills: '', experience: [], education: [], activities: [], projects: [], awards: [], certificates: [], references: [], hobbies: ''
-                        };
-                    }
-                    else if (source === 'suggested') {
-                        // LỰA CHỌN 2: BƠM DỮ LIỆU MỒI ĐÚNG CHUYÊN NGÀNH
-                        initialContent = {
-                            personalInfo: {
-                                fullName: 'Đặng Quốc Duy',
-                                jobTitle: 'Software Engineer Intern',
-                                email: userInfo?.email || 'dangquocduy2004@gmail.com',
-                                phone: '0123 456 789',
-                                address: 'TP.HCM / Cần Thơ',
-                                avatar: ''
-                            },
-                            summary: 'Định hướng phát triển chuyên sâu về Backend và hệ thống nhúng (Embedded). Trải qua quá trình học tập, tôi đã tích lũy kinh nghiệm làm việc với Java, .NET và quản lý mã nguồn qua GitHub. Mục tiêu của tôi là áp dụng kiến thức vào các dự án thực tế và không ngừng học hỏi để trở thành một Software Engineer toàn diện.',
-                            skills: 'Ngôn ngữ: Java, C# (.NET)\nCông cụ: GitHub, Git\nĐịnh hướng: Backend, Frontend, Embedded Software',
-                            experience: [],
-                            education: [
-                                { id: 1, time: '2022 - Hiện tại', school: 'Đại học / Học viện', major: 'Kỹ thuật phần mềm (Software Engineering)', description: '• Tham gia các khóa học chuyên sâu về thuật toán và phát triển phần mềm.' }
-                            ],
-                            projects: [
-                                {
-                                    id: 1,
-                                    name: 'Thực tập chuyên ngành: Hệ thống vé rạp chiếu phim',
-                                    technologies: 'Java, .NET',
-                                    role: 'Backend Developer',
-                                    description: '• Tham gia kiểm thử (testing) và quản lý hệ thống đặt vé đa nền tảng.\n• Tối ưu luồng dữ liệu xử lý vé cho các suất chiếu khung giờ tối (19:30 - 22:40).',
-                                    link: 'https://github.com/your-profile'
-                                }
-                            ],
-                            activities: [], awards: [], certificates: [], references: [], hobbies: 'Đọc sách, Cập nhật công nghệ mới'
-                        };
-
-                        // Nếu người dùng chọn ngôn ngữ tiếng Anh
-                        if (lang === 'en') {
-                            initialContent.summary = 'Software Engineering student oriented towards Backend and Embedded systems...';
-                            initialContent.personalInfo.jobTitle = 'Software Engineer Intern';
-                            // (Bạn có thể thêm logic dịch tiếng Anh cho các trường khác tại đây)
-                        }
-                    }
-                    else if (source === 'upload-linkedin') {
-                        // LỰA CHỌN 3: BÓC TÁCH DỮ LIỆU TỪ FILE ĐÃ TẢI LÊN
-                        message.info("Hệ thống đang trích xuất dữ liệu từ CV của bạn...");
-                        // Tạm thời trả về form trống cho đến khi Backend làm xong API bóc tách
-                        initialContent = {
-                            personalInfo: { fullName: '', jobTitle: '', email: '', phone: '', address: '', avatar: '' },
-                            summary: '', skills: '', experience: [], education: [], activities: [], projects: [], awards: [], certificates: [], references: [], hobbies: ''
-                        };
-                    }
+                    let initialContent = {
+                        personalInfo: {
+                            fullName: userInfo?.fullName || '',
+                            jobTitle: '',
+                            email: userInfo?.email || '',
+                            phone: '',
+                            address: '',
+                            avatar: '',
+                            dob: '',
+                            website: ''
+                        },
+                        summary: '',
+                        skills: [
+                            { name: '' },
+                            { name: '' },
+                            { name: '' }
+                        ],
+                        experience: [],
+                        education: [
+                            { id: 1, startDate: '', endDate: '', school: '', major: '', description: '' }
+                        ],
+                        projects: [], activities: [], awards: [], certificates: [], hobbies: ''
+                    };
                     setCvTitle(`CV_${(userInfo?.fullName || 'UngVien').replace(/\s+/g, '')}_Moi`);
 
                     let templateLayout = null;
-
-                    // 👉 2. LẤY BẢN VẼ JSON TỪ DATABASE
                     if (templateId) {
                         try {
+<<<<<<< Updated upstream
                             const templateRes = await apiClient.get(`/MauCv/${templateId}`);
                             let rawData = templateRes?.layoutJson || templateRes?.LayoutJson || templateRes?.data?.layoutJson;
+=======
+                            const templateRes = await axios.get(`http://localhost:5279/api/MauCV/${templateId}`);
+
+                            const dbColor = templateRes.data.maHex || templateRes.data.MaHex;
+                            const finalTemplateColor = dbColor || (templateId === '3' ? '#5b423b' : '#00b14f');
+
+                            // Cập nhật mã màu gốc vào State thiết kế của thanh Sidebar trái
+                            updateLayoutSetting('themeColor', finalTemplateColor);
+
+                            let rawData = templateRes.data.layoutJson || templateRes.data.LayoutJson;
+>>>>>>> Stashed changes
                             if (rawData) {
-                                try {
-                                    // BƯỚC 1: Dọn dẹp ký tự ẩn (BOM) và khoảng trắng thừa do Copy/Paste
-                                    if (typeof rawData === 'string') {
-                                        rawData = rawData.replace(/^\uFEFF/, '').trim();
-                                    }
-
-                                    // BƯỚC 2: Dịch chuỗi thành Object
-                                    let parsedData = typeof rawData === 'object' ? rawData : JSON.parse(rawData);
-
-                                    // BƯỚC 3: Chống lỗi Double-Serialization từ Backend (.NET)
-                                    if (typeof parsedData === 'string') {
-                                        parsedData = JSON.parse(parsedData);
-                                    }
-
-                                    templateLayout = parsedData;
-                                    console.log("✅ NẠP BẢN VẼ THÀNH CÔNG:", templateLayout);
-
-                                } catch (parseError) {
-                                    console.error("🔴 LỖI CÚ PHÁP JSON TỪ DATABASE:", parseError);
-                                    console.log("CHUỖI BỊ LỖI LÀ:", rawData);
-                                    alert("Mã JSON trong SQL Server bị lỗi cú pháp! Hãy mở tab Console (F12) để xem chi tiết.");
-                                }
+                                if (typeof rawData === 'string') rawData = rawData.replace(/^\uFEFF/, '').trim();
+                                let parsedData = typeof rawData === 'object' ? rawData : JSON.parse(rawData);
+                                if (typeof parsedData === 'string') parsedData = JSON.parse(parsedData);
+                                templateLayout = parsedData;
                             }
                         } catch (err) {
-                            console.error("Lỗi gọi API lấy Mẫu CV:", err);
+                            console.error("Lỗi gọi API hoặc lỗi vỡ định dạng JSON:", err);
                         }
                     }
-
-                    // 👉 3. BƠM CẢ BẢN VẼ VÀ DỮ LIỆU MỒI VÀO CỖ MÁY
                     setInitialData(templateLayout, initialContent);
                 }
             } catch (err) {
@@ -218,46 +221,16 @@ const CvBuilder = () => {
             }
         };
         initializeCvData();
-    }, [cvId, templateId, token, source, lang, positionId, userInfo?.fullName, userInfo?.email, setInitialData]);
+    }, [cvId, templateId, token, source, userInfo?.fullName, userInfo?.email, setInitialData]);
 
-    const handleCvImageUpload = (info) => {
-        if (info.file.status === 'uploading') { setImageLoading(true); return; }
-        if (info.file.status === 'done') {
-            setImageLoading(false);
-            updateCvData('personalInfo', { ...cvData.personalInfo, avatar: info.file.response.url });
-            message.success('Tải ảnh thành công!');
-        } else if (info.file.status === 'error') {
-            setImageLoading(false); message.error('Tải ảnh thất bại!');
-        }
-    };
-
-    const handlePersonalInfoChange = (e) => {
-        const { name, value } = e.target;
-        updateCvData('personalInfo', { ...cvData.personalInfo, [name]: value });
-    };
-
-    const handleTextChange = (e) => {
-        const { name, value } = e.target;
-        updateCvData(name, value);
-    };
-
-    const addExperience = () => {
-        const newExp = { id: Date.now(), time: '', title: '', description: '' };
-        updateCvData('experience', [...cvData.experience, newExp]);
-    };
-
-    const removeExperience = (id) => {
-        updateCvData('experience', cvData.experience.filter(item => item.id !== id));
-    };
-
-    const handleExperienceChange = (id, field, value) => {
-        const updatedExp = cvData.experience.map(item => item.id === id ? { ...item, [field]: value } : item);
-        updateCvData('experience', updatedExp);
+    const handleLanguageToggle = (selectedLang) => {
+        setLang(selectedLang);
+        setSearchParams({ templateId, source, lang: selectedLang });
+        message.success(`Đã chuyển đổi cấu trúc ngôn ngữ hiển thị: ${selectedLang === 'vi' ? 'Tiếng Việt' : 'Tiếng Anh'}`);
     };
 
     const handleDownloadPDF = () => {
         const element = document.querySelector('.cv-preview-page');
-
         const opt = {
             margin: 0,
             filename: `${cvTitle || 'CV_Cua_Toi'}.pdf`,
@@ -265,13 +238,10 @@ const CvBuilder = () => {
             html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
-
         message.loading({ content: 'Đang tạo PDF...', key: 'pdf_loading' });
-
         html2pdf().set(opt).from(element).save().then(() => {
             message.success({ content: 'Tải PDF thành công!', key: 'pdf_loading', duration: 2 });
         }).catch(err => {
-            console.error("Lỗi xuất PDF:", err);
             message.error({ content: 'Có lỗi xảy ra khi tải PDF!', key: 'pdf_loading', duration: 2 });
         });
     };
@@ -299,7 +269,7 @@ const CvBuilder = () => {
                 maCv: cvId ? parseInt(cvId) : null, maUser: parseInt(userId), maMau: parseInt(templateId),
                 maHex: themeColor, tieuDe: cvTitle, duLieuCv: JSON.stringify(contentDataToSave),
                 customLayoutJson: JSON.stringify(layoutJsonData), isPublic: true, duongDan: uploadedImageUrl,
-                fontChu: fontFamily, ngonNgu: lang || 'vi'
+                fontChu: fontFamily, ngonNgu: lang
             };
 
             await apiClient.post('/Cv', payload);
@@ -315,46 +285,65 @@ const CvBuilder = () => {
 
     return (
         <div className="cv-builder-wrapper" style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#141414', overflow: 'hidden' }}>
-
             <style>{`
-                /* HEADER TOPCV STYLE */
                 .cv-builder-header { background-color: #1a1a1a; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; z-index: 10; }
                 .cv-title-input { color: #fff !important; font-weight: 500; font-size: 15px; background-color: transparent !important; border: 1px solid transparent !important; padding: 4px 8px; width: 300px; transition: 0.3s; }
                 .cv-title-input:hover, .cv-title-input:focus { border-color: #333 !important; background-color: #242424 !important; border-radius: 4px; }
                 
                 .builder-body { display: flex; flex: 1; height: calc(100vh - 65px); overflow: hidden; }
                 
-                /* SIDEBAR TOPCV STYLE */
-                .sidebar-menu { width: 90px; min-width: 90px; flex-shrink: 0; background-color: #1a1a1a; border-right: 1px solid #333; display: flex; flex-direction: column; align-items: center; padding-top: 16px; }
-                .menu-btn { width: 100%; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #a6a6a6; cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; }
+                .sidebar-menu { width: 90px; min-width: 90px; flex-shrink: 0; background-color: #1a1a1a; border-right: 1px solid #333; display: flex; flex-direction: column; align-items: center; padding-top: 16px; overflow-y: auto; }
+                .sidebar-menu::-webkit-scrollbar { display: none; }
+                .menu-btn { width: 100%; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #a6a6a6; cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; }
                 .menu-btn:hover { background-color: #242424; color: #fff; }
                 .menu-btn.active { background-color: rgba(0, 177, 79, 0.1); color: #00b14f; border-left: 3px solid #00b14f; }
-                .menu-btn .anticon { font-size: 22px; margin-bottom: 6px; }
+                .menu-btn .anticon { font-size: 20px; margin-bottom: 6px; }
                 .menu-btn span { font-size: 11px; text-align: center; font-weight: 500; }
 
-                /* SETTINGS / CONTENT PANEL */
-                .settings-panel { width: 380px; min-width: 380px; background-color: #1f1f1f; border-right: 1px solid #333; display: flex; flex-direction: column; transition: all 0.3s ease; }
+                .settings-panel { width: 340px; min-width: 340px; background-color: #1f1f1f; border-right: 1px solid #333; display: flex; flex-direction: column; transition: all 0.3s ease; }
                 .settings-panel.hidden { width: 0; min-width: 0; border: none; overflow: hidden; }
                 .panel-header { padding: 16px 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
                 .panel-content { flex: 1; overflow-y: auto; padding: 20px; }
                 .panel-content::-webkit-scrollbar { width: 6px; }
                 .panel-content::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
 
-                /* WORKSPACE (CV PREVIEW) */
                 .workspace-area { flex: 1; background-color: #0f0f0f; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: 40px; }
-                .workspace-area::-webkit-scrollbar { width: 8px; }
-                .workspace-area::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+                .cv-preview-page { 
+    background-color: #ffffff !important; 
+    color: #333333 !important;
+    
+    color-scheme: light !important; 
+    
+    width: 210mm; 
+    min-height: 297mm; 
+    border-radius: 4px; 
+    box-shadow: 0 12px 48px rgba(0,0,0,0.6); 
+    overflow: hidden; 
+    flex-shrink: 0; 
+    position: relative; 
+}
+
+.cv-preview-page * {
+    color-scheme: light !important;
+}
                 
-                .cv-preview-page { background-color: #ffffff !important; width: 210mm; min-height: 297mm; border-radius: 4px; box-shadow: 0 12px 48px rgba(0,0,0,0.6); color: #333; overflow: hidden; flex-shrink: 0; }
-                
-                /* CUSTOM FORMS & SLIDERS */
-                .custom-form-label { color: #a6a6a6 !important; font-size: 13px; margin-bottom: 4px; display: block; }
+                .custom-form-label { color: #a6a6a6 !important; font-size: 12px; margin-bottom: 10px; display: block; font-weight: bold; text-transform: uppercase;}
                 .custom-input { background-color: #141414 !important; color: #fff !important; border: 1px solid #333 !important; border-radius: 6px; }
                 .custom-input:focus { border-color: #00b14f !important; box-shadow: none !important; }
                 
                 .color-circle { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; display: inline-block; }
                 .color-circle:hover { transform: scale(1.1); }
                 .color-circle.active { border-color: #fff; box-shadow: 0 0 0 2px #00b14f; }
+
+                .topcv-lang-button { background: #262626; border: 1px solid #434343; color: #a6a6a6; font-weight: 500; padding: 6px 16px; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+                .topcv-lang-button:hover { color: #fff; border-color: #595959; }
+                .topcv-lang-button.active { background: rgba(0, 177, 79, 0.08); border-color: #00b14f; color: #00b14f; }
+
+                .bg-pattern-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
+                .bg-pattern-item { height: 75px; border-radius: 4px; cursor: pointer; position: relative; border: 2px solid transparent; overflow: hidden; transition: 0.15s; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+                .bg-pattern-item:hover { transform: translateY(-2px); }
+                .bg-pattern-item.active { border-color: #00b14f; }
+                .bg-pattern-check-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.2); display: flex; justify-content: center; align-items: center; color: #00b14f; font-size: 18px; font-weight: bold; }
             `}</style>
 
             {/* HEADER */}
@@ -381,64 +370,107 @@ const CvBuilder = () => {
                     <div className={`menu-btn ${activeMenu === 'design' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'design' ? null : 'design')}>
                         <FormatPainterOutlined /><span>Thiết kế & Font</span>
                     </div>
-                    <div className={`menu-btn ${activeMenu === 'content' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'content' ? null : 'content')}>
-                        <EditOutlined /><span>Nội dung CV</span>
+                    <div className={`menu-btn ${activeMenu === 'add-section' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'add-section' ? null : 'add-section')}>
+                        <PlusSquareOutlined /><span>Thêm mục</span>
                     </div>
                     <div className={`menu-btn ${activeMenu === 'layout' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'layout' ? null : 'layout')}>
                         <LayoutOutlined /><span>Bố cục</span>
                     </div>
-                    <div className={`menu-btn ${activeMenu === 'templates' ? 'active' : ''}`} onClick={() => navigate('/thu-vien-cv')}>
+                    <div className={`menu-btn ${activeMenu === 'change-template' ? 'active' : ''}`} onClick={() => navigate('/thu-vien-cv')}>
                         <SwapOutlined /><span>Đổi mẫu CV</span>
+                    </div>
+                    <div className={`menu-btn ${activeMenu === 'tips' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'tips' ? null : 'tips')}>
+                        <BulbOutlined /><span>Gợi ý viết CV</span>
+                    </div>
+                    <div className="menu-btn" onClick={() => navigate('/thu-vien-cv')}>
+                        <BookOutlined /><span>Thư viện CV</span>
                     </div>
                 </div>
 
-                {/* SETTINGS / CONTENT PANEL */}
+                {/* SETTINGS PANEL */}
                 <div className={`settings-panel no-print ${!activeMenu ? 'hidden' : ''}`}>
                     {activeMenu && (
                         <div className="panel-header">
                             <Title level={5} style={{ color: '#fff', margin: 0 }}>
                                 {activeMenu === 'design' && 'Thiết kế & Font'}
-                                {activeMenu === 'content' && 'Chỉnh sửa Nội dung'}
+                                {activeMenu === 'add-section' && 'Thêm mục CV'}
                                 {activeMenu === 'layout' && 'Quản lý Bố cục'}
+                                {activeMenu === 'tips' && 'Gợi ý viết CV'}
                             </Title>
                             <Button type="text" icon={<CloseOutlined />} style={{ color: '#8c8c8c' }} onClick={() => setActiveMenu(null)} />
                         </div>
                     )}
 
                     <div className="panel-content">
-                        {/* TAB 1: THIẾT KẾ */}
+                        {/* TAB 1: THIẾT KẾ & FONT */}
                         {activeMenu === 'design' && (
                             <div>
+                                <div style={{ marginBottom: '24px' }}>
+                                    <span className="custom-form-label">NGÔN NGỮ CV</span>
+                                    <Space size="small">
+                                        <button className={`topcv-lang-button ${lang === 'vi' ? 'active' : ''}`} onClick={() => handleLanguageToggle('vi')}>Tiếng Việt</button>
+                                        <button className={`topcv-lang-button ${lang === 'en' ? 'active' : ''}`} onClick={() => handleLanguageToggle('en')}>Tiếng Anh</button>
+                                    </Space>
+                                </div>
+
                                 <div style={{ marginBottom: '24px' }}>
                                     <span className="custom-form-label">FONT CHỮ</span>
                                     <Select value={fontFamily} onChange={(val) => updateLayoutSetting && updateLayoutSetting('fontFamily', val)} style={{ width: '100%' }} dropdownStyle={{ backgroundColor: '#242424', color: '#fff' }} className="custom-input">
                                         {fontOptions.map(font => <Option key={font.value} value={font.value}><span style={{ fontFamily: font.value }}>{font.label}</span></Option>)}
                                     </Select>
                                 </div>
-                                <div style={{ marginBottom: '24px' }}>
+
+                                <div style={{ marginBottom: '28px' }}>
                                     <span className="custom-form-label">CỠ CHỮ</span>
-                                    <Slider min={0} max={100} value={fontSize} onChange={(val) => updateLayoutSetting && updateLayoutSetting('fontSize', val)} tooltip={{ formatter: null }} trackStyle={{ backgroundColor: '#00b14f' }} handleStyle={{ borderColor: '#00b14f' }} />
+                                    <Slider min={12} max={17} step={1} value={fontSize || 14} marks={fontSizeMarks} onChange={(val) => updateLayoutSetting && updateLayoutSetting('fontSize', val)} tooltip={{ formatter: null }} trackStyle={{ backgroundColor: '#00b14f' }} handleStyle={{ borderColor: '#00b14f', backgroundColor: '#00b14f' }} />
                                 </div>
-                                <div style={{ marginBottom: '32px' }}>
+
+                                <div style={{ marginBottom: '32px', paddingTop: '8px' }}>
                                     <span className="custom-form-label">KHOẢNG CÁCH DÒNG</span>
-                                    <Slider min={1.0} max={2.0} step={0.1} value={lineHeight} onChange={(val) => updateLayoutSetting && updateLayoutSetting('lineHeight', val)} tooltip={{ formatter: null }} trackStyle={{ backgroundColor: '#00b14f' }} handleStyle={{ borderColor: '#00b14f' }} />
+                                    <Slider min={1.0} max={2.0} step={0.14} value={lineHeight || 1.45} marks={lineHeightMarks} onChange={(val) => updateLayoutSetting && updateLayoutSetting('lineHeight', val)} tooltip={{ formatter: null }} trackStyle={{ backgroundColor: '#00b14f' }} handleStyle={{ borderColor: '#00b14f', backgroundColor: '#00b14f' }} />
                                 </div>
-                                <div>
+
+                                <div style={{ marginBottom: '28px' }}>
                                     <span className="custom-form-label" style={{ marginBottom: '12px' }}>MÀU CHỦ ĐỀ</span>
-                                    <Space size="middle" wrap>
+                                    <Space size="middle" wrap style={{ marginBottom: '14px' }}>
                                         {themeColors.map(color => (
                                             <div key={color} className={`color-circle ${themeColor === color ? 'active' : ''}`} style={{ backgroundColor: color }} onClick={() => updateLayoutSetting && updateLayoutSetting('themeColor', color)} />
                                         ))}
                                     </Space>
 
-                                    {/* Khối gradient màu sắc mô phỏng TopCV */}
-                                    <div style={{ marginTop: '20px', height: '150px', borderRadius: '8px', background: 'linear-gradient(to right, #00b14f, #1890ff)', position: 'relative', border: '1px solid #333' }}>
-                                        <div style={{ position: 'absolute', bottom: '10px', right: '10px', color: '#fff', fontSize: '12px', background: 'rgba(0,0,0,0.5)', padding: '2px 8px', borderRadius: '4px' }}>Tùy chỉnh màu</div>
+                                    <div style={{ background: '#262626', padding: '12px', borderRadius: '6px', border: '1px solid #333' }}>
+                                        <div style={{ position: 'relative', width: '100%', height: '110px', borderRadius: '4px', overflow: 'hidden', background: 'linear-gradient(to right, #fff, transparent), linear-gradient(to top, #000, rgba(255,0,0,0)), red', marginBottom: '10px' }}>
+                                            <input type="color" value={themeColor || '#574040'} onChange={(e) => updateLayoutSetting && updateLayoutSetting('themeColor', e.target.value)} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} />
+                                            <div style={{ width: '100%', height: '100%', background: `linear-gradient(to top, #000000cc, transparent), linear-gradient(to right, #ffffffcc, ${themeColor || '#574040'})` }} />
+                                        </div>
+                                        <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                                            <div style={{ width: '45px', height: '28px', borderRadius: '4px', backgroundColor: themeColor || '#574040', border: '1px solid #434343' }} />
+                                            <Input size="small" value={(themeColor || '#574040').replace('#', '').toUpperCase()} onChange={(e) => {
+                                                const val = e.target.value;
+                                                if (val.length <= 6) updateLayoutSetting && updateLayoutSetting('themeColor', `#${val}`);
+                                            }} style={{ width: '180px', textAlign: 'center', fontFamily: 'monospace' }} className="custom-input" prefix="#" />
+                                        </Space>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <span className="custom-form-label">HÌNH NỀN CV</span>
+                                    <div className="bg-pattern-grid">
+                                        {bgPatterns.map(pattern => (
+                                            <div key={pattern.id} className={`bg-pattern-item ${backgroundStyle === pattern.value ? 'active' : ''}`} style={{ background: pattern.css }} onClick={() => updateLayoutSetting && updateLayoutSetting('backgroundStyle', pattern.value)}>
+                                                {backgroundStyle === pattern.value && (
+                                                    <div className="bg-pattern-check-overlay">
+                                                        <CheckOutlined />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
                         )}
 
+<<<<<<< Updated upstream
                         {/* TAB 2: NỘI DUNG CV (Đưa cụm Form cũ vào đây) */}
                         {activeMenu === 'content' && (
                             <Space direction="vertical" size="large" style={{ display: 'flex' }}>
@@ -653,20 +685,31 @@ const CvBuilder = () => {
                                     </Form>
                                 </Card>
                             </Space>
+=======
+                        {/* TAB THÊM MỤC */}
+                        {activeMenu === 'add-section' && (
+                            <div style={{ color: '#a6a6a6', textAlign: 'center', marginTop: '20px' }}>
+                                <p>Bật/tắt các mục phụ trong CV (Giải thưởng, Sở thích, Chứng chỉ...)</p>
+                                <Button type="dashed" style={{ borderColor: '#333', color: '#fff', background: 'transparent' }} block>+ Hoạt động</Button>
+                                <Button type="dashed" style={{ borderColor: '#333', color: '#fff', background: 'transparent', marginTop: 10 }} block>+ Chứng chỉ</Button>
+                            </div>
+>>>>>>> Stashed changes
                         )}
 
-                        {/* TAB 3: BỐ CỤC (Kéo thả) */}
+                        {/* TAB BỐ CỤC */}
                         {activeMenu === 'layout' && (
-                            <LayoutManager />
+                            <div style={{ color: '#fff' }}>Tính năng quản lý cột bố cục</div>
                         )}
                     </div>
                 </div>
 
-                {/* WORKSPACE - NƠI HIỂN THỊ CV */}
-                <div className="workspace-area">
-                    <div className="cv-preview-page">
-                        <MasterTemplate />
-                    </div>
+                {/* WORKSPACE AREA */}
+                <div className="workspace-area" style={{ background: backgroundStyle !== 'none' ? backgroundStyle : '#0f0f0f' }}>
+                    <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }}>
+                        <div className="cv-preview-page">
+                            <MasterTemplate />
+                        </div>
+                    </ConfigProvider>
                 </div>
             </div>
         </div>

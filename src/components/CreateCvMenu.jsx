@@ -1,165 +1,148 @@
-import React, { useState } from 'react';
-import { Popover, Divider, Typography } from 'antd';
-import { useNavigate } from 'react-router-dom';
-import {
-    ArrowRightOutlined,
-    AppstoreOutlined,
-    HighlightOutlined,
-    StarOutlined,
-    BankOutlined,
-    SolutionOutlined,
-    CodeOutlined,
-    CalculatorOutlined,
-    FundOutlined,   
-    ProfileOutlined,
-    CloudUploadOutlined,
-    ReadOutlined,
-    ContainerOutlined,
-    FormOutlined
-} from '@ant-design/icons';
-
-const { Text } = Typography;
+import React from 'react';
+import { Dropdown, Row, Col, Space } from 'antd';
+import { DownOutlined, AppstoreOutlined, StarOutlined, CrownOutlined, BankOutlined, SolutionOutlined, CodeOutlined, CalculatorOutlined, LineChartOutlined, ProfileOutlined, UploadOutlined, ReadOutlined, FileDoneOutlined, FormOutlined } from '@ant-design/icons';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const CreateCvMenu = () => {
-    const [open, setOpen] = useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
 
-    const handleMenuClick = (path) => {
-        setOpen(false); // Đóng cái menu màu đen lại
-        navigate(path); // Nhảy sang trang mới
+    // Điều hướng chung cho các nút chọn mẫu CV
+    const handleGoToTemplates = () => {
+        navigate('/thu-vien-cv');
     };
 
-    // ==========================================
-    // KHUNG GIAO DIỆN BÊN TRONG MEGA MENU
-    // ==========================================
-    const megaMenuContent = (
-        <div style={{ display: 'flex', width: '560px', padding: '8px 0' }}>
-            {/* CSS Tùy chỉnh cho Menu */}
-            <style>{`
-                .mega-menu-container {
-                    background-color: #212121;
-                }
-                
-                /* Hiệu ứng cho các mục thường */
-                .mega-menu-item {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    padding: 10px 16px;
-                    cursor: pointer;
-                    border-radius: 4px;
-                    color: #a6a6a6;
-                    transition: all 0.2s ease;
-                    font-size: 14px;
-                }
-                .mega-menu-item:hover {
-                    background-color: rgba(255, 255, 255, 0.05);
-                    color: #1890ff; 
-                }
-                .mega-menu-item:hover .anticon {
-                    color: #1890ff;
-                }
+    // Giao diện tùy chỉnh của Menu thả xuống (Mô phỏng 100% cấu trúc TopCV)
+    const customDropdownMenu = (
+        <div className="cv-mega-menu">
+            <Row gutter={32}>
+                {/* ================= CỘT TRÁI ================= */}
+                <Col span={14} className="menu-left-col">
+                    {/* Nhóm 1: Mẫu CV theo style */}
+                    <div className="menu-group">
+                        <div className="menu-group-title" onClick={handleGoToTemplates}>
+                            Mẫu CV theo style &rarr;
+                        </div>
+                        <div className="menu-item" onClick={handleGoToTemplates}>
+                            <AppstoreOutlined className="menu-icon" /> Mẫu CV Đơn giản
+                        </div>
+                        <div className="menu-item" onClick={handleGoToTemplates}>
+                            <StarOutlined className="menu-icon" /> Mẫu CV Ấn tượng
+                        </div>
+                        <div className="menu-item" onClick={handleGoToTemplates}>
+                            <CrownOutlined className="menu-icon" /> Mẫu CV Chuyên nghiệp
+                        </div>
+                        <div className="menu-item" onClick={handleGoToTemplates}>
+                            <BankOutlined className="menu-icon" /> Mẫu CV Harvard
+                        </div>
+                    </div>
 
-                /* Hiệu ứng cho các Tiêu đề có mũi tên */
-                .mega-menu-title {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    padding: 8px 16px;
-                    cursor: pointer;
-                    color: #1890ff;
+                    {/* Nhóm 2: Mẫu CV theo vị trí */}
+                    <div className="menu-group" style={{ marginTop: '20px' }}>
+                        <div className="menu-group-title" onClick={handleGoToTemplates}>
+                            Mẫu CV theo vị trí ứng tuyển &rarr;
+                        </div>
+                        <div className="menu-item" onClick={handleGoToTemplates}>
+                            <SolutionOutlined className="menu-icon" /> Nhân viên kinh doanh
+                        </div>
+                        <div className="menu-item" onClick={handleGoToTemplates}>
+                            <CodeOutlined className="menu-icon" /> Lập trình viên
+                        </div>
+                        <div className="menu-item" onClick={handleGoToTemplates}>
+                            <CalculatorOutlined className="menu-icon" /> Nhân viên kế toán
+                        </div>
+                        <div className="menu-item" onClick={handleGoToTemplates}>
+                            <LineChartOutlined className="menu-icon" /> Chuyên viên marketing
+                        </div>
+                    </div>
+                </Col>
+
+                {/* ================= CỘT PHẢI ================= */}
+                <Col span={10} className="menu-right-col">
+                    <div className="menu-group">
+                        <div className="menu-item right-item" onClick={() => navigate('/manage-cv')}>
+                            <ProfileOutlined className="menu-icon" /> Quản lý CV
+                        </div>
+                        <div className="menu-item right-item" onClick={() => navigate('/manage-cv')}>
+                            <UploadOutlined className="menu-icon" /> Tải CV lên
+                        </div>
+                        <div className="menu-item right-item" onClick={() => navigate('/thu-vien-cv')}>
+                            <ReadOutlined className="menu-icon" /> Hướng dẫn viết CV
+                        </div>
+                        
+                        <div style={{ height: '1px', backgroundColor: '#333', margin: '16px 0' }}></div>
+                        
+                        <div className="menu-item right-item">
+                            <FileDoneOutlined className="menu-icon" /> Quản lý Cover Letter
+                        </div>
+                        <div className="menu-item right-item">
+                            <FormOutlined className="menu-icon" /> Mẫu Cover Letter
+                        </div>
+                    </div>
+                </Col>
+            </Row>
+
+            {/* CSS Tùy chỉnh trực tiếp cho Menu */}
+            <style>{`
+                .cv-mega-menu {
+                    background-color: #1f1f1f;
+                    border-radius: 8px;
+                    padding: 24px;
+                    width: 500px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                    border: 1px solid #333;
+                }
+                .menu-group-title {
+                    color: #1890ff; /* Màu xanh dương chủ đạo thay vì xanh lá của TopCV */
                     font-weight: 600;
                     font-size: 14px;
-                    border-radius: 4px;
-                    transition: all 0.2s ease;
+                    margin-bottom: 12px;
+                    cursor: pointer;
+                    transition: all 0.2s;
                 }
-                .mega-menu-title:hover .anticon {
-                    transform: translateX(4px); 
-                    transition: transform 0.2s;
-                }
-
-                .mega-menu-title:hover {
+                .menu-group-title:hover {
+                    color: #40a9ff;
                     text-decoration: underline;
                 }
+                .menu-item {
+                    color: #d9d9d9;
+                    padding: 8px 12px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    font-size: 14px;
+                    transition: all 0.2s;
+                    margin-bottom: 4px;
+                }
+                .menu-item:hover {
+                    background-color: rgba(24, 144, 255, 0.1);
+                    color: #1890ff;
+                }
+                .menu-icon {
+                    margin-right: 12px;
+                    font-size: 16px;
+                    opacity: 0.8;
+                }
+                .menu-left-col {
+                    border-right: 1px solid #333;
+                }
+                .right-item {
+                    padding: 10px 12px;
+                }
             `}</style>
-
-            {/* CỘT TRÁI: CÁC MẪU CV (Trỏ về trang Thư viện CV) */}
-            <div style={{ flex: 1, padding: '0 8px' }}>
-                {/* Nhóm 1 */}
-                <div className="mega-menu-title" onClick={() => handleMenuClick('/thu-vien-cv')}>
-                    Mẫu CV theo style <ArrowRightOutlined style={{ fontSize: 12 }} />
-                </div>
-                <div className="mega-menu-item" onClick={() => handleMenuClick('/thu-vien-cv')}><AppstoreOutlined style={{ fontSize: 16 }} /> Mẫu CV Đơn giản</div>
-                <div className="mega-menu-item" onClick={() => handleMenuClick('/thu-vien-cv')}><HighlightOutlined style={{ fontSize: 16 }} /> Mẫu CV Ấn tượng</div>
-                <div className="mega-menu-item" onClick={() => handleMenuClick('/thu-vien-cv')}><StarOutlined style={{ fontSize: 16 }} /> Mẫu CV Chuyên nghiệp</div>
-                <div className="mega-menu-item" onClick={() => handleMenuClick('/thu-vien-cv')}><BankOutlined style={{ fontSize: 16 }} /> Mẫu CV Harvard</div>
-
-                <div style={{ height: '12px' }}></div>
-
-                {/* Nhóm 2 */}
-                <div className="mega-menu-title" onClick={() => handleMenuClick('/thu-vien-cv')}>
-                    Mẫu CV theo vị trí ứng tuyển <ArrowRightOutlined style={{ fontSize: 12 }} />
-                </div>
-                <div className="mega-menu-item" onClick={() => handleMenuClick('/thu-vien-cv')}><SolutionOutlined style={{ fontSize: 16 }} /> Nhân viên kinh doanh</div>
-                <div className="mega-menu-item" onClick={() => handleMenuClick('/thu-vien-cv')}><CodeOutlined style={{ fontSize: 16 }} /> Lập trình viên</div>
-                <div className="mega-menu-item" onClick={() => handleMenuClick('/thu-vien-cv')}><CalculatorOutlined style={{ fontSize: 16 }} /> Nhân viên kế toán</div>
-                <div className="mega-menu-item" onClick={() => handleMenuClick('/thu-vien-cv')}><FundOutlined style={{ fontSize: 16 }} /> Chuyên viên marketing</div>
-            </div>
-
-            {/* ĐƯỜNG KẺ DỌC PHÂN CÁCH */}
-            <Divider type="vertical" style={{ height: 'auto', borderColor: '#333', margin: '0' }} />
-
-            {/* CỘT PHẢI: CÁC CÔNG CỤ QUẢN LÝ (Trỏ tạm về trang Tạo CV) */}
-            <div style={{ flex: 1, padding: '0 8px' }}>
-                <div style={{ height: '8px' }}></div> {/* Đẩy nhẹ xuống cho cân bằng với cột trái */}
-                
-                <div className="mega-menu-item" onClick={() => handleMenuClick('/tao-cv')}><ProfileOutlined style={{ fontSize: 16 }} /> Quản lý CV</div>
-                <div className="mega-menu-item" onClick={() => handleMenuClick('/tao-cv')}><CloudUploadOutlined style={{ fontSize: 16 }} /> Tải CV lên</div>
-                <div className="mega-menu-item" onClick={() => handleMenuClick('/tao-cv')}><ReadOutlined style={{ fontSize: 16 }} /> Hướng dẫn viết CV</div>
-                
-                <div style={{ height: '24px' }}></div>
-
-                <div className="mega-menu-item" onClick={() => handleMenuClick('/tao-cv')}><ContainerOutlined style={{ fontSize: 16 }} /> Quản lý Cover Letter</div>
-                <div className="mega-menu-item" onClick={() => handleMenuClick('/tao-cv')}><FormOutlined style={{ fontSize: 16 }} /> Mẫu Cover Letter</div>
-            </div>
         </div>
     );
 
+    // Xác định trạng thái active nếu đang ở các trang liên quan đến CV
+    const isActive = location.pathname.includes('/thu-vien-cv') || location.pathname.includes('/manage-cv');
+
     return (
-        <Popover
-            content={megaMenuContent}
-            trigger="hover"
-            placement="bottomLeft"
-            open={open}
-            onOpenChange={setOpen}
-            arrow={false} 
-            overlayInnerStyle={{
-                backgroundColor: '#212121',
-                padding: 0,
-                border: '1px solid #333',
-                borderRadius: '8px',
-                boxShadow: '0 6px 24px rgba(0,0,0,0.4)'
-            }}
-        >
-            {/* Nút hiển thị trên thanh Header */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                color: open ? '#1890ff' : '#fff', 
-                cursor: 'pointer',
-                fontWeight: 500,
-                padding: '8px 12px',
-                transition: 'color 0.3s'
-            }}>
-                Tạo CV 
-                <span style={{ 
-                    fontSize: '10px', 
-                    transform: open ? 'rotate(180deg)' : 'rotate(0deg)', 
-                    transition: 'transform 0.3s' 
-                }}>▼</span> 
+        <Dropdown dropdownRender={() => customDropdownMenu} placement="bottomLeft" trigger={['hover']}>
+            <div className={`nav-item ${isActive ? 'active' : ''}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <FormOutlined /> Tạo CV <DownOutlined style={{ fontSize: '10px', marginTop: '2px' }} />
             </div>
-        </Popover>
+        </Dropdown>
     );
 };
 

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 import { Spin } from 'antd';
+import apiClient from './api/apiClient';
 
 import Register from './pages/Register';
 import RegisterChoose from './pages/RegisterChoose';
@@ -14,6 +15,10 @@ import ManageCv from './pages/ManageCv';
 import TemplatePreview from './pages/TemplatePreview';
 import Login from './pages/Login';
 import ViewCv from './pages/ViewCv';
+import AppliedJobs from './pages/AppliedJobs';
+import ApproveCompanies from './pages/Admin/ApproveCompanies';
+import ApproveCampaigns from './pages/Admin/ApproveCampaigns';
+import EmployerOnboarding from './pages/Employer/EmployerOnboarding';
 
 // Import các Layout bảo vệ
 import CandidateLayout from './Layouts/CandidateLayout';
@@ -36,13 +41,14 @@ import EmployerJobs from './components/EmployerJobs';
 import CandidateAiDetail from './pages/Employer/CandidateAiDetail';
 
 import CvHunter from './pages/Employer/CvHunter';
-
-
 import ServicePackage from './pages/Employer/ServicePackage';
 
 const App = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  
+  // Trạng thái hồ sơ của Nhà tuyển dụng (Mặc định APPROVED để không chặn nhầm Admin / Ứng viên)
+  const [employerStatus, setEmployerStatus] = useState("APPROVED");
 
   // LUỒNG 1: AUTO LOGIN CHẠY KHI F5 TRANG
   useEffect(() => {
@@ -60,6 +66,22 @@ const App = () => {
             vaiTro: role,
             hoTen: decoded.HoTen
           });
+
+          // ✨ TỰ ĐỘNG CHECK TRẠNG THÁI DOANH NGHIỆP QUA APICLIENT NẾU LÀ NTD (ROLE = 1)
+          if (role === "1" || role === 1) {
+            apiClient.get('/auth/employer-status')
+              .then(res => {
+                // Đọc trạng thái (NO_COMPANY, PENDING, APPROVED) trả về từ Server
+                const status = res.status || res.data?.status || "NO_COMPANY";
+                setEmployerStatus(status);
+                setLoading(false); // Chờ có kết quả trạng thái mới tắt Spin Loading
+              })
+              .catch(() => {
+                setEmployerStatus("NO_COMPANY");
+                setLoading(false);
+              });
+            return; // Dừng luồng đồng bộ tại đây để đợi API phản hồi
+          }
         } else {
           localStorage.clear();
         }
@@ -93,6 +115,26 @@ const App = () => {
       window.removeEventListener('click', resetTimer);
     };
   }, [user]);
+
+  // ✨ HÀM TIỆN ÍCH BỌC BẢO VỆ ROUTE NHÀ TUYỂN DỤNG (CHẶN BẤT HỢP PHÁP NẾU CHƯA DUYỆT)
+  const renderEmployerRoute = (element) => {
+    if (!user || user.vaiTro !== "1") return <Navigate to="/login" replace />;
+    
+    // Nếu chưa tạo hồ sơ doanh nghiệp hoặc hồ sơ đang trong trạng thái chờ duyệt
+    if (employerStatus === "NO_COMPANY" || employerStatus === "PENDING") {
+      return (
+        <AdminLayout user={user}>
+          <EmployerOnboarding 
+            currentStatus={employerStatus} 
+            onStatusChange={(newStatus) => setEmployerStatus(newStatus)} 
+          />
+        </AdminLayout>
+      );
+    }
+    
+    // Đã phê duyệt thành công -> Trả về giao diện trang chức năng mong muốn
+    return <AdminLayout user={user}>{element}</AdminLayout>;
+  };
 
   if (loading) {
     return (
@@ -129,27 +171,35 @@ const App = () => {
           path="/admin/dashboard"
           element={user && user.vaiTro === "0" ? <AdminLayout user={user}><AdminDashboard /></AdminLayout> : <Navigate to="/login" replace />}
         />
+        <Route
+          path="/admin/approve-companies"
+          element={user && user.vaiTro === "0" ? <AdminLayout user={user}><ApproveCompanies /></AdminLayout> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/admin/approve-campaigns"
+          element={user && user.vaiTro === "0" ? <AdminLayout user={user}><ApproveCampaigns /></AdminLayout> : <Navigate to="/login" replace />}
+        />
 
-        {/* ================= TRANG NHÀ TUYỂN DỤNG ================= */}
+        {/* ================= TRANG NHÀ TUYỂN DỤNG (ĐÃ ĐƯỢC BỌC BẢO VỆ QUA HÀM HỢP NHẤT) ================= */}
         <Route
           path="/employer/dashboard"
-          element={user && user.vaiTro === "1" ? <AdminLayout user={user}><EmployerDashboard /></AdminLayout> : <Navigate to="/login" replace />}
+          element={renderEmployerRoute(<EmployerDashboard />)}
         />
 
         {/* Đuôi Ví và Gói dịch vụ của Nhà tuyển dụng */}
         <Route
           path="/employer/wallet"
-          element={user && user.vaiTro === "1" ? <AdminLayout user={user}><Wallet /></AdminLayout> : <Navigate to="/login" replace />}
+          element={renderEmployerRoute(<Wallet />)}
         />
         <Route
           path="/employer/jobs"
-          element={user?.vaiTro === "1" ? <AdminLayout user={user}><EmployerJobs /></AdminLayout> : <Navigate to="/login" replace />}
+          element={renderEmployerRoute(<EmployerJobs />)}
         />
 
-        {/* Quản lý phễu ứng viên của 1 tin cụ thể (Chú ý có :maViTri ở cuối) */}
+        {/* Quản lý phễu ứng viên của 1 tin cụ thể */}
         <Route
           path="/employer/candidate-funnel/:maViTri"
-          element={user?.vaiTro === "1" ? <AdminLayout user={user}><CandidateFunnel /></AdminLayout> : <Navigate to="/login" replace />}
+          element={renderEmployerRoute(<CandidateFunnel />)}
         />
         <Route
           path="/employer/applications/:maDon/ai-details"
@@ -160,26 +210,27 @@ const App = () => {
           path="/employer/wallet"
           element={user && user.vaiTro === "1" ? <AdminLayout user={user}><Wallet /></AdminLayout> : <Navigate to="/login" replace />}
         />
+
         <Route
           path="/employer/service-package"
-          element={user && user.vaiTro === "1" ? <AdminLayout user={user}><ServicePackage /></AdminLayout> : <Navigate to="/login" replace />}
+          element={renderEmployerRoute(<ServicePackage />)}
         />
 
         {/* Quản lý hồ sơ công ty */}
         <Route
           path="/employer/company-profile"
-          element={user && user.vaiTro === "1" ? <AdminLayout user={user}><CompanyProfile /></AdminLayout> : <Navigate to="/login" replace />}
+          element={renderEmployerRoute(<CompanyProfile />)}
         />
 
         {/* Quản lý tuyển dụng */}
         <Route
           path="/employer/post-job"
-          element={user && user.vaiTro === "1" ? <AdminLayout user={user}><PostJob /></AdminLayout> : <Navigate to="/login" replace />}
+          element={renderEmployerRoute(<PostJob />)}
         />
 
         <Route
           path="/employer/cv-hunter"
-          element={user && user.vaiTro === "1" ? <AdminLayout user={user}><CvHunter /></AdminLayout> : <Navigate to="/login" replace />}
+          element={renderEmployerRoute(<CvHunter />)}
         />
 
         {/* ================= TRANG ỨNG VIÊN ================= */}
@@ -188,27 +239,28 @@ const App = () => {
           element={user ? <CandidateLayout user={user}><ManageCv /></CandidateLayout> : <Navigate to="/login" replace />}
         />
 
-        <Route path="/" element={<Home />} />
         {/* Cấu hình đường dẫn động nhận maViTri làm tham số */}
         <Route
           path="/job/:id"
           element={
-            <CandidateLayout user={user}> 
+            <CandidateLayout user={user}>
               <JobDetail />
             </CandidateLayout>
           }
         />
-        {/* Các route khác của bạn */}
+        <Route path="/viec-lam" element={
+          <CandidateLayout user={user}>
+            <AppliedJobs user={user} />
+          </CandidateLayout>
+        } />
 
         <Route path="/xem-cv/:id" element={<ViewCv />} />
 
         <Route path="/thu-vien-cv" element={<CandidateLayout user={user}><CvTemplateLibrary /></CandidateLayout>} />
 
-        {/* 2. Đổi tên Route thành /builder (hoặc khai báo cả 2) để khớp với lệnh chuyển trang */}
         <Route path="/builder" element={<CandidateLayout user={user}><CvBuilder /></CandidateLayout>} />
         <Route path="/tao-cv" element={<CandidateLayout user={user}><CvBuilder /></CandidateLayout>} />
 
-        {/* 👉 ĐÃ BỔ SUNG: Khai báo Route cho TemplatePreview để dùng được tính năng xem trước CV */}
         <Route path="/xem-truoc-cv/:id" element={<CandidateLayout user={user}><TemplatePreview /></CandidateLayout>} />
 
         {/* ================= CÁC TRANG CALLBACK THANH TOÁN ================= */}

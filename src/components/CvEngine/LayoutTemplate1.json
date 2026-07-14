@@ -1,0 +1,175 @@
+{
+  "type": "Container",
+  "styles": {
+    "boxSizing": "border-box",
+    "width": "210mm",
+    "minHeight": "297mm",
+    "padding": "40px 50px",
+    "backgroundColor": "#ffffff",
+    "color": "#333333",
+    "fontFamily": "var(--font-family, Arial, sans-serif)",
+    "lineHeight": "var(--line-height, 1.5)",
+    "fontSize": "var(--base-font-size, 13px)"
+  },
+  "children": [
+    {
+      "type": "Container",
+      "styles": { "display": "flex", "gap": "30px", "marginBottom": "30px" },
+      "children": [
+        {
+          "type": "Image",
+          "dataPath": "personalInfo.avatar",
+          "styles": { "width": "140px", "height": "180px", "objectFit": "cover", "borderRadius": "2px", "backgroundColor": "#f0f0f0" }
+        },
+        {
+          "type": "Container",
+          "styles": { "flexGrow": "1" },
+          "children": [
+            { "type": "Text", "dataPath": "personalInfo.fullName", "placeholder": "NHẬP HỌ VÀ TÊN", "styles": { "fontSize": "26px", "fontWeight": "bold", "color": "var(--theme-color)", "marginBottom": "5px", "textTransform": "uppercase" } },
+            { "type": "Text", "dataPath": "personalInfo.jobTitle", "placeholder": "Vị trí ứng tuyển", "styles": { "fontSize": "15px", "fontWeight": "500", "color": "#666666", "marginBottom": "15px" } },
+            {
+              "type": "Container",
+              "styles": { "display": "grid", "gridTemplateColumns": "90px 1fr", "rowGap": "6px", "fontSize": "13px" },
+              "children": [
+                { "type": "Text", "content": "Ngày sinh:", "styles": { "color": "#666666" } },
+                { "type": "Text", "dataPath": "personalInfo.dob", "placeholder": "01/01/1999" },
+                { "type": "Text", "content": "Email:", "styles": { "color": "#666666" } },
+                { "type": "Text", "dataPath": "personalInfo.email", "placeholder": "example@mail.com" },
+                { "type": "Text", "content": "Điện thoại:", "styles": { "color": "#666666" } },
+                { "type": "Text", "dataPath": "personalInfo.phone", "placeholder": "0123456789" },
+                { "type": "Text", "content": "Địa chỉ:", "styles": { "color": "#666666" } },
+                { "type": "Text", "dataPath": "personalInfo.address", "placeholder": "Quận/Huyện, Tỉnh/Thành Phố" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "styles": { "marginBottom": "25px" },
+      "children": [
+        { "type": "Text", "content": "MỤC TIÊU NGHỀ NGHIỆP", "styles": { "fontSize": "15px", "fontWeight": "bold", "color": "var(--theme-color)", "marginBottom": "6px", "letterSpacing": "0.5px" } },
+        { "type": "Divider", "styles": { "marginBottom": "12px", "backgroundColor": "var(--theme-color)", "height": "2px" } },
+        { "type": "RichText", "dataPath": "summary", "placeholder": "Tóm tắt ngắn gọn mục tiêu công việc và định hướng nghề nghiệp tương lai của bạn...", "styles": { "textAlign": "justify" } }
+      ]
+    },
+    {
+      "type": "Container",
+      "styles": { "marginBottom": "25px" },
+      "children": [
+        { "type": "Text", "content": "HỌC VẤN", "styles": { "fontSize": "15px", "fontWeight": "bold", "color": "var(--theme-color)", "marginBottom": "6px", "letterSpacing": "0.5px" } },
+        { "type": "Divider", "styles": { "marginBottom": "12px", "backgroundColor": "var(--theme-color)", "height": "2px" } },
+        {
+          "type": "LoopContainer",
+          "dataPath": "education",
+          "styles": { "display": "flex", "flexDirection": "column", "gap": "16px" },
+          "itemTemplate": {
+            "type": "Container",
+            "styles": { "display": "flex", "gap": "20px" },
+            "children": [
+              { "type": "Text", "dataPath": "time", "placeholder": "Thời gian học", "styles": { "width": "25%", "flexShrink": "0", "fontWeight": "600", "color": "#555555" } },
+              {
+                "type": "Container",
+                "styles": { "width": "75%" },
+                "children": [
+                  { "type": "Text", "dataPath": "school", "placeholder": "Tên trường Đại học / Cao đẳng", "styles": { "fontWeight": "bold", "fontSize": "14px" } },
+                  { "type": "Text", "dataPath": "major", "placeholder": "Chuyên ngành học", "styles": { "fontStyle": "italic", "color": "#666666", "marginTop": "2px" } },
+                  { "type": "RichText", "dataPath": "description", "placeholder": "Mô tả chi tiết quá trình học tập hoặc thành tích nổi bật tại trường...", "styles": { "marginTop": "4px" } }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "styles": { "marginBottom": "25px" },
+      "children": [
+        { "type": "Text", "content": "KINH NGHIỆM LÀM VIỆC", "styles": { "fontSize": "15px", "fontWeight": "bold", "color": "var(--theme-color)", "marginBottom": "6px", "letterSpacing": "0.5px" } },
+        { "type": "Divider", "styles": { "marginBottom": "12px", "backgroundColor": "var(--theme-color)", "height": "2px" } },
+        {
+          "type": "LoopContainer",
+          "dataPath": "experience",
+          "styles": { "display": "flex", "flexDirection": "column", "gap": "16px" },
+          "itemTemplate": {
+            "type": "Container",
+            "styles": { "display": "flex", "gap": "20px" },
+            "children": [
+              { "type": "Text", "dataPath": "time", "placeholder": "Thời gian làm việc", "styles": { "width": "25%", "flexShrink": "0", "fontWeight": "600", "color": "#555555" } },
+              {
+                "type": "Container",
+                "styles": { "width": "75%" },
+                "children": [
+                  { "type": "Text", "dataPath": "title", "placeholder": "Tên Công ty & Vị trí làm việc", "styles": { "fontWeight": "bold", "fontSize": "14px" } },
+                  { "type": "RichText", "dataPath": "description", "placeholder": "Mô tả chi tiết nhiệm vụ công việc, kết quả và các dự án đã tham gia...", "styles": { "marginTop": "4px" } }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "styles": { "marginBottom": "25px" },
+      "children": [
+        { "type": "Text", "content": "KỸ NĂNG & NGOẠI NGỮ", "styles": { "fontSize": "15px", "fontWeight": "bold", "color": "var(--theme-color)", "marginBottom": "6px", "letterSpacing": "0.5px" } },
+        { "type": "Divider", "styles": { "marginBottom": "12px", "backgroundColor": "var(--theme-color)", "height": "2px" } },
+        { "type": "RichText", "dataPath": "skills", "placeholder": "Liệt kê các kỹ năng chuyên môn, ngoại ngữ hoặc công cụ làm việc của bạn...", "styles": { "textAlign": "justify" } }
+      ]
+    },
+    {
+      "type": "Container",
+      "styles": { "marginBottom": "25px" },
+      "children": [
+        { "type": "Text", "content": "CHỨNG CHỈ", "styles": { "fontSize": "15px", "fontWeight": "bold", "color": "var(--theme-color)", "marginBottom": "6px", "letterSpacing": "0.5px" } },
+        { "type": "Divider", "styles": { "marginBottom": "12px", "backgroundColor": "var(--theme-color)", "height": "2px" } },
+        {
+          "type": "LoopContainer",
+          "dataPath": "certificates",
+          "styles": { "display": "flex", "flexDirection": "column", "gap": "8px" },
+          "itemTemplate": {
+            "type": "Container",
+            "styles": { "display": "flex", "gap": "20px" },
+            "children": [
+              { "type": "Text", "dataPath": "time", "placeholder": "Năm cấp", "styles": { "width": "25%", "fontWeight": "600", "color": "#555555" } },
+              { "type": "Text", "dataPath": "name", "placeholder": "Tên chứng chỉ (Ví dụ: TOEIC 800, AWS...)", "styles": { "width": "75%", "fontWeight": "500" } }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "styles": { "marginBottom": "25px" },
+      "children": [
+        { "type": "Text", "content": "DANH HIỆU & GIẢI THƯỞNG", "styles": { "fontSize": "15px", "fontWeight": "bold", "color": "var(--theme-color)", "marginBottom": "6px", "letterSpacing": "0.5px" } },
+        { "type": "Divider", "styles": { "marginBottom": "12px", "backgroundColor": "var(--theme-color)", "height": "2px" } },
+        {
+          "type": "LoopContainer",
+          "dataPath": "awards",
+          "styles": { "display": "flex", "flexDirection": "column", "gap": "8px" },
+          "itemTemplate": {
+            "type": "Container",
+            "styles": { "display": "flex", "gap": "20px" },
+            "children": [
+              { "type": "Text", "dataPath": "time", "placeholder": "Thời gian", "styles": { "width": "25%", "fontWeight": "600", "color": "#555555" } },
+              { "type": "Text", "dataPath": "name", "placeholder": "Tên giải thưởng / Danh hiệu đạt được...", "styles": { "width": "75%", "fontWeight": "500" } }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "styles": { "marginBottom": "25px" },
+      "children": [
+        { "type": "Text", "content": "SỞ THÍCH", "styles": { "fontSize": "15px", "fontWeight": "bold", "color": "var(--theme-color)", "marginBottom": "6px", "letterSpacing": "0.5px" } },
+        { "type": "Divider", "styles": { "marginBottom": "12px", "backgroundColor": "var(--theme-color)", "height": "2px" } },
+        { "type": "RichText", "dataPath": "hobbies", "placeholder": "Ví dụ: Đọc sách công nghệ, đá bóng, nghe nhạc...", "styles": { "textAlign": "justify" } }
+      ]
+    }
+  ]
+}

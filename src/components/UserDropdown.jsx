@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // 👉 ĐÃ THÊM: Import thư viện chuyển trang
+import { useNavigate } from 'react-router-dom';
 import { Popover, Avatar, Menu, Typography, Divider } from 'antd';
 import apiClient from '../api/apiClient';
 import {
@@ -14,7 +14,7 @@ import {
 const { Text } = Typography;
 
 const UserDropdown = ({ user, onLogout }) => {
-    const navigate = useNavigate(); // 👉 ĐÃ THÊM: Khởi tạo hàm chuyển trang
+    const navigate = useNavigate(); 
 
     // 1. STATE LƯU TRỮ LINK ẢNH REALTIME LẤY TỪ CV CHÍNH
     const [liveAvatar, setLiveAvatar] = useState(null);
@@ -55,7 +55,9 @@ const UserDropdown = ({ user, onLogout }) => {
             label: <span style={{ fontWeight: 500 }}>Quản lý tìm việc</span>,
             children: [
                 { key: 'viec-lam-da-luu', label: 'Việc làm đã lưu' },
-                { key: 'viec-lam-da-ung-tuyen', label: 'Việc làm đã ứng tuyển' },
+                { key: 'viec-lam-da-ung-tuyen', label: 'Việc làm đã ứng tuyển', 
+                    onClick: () => navigate('/viec-lam')
+                },
             ],
         },
         {
