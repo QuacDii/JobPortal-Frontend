@@ -1,19 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import useCvStore from '../../../store/useCvStore';
 import get from 'lodash/get';
 import AtomicRenderer from '../AtomicRenderer';
-import { PlusOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, DragOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 
 const LoopNode = ({ dataPath, styles, itemTemplate }) => {
   const cvData = useCvStore(state => state.cvData);
   const addArrayItem = useCvStore(state => state.addArrayItem);
   const removeArrayItem = useCvStore(state => state.removeArrayItem);
-  const moveArrayItem = useCvStore(state => state.moveArrayItem); // <--- Lấy hàm di chuyển vừa tạo
+  const moveArrayItem = useCvStore(state => state.moveArrayItem); 
 
-  const [hoveredIndex, setHoveredIndex] = useState(null);
   const loopArray = get(cvData, dataPath, []);
-
-  // Khung dữ liệu trống mặc định để làm placeholder ảo
   const defaultEmptyItem = { time: '', companyName: '', title: '', description: '', school: '', major: '', name: '' };
   const isPlaceholder = loopArray.length === 0;
   const displayArray = isPlaceholder ? [defaultEmptyItem] : loopArray;
@@ -23,35 +20,43 @@ const LoopNode = ({ dataPath, styles, itemTemplate }) => {
       {displayArray.map((itemData, index) => (
         <div
           key={itemData.id || index}
-          className={`cv-loop-item-block ${hoveredIndex === index ? 'is-hovered' : ''}`}
+          className={`cv-loop-item-block ${isPlaceholder ? 'is-ghost' : ''}`}
           style={{
             position: 'relative',
-            padding: '8px',
-            margin: '-8px -8px 10px -8px',
+            padding: '12px 8px 8px 8px',
+            margin: '-12px -8px 14px -8px',
             borderRadius: '4px',
             transition: 'all 0.15s ease',
-            opacity: isPlaceholder ? 0.45 : 1
+            opacity: isPlaceholder ? 0.35 : 1
           }}
-          onMouseEnter={() => setHoveredIndex(index)}
-          onMouseLeave={() => setHoveredIndex(null)}
         >
-          {/* 🛠️ THANH CÔNG CỤ ĐIỀU KHIỂN NỔI (FLOATING TOOLBAR) CHUẨN TOPCV */}
-          {hoveredIndex === index && !isPlaceholder && (
-            <div className="cv-action-toolbar no-print">
-              <div className="toolbar-btn drag-handle"><DragOutlined /></div>
-              <button className="toolbar-btn" disabled={index === 0} onClick={() => moveArrayItem(dataPath, index, 'up')}><ArrowUpOutlined /></button>
-              <button className="toolbar-btn" disabled={index === loopArray.length - 1} onClick={() => moveArrayItem(dataPath, index, 'down')}><ArrowDownOutlined /></button>
+          {/* THANH CÔNG CỤ: Được CSS ẩn đi và tự hiện lên khi hover */}
+          <div className="cv-action-toolbar no-print">
+            {!isPlaceholder && (
+              <>
+                {index > 0 && (
+                  <button className="toolbar-btn" onClick={() => moveArrayItem(dataPath, index, 'up')}>
+                    <ArrowUpOutlined />
+                  </button>
+                )}
+                {index < loopArray.length - 1 && (
+                  <button className="toolbar-btn" onClick={() => moveArrayItem(dataPath, index, 'down')}>
+                    <ArrowDownOutlined />
+                  </button>
+                )}
+              </>
+            )}
+            {!isPlaceholder && loopArray.length > 1 && (
+              <button className="toolbar-btn delete-btn" onClick={() => removeArrayItem(dataPath, itemData.id)}>
+                Xóa
+              </button>
+            )}
+          </div>
 
-              {/* 1. CHỈ HIỆN NÚT XÓA NẾU DANH SÁCH CÓ TỪ 2 PHẦN TỬ TRỞ LÊN */}
-              {displayArray.length > 1 && (
-                <button className="toolbar-btn delete-btn" onClick={() => removeArrayItem(dataPath, itemData.id)}>
-                  <DeleteOutlined /> Xóa
-                </button>
-              )}
-            </div>
-          )}
+          <button className="cv-inline-add-button no-print" onClick={() => addArrayItem(dataPath, defaultEmptyItem)}>
+            <PlusOutlined /> Thêm
+          </button>
 
-          {/* Lớp phủ click kích hoạt tạo phần tử thật nếu đang ở trạng thái hiển thị ghost text */}
           {isPlaceholder && (
             <div
               style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 5, cursor: 'pointer' }}
@@ -59,106 +64,120 @@ const LoopNode = ({ dataPath, styles, itemTemplate }) => {
             />
           )}
 
-          {/* Render lõi nội dung chữ */}
           <AtomicRenderer node={itemTemplate} dataScope={{ parentPath: dataPath, index: index, ...itemData }} />
         </div>
       ))}
 
-      {/* Nút thêm mục mới bọc viền nét đứt màu xanh chuẩn chỉ */}
-      <div className="no-print" style={{ marginTop: '5px' }}>
-        <button
-          onClick={() => addArrayItem(dataPath, defaultEmptyItem)}
-          className="cv-add-item-button"
-        >
-          <PlusOutlined /> Thêm mục mới
-        </button>
-      </div>
-
       <style>{`
-        /* Viền đỏ lờ mờ bao quanh khối khi di chuột vào */
-        .cv-loop-item-block.is-hovered {
-          outline: 1px dashed rgba(255, 255, 255, 0.6);
-          background-color: rgba(255, 255, 255, 0.05);
+        /* Ẩn công cụ mặc định */
+        .cv-action-toolbar, .cv-inline-add-button {
+          display: none !important;
         }
 
-        /* Thanh dock màu xám chứa nút điều khiển */
+        /* Hiện công cụ khi hover */
+        .cv-loop-item-block:hover .cv-action-toolbar,
+        .cv-loop-item-block:hover .cv-inline-add-button {
+          display: flex !important;
+        }
+
+        /* 🚀 Tắt hoàn toàn viền và nền của Khối Cha khi Hover để tránh rối mắt */
+        .cv-loop-item-block:hover {
+          outline: none !important;
+          background-color: transparent !important;
+        }
+
+        /* 🚀 Tắt viền đứt của Khối Cha khi nó đang rỗng (Ghost) */
+        .cv-loop-item-block.is-ghost {
+          outline: none !important;
+        }
+
+        /* 🛠️ THANH DOCK ĐIỀU KHIỂN TRÁI TINH GỌN MỚI */
         .cv-action-toolbar {
           position: absolute;
-          top: -22px;
-          left: 10px;
-          display: flex;
+          top: -20px;
+          left: 8px;
           align-items: center;
-          background: #4d4d4d;
-          border-radius: 4px 4px 0 0;
-          padding: 2px 4px;
-          zIndex: 100;
-          box-shadow: 0 -2px 10px rgba(0,0,0,0.15);
+          background: rgba(36, 36, 36, 0.85) !important;
+          backdrop-filter: blur(8px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
+          border-radius: 6px !important;
+          padding: 3px !important;
+          z-index: 100;
+          gap: 2px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.25);
         }
-          .cv-action-toolbar::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 100%;
-  height: 10px;        /* Tạo một tấm thảm tàng hình 10px tràn xuống dưới */
-  background: transparent; /* Giữ trong suốt để không ảnh hưởng giao diện */
-  pointer-events: auto;   /* Ép trình duyệt vẫn ghi nhận chuột đang nằm trong cây DOM của Toolbar */
-}
+        
+        .cv-action-toolbar::after {
+          content: '';
+          position: absolute;
+          top: 100%;
+          left: 0;
+          width: 100%;
+          height: 14px;
+          background: transparent;
+          pointer-events: auto;
+        }
 
         .toolbar-btn {
           background: transparent;
           border: none;
-          color: #ffffff;
-          padding: 2px 6px;
-          font-size: 12px;
+          color: #a0a0a0;
+          width: 26px;
+          height: 26px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 4px;
           cursor: pointer;
+          font-size: 12px;
+          transition: all 0.2s ease;
+        }
+        .toolbar-btn:hover {
+          background: rgba(255, 255, 255, 0.12);
+          color: #ffffff;
+        }
+
+        .toolbar-btn.delete-btn {
+          background: transparent !important;
+          color: #ff4d4f !important;
+          width: auto !important;
+          padding: 0 10px !important;
+          font-weight: 500;
+          font-size: 12px;
+        }
+        .toolbar-btn.delete-btn:hover {
+          background: #ff4d4f !important;
+          color: #ffffff !important;
+        }
+
+        /* 🚀 NÚT + THÊM BÊN PHẢI MỚI */
+        .cv-inline-add-button {
+          position: absolute;
+          top: -14px;
+          right: 14px;
+          background: #00b14f !important;
+          color: #ffffff !important;
+          border: none !important;
+          padding: 4px 14px !important;
+          border-radius: 14px !important;
+          font-size: 12px !important;
+          font-weight: 600 !important;
+          cursor: pointer !important;
           display: flex;
           align-items: center;
           gap: 4px;
-          transition: background 0.2s;
-        }
-        .toolbar-btn:hover:not(:disabled) {
-          background: rgba(255,255,255,0.15);
-        }
-        .toolbar-btn:disabled {
-          opacity: 0.3;
-          cursor: not-allowed;
-        }
-        .toolbar-btn.delete-btn {
-          background: #ff4d4f;
-          border-radius: 2px;
-          margin-left: 4px;
-          padding: 2px 8px;
-          font-weight: 500;
-        }
-        .toolbar-btn.delete-btn:hover {
-          background: #ff7875;
-        }
-        .drag-handle {
-          cursor: move;
-          opacity: 0.6;
-        }
-
-        /* Định dạng nút + Thêm mục mới viền xanh lá đứt đoạn */
-        .cv-add-item-button {
-          background: rgba(0, 177, 79, 0.04);
-          color: #00b14f;
-          border: 1px dashed #00b14f;
-          padding: 8px 16px;
-          border-radius: 4px;
-          cursor: pointer;
-          width: 100%;
-          font-weight: 500;
+          z-index: 101;
+          box-shadow: 0 2px 8px rgba(0, 177, 79, 0.25);
           transition: all 0.2s ease;
         }
-        .cv-add-item-button:hover {
-          background: rgba(0, 177, 79, 0.1);
-          box-shadow: 0 2px 6px rgba(0, 177, 79, 0.15);
+        .cv-inline-add-button:hover {
+          background: #009845 !important;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(0, 177, 79, 0.4);
         }
 
         @media print {
-          .cv-action-toolbar, .cv-add-item-button { display: none !important; }
-          .cv-loop-item-block.is-hovered { outline: none !important; background: transparent !important; }
+          .cv-action-toolbar, .cv-inline-add-button { display: none !important; }
         }
       `}</style>
     </div>

@@ -4,6 +4,7 @@ import useCvStore from '../../../store/useCvStore';
 const ContainerNode = ({ node, children, isRoot = false }) => {
   const layoutSettings = useCvStore((state) => state.layoutSettings) || {};
   const addMacroSection = useCvStore((state) => state.addMacroSection);
+  
   const [isDragOver, setIsDragOver] = useState(false);
 
   const { fontFamily, fontSize, lineHeight, themeColor } = layoutSettings;
@@ -14,7 +15,7 @@ const ContainerNode = ({ node, children, isRoot = false }) => {
 
   const handleDragOver = (e) => {
     if (!isColumn) return;
-    e.preventDefault(); // Bắt buộc phải preventDefault để trình duyệt cho phép thả
+    e.preventDefault();
     setIsDragOver(true);
   };
 
@@ -27,10 +28,8 @@ const ContainerNode = ({ node, children, isRoot = false }) => {
       const parsedData = JSON.parse(rawData);
 
       if (parsedData.type === 'MOVE_EXISTING_SECTION') {
-        // 1. Gọi hàm di chuyển khối đã có sẵn sang cột này
         useCvStore.getState().moveSectionToColumn(parsedData.sectionId, node.id);
       } else {
-        // 2. Kéo một mục hoàn toàn mới từ Sidebar vào
         addMacroSection(node.id, parsedData);
       }
     } catch (err) {
@@ -50,12 +49,13 @@ const ContainerNode = ({ node, children, isRoot = false }) => {
       fontSize: 'var(--base-font-size)',
       lineHeight: 'var(--line-height)',
     }),
-    // Vẽ viền hiệu ứng xanh lá lờ mờ đón chào khi kéo mục lướt qua cột (Chuẩn TopCV)
+    // Vẽ viền hiệu ứng xanh lá đón chào khi kéo mục lướt qua cột
     ...(isDragOver && {
       outline: '2px dashed #00b14f',
       backgroundColor: 'rgba(0, 177, 79, 0.02)',
       transition: 'all 0.2s'
     })
+    // 🚫 ĐÃ XÓA BỎ: Hoàn toàn loại bỏ logic check hover và outline rác tại đây để chấm dứt viền đen bên trong[cite: 3]
   };
 
   return (
@@ -64,6 +64,7 @@ const ContainerNode = ({ node, children, isRoot = false }) => {
       onDragOver={handleDragOver}
       onDragLeave={() => setIsDragOver(false)}
       onDrop={handleDrop}
+      // 🚫 ĐÃ XÓA BỎ: Các hàm bắt sự kiện onMouseEnter / onMouseLeave dư thừa[cite: 3]
     >
       {children}
     </div>

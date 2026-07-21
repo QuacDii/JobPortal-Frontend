@@ -3,22 +3,30 @@ import useCvStore from '../../../store/useCvStore';
 import get from 'lodash/get';
 
 const TextNode = ({ dataPath, placeholder, styles, dataScope }) => {
-  const cvData = useCvStore((state) => state.cvData);
   const updateCvDataPath = useCvStore((state) => state.updateCvDataPath);
 
-  const finalPath = dataPath;
-  // Lấy dữ liệu thực tế, nếu trống thì trả về chuỗi rỗng tuyệt đối '', KHÔNG lấy placeholder gán vào đây
-  const value = get(dataScope || cvData, finalPath, ''); 
+  // 🚀 SỬA LỖI 1: Tính toán chính xác tuyệt đối đường dẫn mảng lặp
+  let finalPath = dataPath;
+  if (dataScope && dataScope.parentPath !== undefined) {
+    finalPath = `${dataScope.parentPath}[${dataScope.index}].${dataPath}`;
+  }
+
+  // 🚀 SỬA LỖI 2: Chỉ lấy đúng dữ liệu của ô này từ store để tránh re-render vô ích
+  const value = useCvStore((state) => get(state.cvData, finalPath, '')); 
   const elementRef = useRef(null);
 
-  // Đồng bộ dữ liệu mượt mà từ Store xuống màn hình
+  // 🚀 SỬA LỖI 3: Bảo vệ DOM không bị ghi đè khi đang nhấp nháy chuột gõ chữ
   useEffect(() => {
-    if (elementRef.current && elementRef.current.innerText !== value) {
-      elementRef.current.innerText = value;
+    if (elementRef.current) {
+      const isCurrentlyFocused = document.activeElement === elementRef.current;
+      if (!isCurrentlyFocused && elementRef.current.innerText !== value) {
+        elementRef.current.innerText = value;
+      }
     }
   }, [value]);
 
-  const handleInput = (e) => {
+  // Đổi sang onBlur (khi click/di chuyển chuột ra ngoài mới lưu) để tăng hiệu năng
+  const handleBlur = (e) => {
     const text = e.target.innerText;
     updateCvDataPath(finalPath, text);
   };
@@ -29,9 +37,8 @@ const TextNode = ({ dataPath, placeholder, styles, dataScope }) => {
         ref={elementRef}
         contentEditable={true}
         suppressContentEditableWarning={true}
-        // Bắn placeholder vào thuộc tính data của HTML chứ không nhét vào ruột
         data-placeholder={placeholder || 'Nhập dữ liệu...'} 
-        onInput={handleInput}
+        onBlur={handleBlur}
         className="editable-text-node"
         style={{
           outline: 'none',
@@ -42,14 +49,12 @@ const TextNode = ({ dataPath, placeholder, styles, dataScope }) => {
         }}
       />
 
-      {/* Nhúng đoạn CSS Ma Thuật để hiển thị chữ bóng ma chuẩn TopCV */}
       <style>{`
-        /* Khi thẻ div trống rỗng tuyệt đối, CSS này sẽ tự kích hoạt */
         .editable-text-node:empty::before {
           content: attr(data-placeholder);
-          opacity: 0.55; /* Làm mờ chữ đi để tạo hiệu ứng ghost text */
+          opacity: 0.55; 
           font-style: italic;
-          pointer-events: none; /* Tránh việc người dùng click trúng chữ placeholder */
+          pointer-events: none; 
           display: inline-block;
         }
       `}</style>

@@ -14,22 +14,71 @@ const PostJob = () => {
     const [industries, setIndustries] = useState([]);
     const [locations, setLocations] = useState([]);
 
+    // 1. TẢI DỮ LIỆU ĐỘC LẬP - TRÁNH LỖI DÂY CHUYỀN
     useEffect(() => {
         const fetchMasterData = async () => {
+            // Khối 1: Tải Kỹ năng (Bọc catch độc lập để nếu lỗi 500 thì các mục khác vẫn chạy)
             try {
-                // Gọi 3 API song song để tối ưu tốc độ load trang
-                const [resSkills, resInd, resLoc] = await Promise.all([
-                    apiClient.get('/recruitment/skills'),
-                    apiClient.get('/recruitment/industries'),
-                    apiClient.get('/recruitment/locations')
-                ]);
-                setStandardSkills(resSkills);
-                setIndustries(resInd);
-                setLocations(resLoc);
+                const resSkills = await apiClient.get('/recruitment/skills').catch(err => {
+                    console.error("Lỗi tải Kỹ năng:", err);
+                    return []; // Trả về mảng rỗng phòng hờ
+                });
+                
+                // Chuẩn hóa dữ liệu Kỹ năng sang { label, value } chuẩn Ant Design
+                const mappedSkills = Array.isArray(resSkills)
+                    ? resSkills.map(item => ({
+                        label: item.tenKyNang || item.label,
+                        value: item.maKyNang || item.value
+                    }))
+                    : [];
+                setStandardSkills(mappedSkills);
             } catch (error) {
-                console.error("Lỗi lấy dữ liệu danh mục", error);
+                console.error("Lỗi xử lý Kỹ năng:", error);
+            }
+
+            // Khối 2: Tải Ngành nghề
+            try {
+                const resInd = await apiClient.get('/recruitment/industries').catch(err => {
+                    console.error("Lỗi tải Ngành nghề:", err);
+                    return [];
+                });
+                
+                // Chuẩn hóa dữ liệu Ngành nghề sang { label, value }
+                const mappedIndustries = Array.isArray(resInd)
+                    ? resInd.map(item => ({
+                        label: item.tenNganh || item.label,
+                        value: item.maNganh || item.value
+                    }))
+                    : [];
+                setIndustries(mappedIndustries);
+            } catch (error) {
+                console.error("Lỗi xử lý Ngành nghề:", error);
+            }
+
+            // Khối 3: Tải Khu vực (Hỗ trợ cấu trúc phân cấp cho Cascader)
+            try {
+                const resLoc = await apiClient.get('/recruitment/locations').catch(err => {
+                    console.error("Lỗi tải Khu vực:", err);
+                    return [];
+                });
+                
+                // Chuẩn hóa dữ liệu Tỉnh/Thành -> Quận/Huyện cho Cascader
+                const mappedLocations = Array.isArray(resLoc)
+                    ? resLoc.map(tp => ({
+                        label: tp.tenTP || tp.tenTp || tp.label,
+                        value: tp.maTP || tp.maTp || tp.value,
+                        children: (tp.phuongXas || tp.phuongXasNavigation || tp.children || []).map(px => ({
+                            label: px.tenPhuong || px.label,
+                            value: px.maPhuong || px.value
+                        }))
+                    }))
+                    : [];
+                setLocations(mappedLocations);
+            } catch (error) {
+                console.error("Lỗi xử lý Khu vực:", error);
             }
         };
+        
         fetchMasterData();
     }, []);
 
@@ -48,7 +97,7 @@ const PostJob = () => {
                     moTaCongViec: pos.moTaCongViec,
                     yeuCauUngVien: pos.yeuCauUngVien,
                     quyenLoi: pos.quyenLoi,
-                    maNganh: pos.maNganh, // Tạm hardcode chờ API Ngành nghề
+                    maNganh: pos.maNganh, 
                     maPhuong: Array.isArray(pos.maPhuong) ? pos.maPhuong[pos.maPhuong.length - 1] : pos.maPhuong,
                     danhSachKyNang: pos.danhSachKyNang || [],
                     nganhNgheKhac: pos.nganhNgheKhac || null
@@ -57,8 +106,8 @@ const PostJob = () => {
 
             const response = await apiClient.post('/recruitment/post-job', payload);
             
-            if (response.success) {
-                message.success(response.message);
+            if (response.success || response.data?.success) {
+                message.success(response.message || 'Đăng tin thành công!');
                 form.resetFields(); // Xóa trắng form sau khi thành công
             }
         } catch (error) {
@@ -80,7 +129,6 @@ const PostJob = () => {
                 layout="vertical" 
                 form={form} 
                 onFinish={onFinish}
-                // Mặc định ban đầu sẽ có sẵn 1 vị trí trống để điền
                 initialValues={{ danhSachViTri: [{}] }} 
             >
                 {/* --- PHẦN MASTER: THÔNG TIN CHIẾN DỊCH --- */}
@@ -152,7 +200,8 @@ const PostJob = () => {
                                                     filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
                                                 />
                                             </Form.Item>
-                                            {/* THÊM KHỐI NÀY: Tự động bắt sự kiện khi chọn ngành "Khác" */}
+                                            
+                                            {/* Tự động hiển thị ô nhập khi chọn ngành nghề "Khác" */}
                                             <Form.Item 
                                                 noStyle 
                                                 shouldUpdate={(prevValues, currentValues) => 
@@ -164,11 +213,8 @@ const PostJob = () => {
 
                                                     if (!selectedId) return null;
                                                     
-                                                    // Dò trong mảng industries xem ID này có tên là "Khác" hay không
-                                                    const isKhac = industries.find(
-                                                        item => (item.value === selectedId || item.maNganh === selectedId) && 
-                                                                (item.label === 'Khác' || item.tenNganh === 'Khác')
-                                                    );
+                                                    // Kiểm tra xem ngành được chọn có nhãn là "Khác" hay không
+                                                    const isKhac = industries.find(item => item.value === selectedId && item.label === 'Khác');
 
                                                     return isKhac ? (
                                                         <Form.Item
@@ -178,7 +224,7 @@ const PostJob = () => {
                                                             rules={[{ required: true, message: 'Vui lòng điền tên ngành nghề khác!' }]}
                                                             style={{ marginTop: 10 }}
                                                         >
-                                                            <Input placeholder="VD: Kỹ sư Trí tuệ nhân tạo (AI Engineer), Prompt Engineer..." />
+                                                            <Input placeholder="VD: Kỹ sư Trí tuệ nhân tạo (AI Engineer)..." />
                                                         </Form.Item>
                                                     ) : null;
                                                 }}
@@ -190,12 +236,15 @@ const PostJob = () => {
                                                     options={locations} 
                                                     showSearch 
                                                     placeholder="Chọn Tỉnh/Thành phố -> Quận/Huyện" 
+                                                    filter={(inputValue, path) =>
+                                                        path.some(option => option.label.toLowerCase().indexOf(inputValue.toLowerCase()) > -1)
+                                                    }
                                                 />
                                             </Form.Item>
                                         </Col>
                                     </Row>
 
-                                    {/* Ô NHẬP KỸ NĂNG AUTO-SUGGEST TUYỆT ĐỈNH */}
+                                    {/* Khối nhập Kỹ năng */}
                                     <Form.Item 
                                         {...restField} 
                                         label="Kỹ năng yêu cầu (Nhập hoặc dán danh sách ngăn cách bởi dấu phẩy)" 
@@ -231,7 +280,7 @@ const PostJob = () => {
                                 </Card>
                             ))}
 
-                            {/* NÚT THÊM VỊ TRÍ */}
+                            {/* Nút thêm vị trí mới */}
                             <Form.Item>
                                 <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />} style={{ height: 50, borderColor: '#1890ff', color: '#1890ff', fontSize: 16 }}>
                                     Thêm vị trí công việc

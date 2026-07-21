@@ -19,33 +19,35 @@ const Home = () => {
     const [loading, setLoading] = useState(true);
     const [thanhPhos, setThanhPhos] = useState([]);
     const [nganhNghes, setNganhNghes] = useState([]);
+    
+    // 👉 Thêm state lưu trữ danh sách Phường/Xã
+    const [phuongXas, setPhuongXas] = useState([]);
 
-    // 👉 1. STATE LƯU TRỮ BỘ LỌC TÌM KIẾM
+    // 👉 1. STATE LƯU TRỮ BỘ LỌC TÌM KIẾM (Bổ sung maPhuong)
     const [searchQuery, setSearchQuery] = useState({
         keyword: '',
-        maTP: null,    // Đổi 'all_location' thành null để API dễ xử lý hơn
-        maNganh: null  // Đổi 'all_category' thành null
+        maTP: null,    
+        maPhuong: null, // Thêm trường phường/xã
+        maNganh: null  
     });
 
-    // 👉 2. HÀM GỌI API (Xử lý thông minh: có tham số thì gọi search, không có thì lấy tất cả)
+    // 👉 2. HÀM GỌI API TÌM KIẾM
     const fetchJobs = async (queryOverrides = null) => {
         setLoading(true);
         try {
-            // Lấy state hiện tại hoặc data truyền vào tức thời (khi vừa đổi Select)
             const currentQuery = queryOverrides || searchQuery;
 
             const params = {};
             if (currentQuery.keyword) params.keyword = currentQuery.keyword;
             if (currentQuery.maTP) params.maTP = currentQuery.maTP;
+            if (currentQuery.maPhuong) params.maPhuong = currentQuery.maPhuong; // Đẩy maPhuong lên API
             if (currentQuery.maNganh) params.maNganh = currentQuery.maNganh;
 
-            // Nếu có bất kỳ điều kiện lọc nào thì gọi API search, ngược lại gọi API thường
             const isSearching = Object.keys(params).length > 0;
             const endpoint = isSearching ? '/Jobs/search' : '/Jobs';
 
             const response = await apiClient.get(endpoint, { params });
 
-            // Bóc tách dữ liệu JSON an toàn
             let finalData = null;
             if (response) {
                 if (response.data && response.data.data) finalData = response.data.data;
@@ -68,18 +70,33 @@ const Home = () => {
         }
     };
 
+    // 👉 Hàm gọi API lấy Phường Xã theo maTP
+    const fetchPhuongXa = async (maTP) => {
+        if (!maTP) {
+            setPhuongXas([]);
+            return;
+        }
+        try {
+            // Gọi API lấy phường xã dựa trên mã thành phố
+            const res = await apiClient.get('/PhuongXa', { params: { maTP: maTP } });
+            const data = res?.data?.data || res?.data || (Array.isArray(res) ? res : []);
+            setPhuongXas(data);
+        } catch (err) {
+            console.error("Lỗi lấy danh sách phường xã", err);
+        }
+    };
+
     // Tự động load danh sách khi mới vào trang
     useEffect(() => {
         fetchJobs();
+        
         apiClient.get('/ThanhPho')
             .then(res => {
-                // Tùy cấu trúc API trả về, thường là res.data
                 const data = res?.data?.data || res?.data || (Array.isArray(res) ? res : []);
                 setThanhPhos(data);
             })
             .catch(err => console.error("Lỗi lấy danh sách thành phố", err));
 
-        // 3. Gọi API lấy danh sách Ngành Nghề từ Backend
         apiClient.get('/NganhNghe')
             .then(res => {
                 const data = res?.data?.data || res?.data || (Array.isArray(res) ? res : []);
@@ -88,7 +105,6 @@ const Home = () => {
             .catch(err => console.error("Lỗi lấy danh sách ngành nghề", err));
     }, []);
 
-    // 👉 3. HÀM XỬ LÝ NÚT LƯU TIN
     const handleBookmark = async (maViTri) => {
         if (!maViTri) {
             message.warning("Chiến dịch này hiện chưa có vị trí cụ thể để lưu!");
@@ -96,7 +112,7 @@ const Home = () => {
         }
         try {
             const res = await apiClient.post(`/Jobs/${maViTri}/bookmark`, null, {
-                headers: { maUser: 1 } // Backup: sau này thay bằng token
+                headers: { maUser: 1 }
             });
             if (res.data && res.data.success) {
                 message.success(res.data.isBookmarked ? "Đã lưu tin thành công!" : "Đã bỏ lưu tin!");
@@ -126,40 +142,63 @@ const Home = () => {
 
                 {/* KHUNG TÌM KIẾM */}
                 <div style={{
-                    maxWidth: 900, margin: '0 auto', background: '#1f1f1f', padding: 8,
+                    maxWidth: 1000, margin: '0 auto', background: '#1f1f1f', padding: 8,
                     borderRadius: 8, display: 'flex', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', border: '1px solid #303030'
                 }}>
                     <Input
                         prefix={<SearchOutlined style={{ color: '#8c8c8c' }} />}
                         placeholder="Tên công ty, chiến dịch..."
                         variant="borderless"
-                        style={{ flex: 2, fontSize: 15, color: '#fff' }}
+                        style={{ flex: 1.5, fontSize: 15, color: '#fff' }}
                         value={searchQuery.keyword}
                         onChange={(e) => setSearchQuery({ ...searchQuery, keyword: e.target.value })}
-                        onPressEnter={() => fetchJobs()} // Nhấn Enter tự tìm
+                        // Bỏ onPressEnter để ép người dùng ấn nút TÌM KIẾM
                     />
                     <div style={{ width: 1, background: '#303030', margin: '5px 10px' }}></div>
 
-                    {/* BỘ LỌC ĐỊA ĐIỂM */}
+                    {/* BỘ LỌC ĐỊA ĐIỂM (TỈNH/THÀNH PHỐ) */}
                     <Select
                         value={searchQuery.maTP || "all"}
                         onChange={(value) => {
                             const val = value === "all" ? null : value;
-                            const newQuery = { ...searchQuery, maTP: val };
-                            setSearchQuery(newQuery);
-                            fetchJobs(newQuery);
+                            setSearchQuery({ ...searchQuery, maTP: val, maPhuong: null }); // Xóa phường/xã khi đổi TP
+                            fetchPhuongXa(val); // Lấy danh sách phường xã mới
+                            // Xóa lệnh fetchJobs(newQuery) ở đây
                         }}
                         variant="borderless"
                         style={{ flex: 1, color: '#fff' }}
                         suffixIcon={<EnvironmentOutlined style={{ color: '#8c8c8c' }} />}
-                        showSearch // Thêm showSearch để gõ tìm kiếm thành phố cho nhanh
-                        optionFilterProp="children" // Cho phép lọc theo tên hiển thị
+                        showSearch
+                        optionFilterProp="children"
                     >
-                        <Select.Option value="all">Tất cả địa điểm</Select.Option>
-                        {/* 👉 Render danh sách thành phố từ Database */}
+                        <Select.Option value="all">Tỉnh / TP</Select.Option>
                         {thanhPhos.map((tp) => (
                             <Select.Option key={tp.maTP} value={tp.maTP}>
                                 {tp.tenTP}
+                            </Select.Option>
+                        ))}
+                    </Select>
+
+                    <div style={{ width: 1, background: '#303030', margin: '5px 10px' }}></div>
+
+                    {/* BỘ LỌC ĐỊA ĐIỂM (PHƯỜNG/XÃ) */}
+                    <Select
+                        value={searchQuery.maPhuong || "all"}
+                        onChange={(value) => {
+                            const val = value === "all" ? null : value;
+                            setSearchQuery({ ...searchQuery, maPhuong: val });
+                            // Xóa lệnh fetchJobs(newQuery) ở đây
+                        }}
+                        disabled={!searchQuery.maTP} // Khóa nếu chưa chọn TP
+                        variant="borderless"
+                        style={{ flex: 1, color: '#fff' }}
+                        showSearch
+                        optionFilterProp="children"
+                    >
+                        <Select.Option value="all">Phường / Xã</Select.Option>
+                        {phuongXas.map((px) => (
+                            <Select.Option key={px.maPhuong} value={px.maPhuong}>
+                                {px.tenPhuong}
                             </Select.Option>
                         ))}
                     </Select>
@@ -171,17 +210,15 @@ const Home = () => {
                         value={searchQuery.maNganh || "all"}
                         onChange={(value) => {
                             const val = value === "all" ? null : value;
-                            const newQuery = { ...searchQuery, maNganh: val };
-                            setSearchQuery(newQuery);
-                            fetchJobs(newQuery);
+                            setSearchQuery({ ...searchQuery, maNganh: val });
+                            // Xóa lệnh fetchJobs(newQuery) ở đây
                         }}
                         variant="borderless"
                         style={{ flex: 1, color: '#fff' }}
                         showSearch
                         optionFilterProp="children"
                     >
-                        <Select.Option value="all">Tất cả ngành nghề</Select.Option>
-                        {/* 👉 Render danh sách ngành nghề từ Database */}
+                        <Select.Option value="all">Ngành nghề</Select.Option>
                         {nganhNghes.map((nganh) => (
                             <Select.Option key={nganh.maNganh} value={nganh.maNganh}>
                                 {nganh.tenNganh}
@@ -189,10 +226,11 @@ const Home = () => {
                         ))}
                     </Select>
 
+                    {/* 👉 CHỈ LỌC KHI ẤN NÚT NÀY */}
                     <Button
                         type="primary"
                         onClick={() => fetchJobs()}
-                        style={{ background: '#fa8c16', borderColor: '#fa8c16', width: 100, height: 40, borderRadius: 6 }}
+                        style={{ background: '#fa8c16', borderColor: '#fa8c16', width: 100, height: 40, borderRadius: 6, marginLeft: 10 }}
                     >
                         <SearchOutlined style={{ fontSize: 18 }} />
                     </Button>
@@ -249,7 +287,6 @@ const Home = () => {
                                             onMouseEnter={(e) => e.target.style.color = '#ff4d4f'}
                                             onMouseLeave={(e) => e.target.style.color = '#8c8c8c'}
                                             onClick={(e) => {
-                                                // 👉 CHẶN EVENT: Ngăn không cho sự kiện click lan ra thẻ Card (tránh chuyển trang khi bấm lưu)
                                                 e.stopPropagation();
                                                 const maViTriDauTien = campaign.viTris && campaign.viTris.length > 0 ? campaign.viTris[0].maViTri || campaign.viTris[0].id : null;
                                                 handleBookmark(maViTriDauTien);
@@ -271,7 +308,6 @@ const Home = () => {
                                                     key={vt.maViTri || vt.id}
                                                     style={{ background: '#11284d', borderColor: '#164c7e', color: '#1677ff', margin: 0, borderRadius: 4, cursor: 'pointer' }}
                                                     onClick={(e) => {
-                                                        // Bấm vào Tag vị trí cũng dẫn về trang chi tiết Chiến dịch
                                                         e.stopPropagation();
                                                         const campaignId = campaign.maTin || campaign.id;
                                                         if (campaignId) navigate(`/job/${campaignId}`);

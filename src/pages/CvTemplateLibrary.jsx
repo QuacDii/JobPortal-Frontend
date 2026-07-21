@@ -70,7 +70,7 @@ const CvTemplateLibrary = () => {
             });
     }, []);
 
-    // 🛠️ FIX LỖI 2: Ép ngôn ngữ về Chữ Hoa khi lọc để tránh kẹt dữ liệu
+    // FIX LỖI 2: Ép ngôn ngữ về Chữ Hoa khi lọc để tránh kẹt dữ liệu
     const filteredCVs = cvTemplates.filter(cv => {
         const cvLangUpper = cv.ngonNgu ? cv.ngonNgu.toUpperCase() : '';
         const matchLang = language === 'ALL' || cvLangUpper === language.toUpperCase();
@@ -78,12 +78,18 @@ const CvTemplateLibrary = () => {
         return matchLang && matchCategory;
     });
 
-    const handleTemplateClick = (currentId) => {
+    // 🌟 ĐÃ SỬA: Nhận thêm tham số chosenColor để đính kèm lên URL hướng trang Builder
+    const handleTemplateClick = (currentId, chosenColor) => {
         const token = localStorage.getItem('token');
         if (!token) {
             setIsModalOpen(true);
         } else {
-            navigate(`/xem-truoc-cv/${currentId}`);
+            if (chosenColor) {
+                // Đóng gói mã màu Hex (chuyển dấu # thành %23 an toàn trên trình duyệt)
+                navigate(`/xem-truoc-cv/${currentId}?color=${encodeURIComponent(chosenColor)}`);
+            } else {
+                navigate(`/xem-truoc-cv/${currentId}`);
+            }
         }
     };
 
@@ -167,8 +173,8 @@ const CvTemplateLibrary = () => {
                 .cv-card { background-color: #242424 !important; border: 1px solid #333 !important; border-radius: 8px !important; overflow: hidden; transition: transform 0.3s ease, border-color 0.3s ease; }
                 .cv-card:hover { transform: translateY(-5px); border-color: #1890ff !important; }
                 .cv-card .ant-card-body { padding: 16px !important; }
-                .color-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; cursor: pointer; border: 2px solid transparent; }
-                .color-dot:hover { border-color: #fff; }
+                .color-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; cursor: pointer; border: 2px solid transparent; transition: all 0.15s ease; }
+                .color-dot:hover { border-color: #ffffff !important; transform: scale(1.15); }
                 .dark-login-modal .ant-modal-content { background-color: #1f1f1f !important; color: #fff !important; border-radius: 12px !important; border: 1px solid #303030; padding: 24px !important; }
                 .dark-login-modal .ant-modal-header { background: transparent !important; border-bottom: none !important; margin-bottom: 8px !important; }
                 .dark-login-modal .ant-modal-title { color: #fff !important; text-align: center; font-size: 22px; font-weight: bold; background: transparent !important; }
@@ -246,7 +252,15 @@ const CvTemplateLibrary = () => {
                                         {cv.colors && cv.colors.length > 0 && (
                                             <Space size={8} style={{ marginBottom: '12px' }}>
                                                 {cv.colors.map((color, index) => (
-                                                    <span key={index} className="color-dot" style={{ backgroundColor: color }}></span>
+                                                    <span 
+                                                        key={index} 
+                                                        className="color-dot" 
+                                                        style={{ backgroundColor: color }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation(); // 🛡️ Ngăn click lây lan ra Card cha
+                                                            handleTemplateClick(currentId, color); // Hướng về Builder kèm màu chỉ định
+                                                        }}
+                                                    ></span>
                                                 ))}
                                             </Space>
                                         )}
@@ -256,7 +270,6 @@ const CvTemplateLibrary = () => {
                                         <Space size={[0, 8]} wrap>
                                             <Tag color="blue" style={{ border: 'none', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 <GlobalOutlined />
-                                                {/* 🛠️ FIX LỖI 1: Ép chữ hoa khi so sánh để không bị nhận nhầm tiếng Việt thành tiếng Anh */}
                                                 {cv.ngonNgu && cv.ngonNgu.toUpperCase() === 'VI' ? 'Tiếng Việt' : 'Tiếng Anh'}
                                             </Tag>
                                             {cv.tags && cv.tags.split(',').map((tag, idx) => (

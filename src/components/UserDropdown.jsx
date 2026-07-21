@@ -22,17 +22,30 @@ const UserDropdown = ({ user, onLogout }) => {
     const displayName = user?.hoTen || 'Người dùng';
     const displayEmail = user?.email || 'Chưa cập nhật email';
 
-    // 2. 🔄 TỰ ĐỘNG GỌI API LẤY ẢNH CV CHÍNH KHI ĐĂNG NHẬP THÀNH CÔNG
+    // 2. 🔄 TỰ ĐỘNG GỌI API LẤY ẢNH CV CHÍNH KHI ĐĂNG NHẬP THÀNH CÔNG (PHÒNG THỦ ĐA TẦNG)
     useEffect(() => {
-        if (user?.maUser) {
-            apiClient.get(`/Cv/primary-avatar/${user.maUser}`)
+        // Dự phòng trường hợp maUser bị biến thể thành id hoặc userId từ Token
+        const userId = user?.maUser || user?.userId || user?.id;
+
+        if (userId) {
+            apiClient.get(`/Cv/primary-avatar/${userId}`)
                 .then(res => {
-                    if (res.data && res.data.url) {
-                        setLiveAvatar(res.data.url); 
+                    // Đề phòng Interceptor tự động bóc tách dữ liệu JSON
+                    const actualData = res?.data !== undefined ? res.data : res;
+                    
+                    if (actualData) {
+                        // Trường hợp 1: API trả về một Object chứa URL dạng { url: "http://..." }
+                        if (typeof actualData === 'object' && actualData.url) {
+                            setLiveAvatar(actualData.url); 
+                        } 
+                        // Trường hợp 2: API trả về thẳng một chuỗi chuỗi String URL
+                        else if (typeof actualData === 'string' && actualData.trim().startsWith('http')) {
+                            setLiveAvatar(actualData);
+                        }
                     }
                 })
                 .catch(err => {
-                    console.error("Lỗi đồng bộ ảnh đại diện từ CV:", err);
+                    console.error("Lỗi đồng bộ ảnh đại diện từ CV chính:", err);
                 });
         }
     }, [user]);

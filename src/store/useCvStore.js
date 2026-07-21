@@ -12,7 +12,7 @@ const useCvStore = create((setStore, getStore) => ({
     skills: [],
     certificates: [],
     awards: [],
-    hobbies: '',
+    hobbies: [],
     summary: '',
     activities: [],
     projects: []
@@ -52,6 +52,51 @@ const useCvStore = create((setStore, getStore) => ({
   getValueFromPath: (path, defaultValue = '') => {
     return get(getStore().cvData, path, defaultValue);
   },
+
+  /* ========================================================
+     BỔ SUNG 3 HÀM DÀNH RIÊNG CHO ATOMIC RENDERER ĐIỀU KHIỂN
+  ======================================================== */
+  addLoopItem: (arrayPath) => setStore((state) => {
+    const newCvData = JSON.parse(JSON.stringify(state.cvData));
+    const currentArray = get(newCvData, arrayPath, []);
+    // Thêm một item với id ngẫu nhiên để UI nhận dạng và render khối mới
+    set(newCvData, arrayPath, [...currentArray, { id: Date.now() }]);
+    return { cvData: newCvData };
+  }),
+
+  removeLoopItem: (itemPath) => setStore((state) => {
+    // itemPath truyền từ Atomic sẽ có dạng "education[0]" hoặc "experience[1]"
+    const match = itemPath.match(/(.*)\[(\d+)\]$/);
+    if (!match) return state;
+    
+    const arrayPath = match[1];
+    const indexToRemove = parseInt(match[2], 10);
+    
+    const newCvData = JSON.parse(JSON.stringify(state.cvData));
+    const currentArray = get(newCvData, arrayPath, []);
+    
+    // Xóa item dựa theo chính xác số thứ tự (index)
+    if (indexToRemove >= 0 && indexToRemove < currentArray.length) {
+      currentArray.splice(indexToRemove, 1);
+      set(newCvData, arrayPath, currentArray);
+    }
+    return { cvData: newCvData };
+  }),
+
+  moveLoopItem: (arrayPath, fromIndex, toIndex) => setStore((state) => {
+    const newCvData = JSON.parse(JSON.stringify(state.cvData));
+    const currentArray = get(newCvData, arrayPath, []);
+
+    // Hoán đổi vị trí 2 phần tử trong mảng
+    if (fromIndex >= 0 && fromIndex < currentArray.length && toIndex >= 0 && toIndex < currentArray.length) {
+      const temp = currentArray[fromIndex];
+      currentArray[fromIndex] = currentArray[toIndex];
+      currentArray[toIndex] = temp;
+      set(newCvData, arrayPath, currentArray);
+    }
+    return { cvData: newCvData };
+  }),
+  /* ======================================================== */
 
   addArrayItem: (arrayPath, newItemTemplate) => setStore((state) => {
     const newCvData = JSON.parse(JSON.stringify(state.cvData));
