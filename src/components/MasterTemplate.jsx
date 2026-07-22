@@ -1,45 +1,22 @@
 import React from 'react';
 import useCvStore from '../store/useCvStore';
-import BlockRenderer from './BlockRenderer';
+import AtomicRenderer from './CvEngine/AtomicRenderer';
 
 const MasterTemplate = () => {
-    const layoutSchema = useCvStore(state => state.layoutSchema);
-    const layoutSettings = useCvStore(state => state.layoutSettings);
+  // Lấy bản vẽ hiện tại từ Zustand Store
+  const layoutSchema = useCvStore((state) => state.layoutSchema);
+  // Lấy dữ liệu ứng viên làm ngữ cảnh gốc (Global Context Scope)
+  const cvData = useCvStore((state) => state.cvData);
 
-    if (!layoutSchema || !layoutSchema.layout) return null;
+  if (!layoutSchema) {
+    return <div style={{ padding: '20px', textAlign: 'center' }}>Đang tải mẫu thiết kế...</div>;
+  }
 
-    return (
-        <div style={{
-            fontFamily: layoutSettings.fontFamily || 'Arial, sans-serif',
-            fontSize: `${(layoutSettings.fontSize / 100) * 10 + 10}px`, 
-            lineHeight: layoutSettings.lineHeight || 1.5,
-            width: '100%',
-            minHeight: '297mm', // Chuẩn A4
-            backgroundColor: '#ffffff', // 👉 Ép cứng nền trắng cho toàn bộ tờ giấy
-            boxSizing: 'border-box'
-        }}>
-            {layoutSchema.layout.map((row, rIndex) => (
-                <div key={`row-${rIndex}`} style={{ ...row.rowStyles, boxSizing: 'border-box' }}>
-                    
-                    {row.columns.map((col) => (
-                        <div 
-                            key={col.columnId} 
-                            style={{ 
-                                ...col.styles, // 👉 Đọc màu sắc cột từ Database (JSON)
-                                width: `${col.widthPercentage}%`, 
-                                boxSizing: 'border-box' 
-                            }}
-                        >
-                            {col.blocks.map((block) => (
-                                <BlockRenderer key={block.id} blockConfig={block} />
-                            ))}
-                        </div>
-                    ))}
-
-                </div>
-            ))}
-        </div>
-    );
+  return (
+    <div className="master-template-container" style={{ width: '100%', height: '100%' }}>
+      <AtomicRenderer node={layoutSchema} dataScope={cvData} isRoot={true} />
+    </div>
+  );
 };
 
 export default MasterTemplate;

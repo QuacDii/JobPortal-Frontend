@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const apiClient = axios.create({
+const apiClient =  axios.create({
     baseURL: 'http://localhost:5279/api', 
     headers: { 'Content-Type': 'application/json' }
 });
@@ -18,7 +18,7 @@ apiClient.interceptors.request.use((config) => {
 // Xử lý Response trả về từ Server
 apiClient.interceptors.response.use(
     (response) => {
-        // Bước 1: Lột lớp vỏ mặc định của Axios
+        // Bước 1: Lột lớp vỏ mặc định của  
         const resData = response.data;
 
         // Bước 2: Tự động lột lớp vỏ của Backend (nếu có)
@@ -54,7 +54,7 @@ apiClient.interceptors.response.use(
                 if (!oldRefreshToken) throw new Error("Không tìm thấy khóa phụ");
 
                 // Gọi API ngầm đổi token mới
-                const res = await axios.post('http://localhost:5279/api/auth/refresh-token', {
+                const res = await apiClient.post('http://localhost:5279/api/auth/refresh-token', {
                     refreshToken: oldRefreshToken
                 });
 

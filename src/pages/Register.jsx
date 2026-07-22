@@ -138,7 +138,6 @@ const Register = () => {
                             callback={async (response) => {
                                 if (response.accessToken) {
                                     try {
-                                        // 👉 ĐÃ SỬA: Gửi kèm cả vaiTro giống y chang bên Google
                                         const res = await apiClient.post('/auth/facebook-login', {
                                             accessToken: response.accessToken,
                                             vaiTro: finalRoleValue
@@ -147,8 +146,6 @@ const Register = () => {
                                         if (res.data.success) {
                                             message.success(res.data.message || 'Xác thực tài khoản Facebook thành công!');
                                             localStorage.setItem('token', res.data.token);
-                                            
-                                            // 👉 ĐÃ SỬA CHÍ MẠNG: Thay thế hàm không tồn tại bằng điều hướng chuẩn
                                             window.location.href = '/'; 
                                         }
                                     } catch (error) {

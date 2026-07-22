@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // 👉 ĐÃ THÊM: Import thư viện chuyển trang
+import { useNavigate } from 'react-router-dom';
 import { Popover, Avatar, Menu, Typography, Divider } from 'antd';
 import apiClient from '../api/apiClient';
 import {
@@ -14,7 +14,7 @@ import {
 const { Text } = Typography;
 
 const UserDropdown = ({ user, onLogout }) => {
-    const navigate = useNavigate(); // 👉 ĐÃ THÊM: Khởi tạo hàm chuyển trang
+    const navigate = useNavigate(); 
 
     // 1. STATE LƯU TRỮ LINK ẢNH REALTIME LẤY TỪ CV CHÍNH
     const [liveAvatar, setLiveAvatar] = useState(null);
@@ -22,17 +22,30 @@ const UserDropdown = ({ user, onLogout }) => {
     const displayName = user?.hoTen || 'Người dùng';
     const displayEmail = user?.email || 'Chưa cập nhật email';
 
-    // 2. 🔄 TỰ ĐỘNG GỌI API LẤY ẢNH CV CHÍNH KHI ĐĂNG NHẬP THÀNH CÔNG
+    // 2. 🔄 TỰ ĐỘNG GỌI API LẤY ẢNH CV CHÍNH KHI ĐĂNG NHẬP THÀNH CÔNG (PHÒNG THỦ ĐA TẦNG)
     useEffect(() => {
-        if (user?.maUser) {
-            apiClient.get(`/Cv/primary-avatar/${user.maUser}`)
+        // Dự phòng trường hợp maUser bị biến thể thành id hoặc userId từ Token
+        const userId = user?.maUser || user?.userId || user?.id;
+
+        if (userId) {
+            apiClient.get(`/Cv/primary-avatar/${userId}`)
                 .then(res => {
-                    if (res.data && res.data.url) {
-                        setLiveAvatar(res.data.url); 
+                    // Đề phòng Interceptor tự động bóc tách dữ liệu JSON
+                    const actualData = res?.data !== undefined ? res.data : res;
+                    
+                    if (actualData) {
+                        // Trường hợp 1: API trả về một Object chứa URL dạng { url: "http://..." }
+                        if (typeof actualData === 'object' && actualData.url) {
+                            setLiveAvatar(actualData.url); 
+                        } 
+                        // Trường hợp 2: API trả về thẳng một chuỗi chuỗi String URL
+                        else if (typeof actualData === 'string' && actualData.trim().startsWith('http')) {
+                            setLiveAvatar(actualData);
+                        }
                     }
                 })
                 .catch(err => {
-                    console.error("Lỗi đồng bộ ảnh đại diện từ CV:", err);
+                    console.error("Lỗi đồng bộ ảnh đại diện từ CV chính:", err);
                 });
         }
     }, [user]);
@@ -55,7 +68,9 @@ const UserDropdown = ({ user, onLogout }) => {
             label: <span style={{ fontWeight: 500 }}>Quản lý tìm việc</span>,
             children: [
                 { key: 'viec-lam-da-luu', label: 'Việc làm đã lưu' },
-                { key: 'viec-lam-da-ung-tuyen', label: 'Việc làm đã ứng tuyển' },
+                { key: 'viec-lam-da-ung-tuyen', label: 'Việc làm đã ứng tuyển', 
+                    onClick: () => navigate('/viec-lam')
+                },
             ],
         },
         {

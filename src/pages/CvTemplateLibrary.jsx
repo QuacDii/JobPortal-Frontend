@@ -14,7 +14,7 @@ import {
     GoogleOutlined,
     FacebookFilled,
     CheckCircleFilled,
-    GlobalOutlined // <-- Đã thêm icon này để sửa lỗi sập ứng dụng
+    GlobalOutlined 
 } from '@ant-design/icons';
 import apiClient from '../api/apiClient';
 import { useGoogleLogin } from '@react-oauth/google';
@@ -60,9 +60,7 @@ const CvTemplateLibrary = () => {
     useEffect(() => {
         apiClient.get('/MauCv')
             .then(response => {
-
                 const data = response.data !== undefined ? response.data : response;
-                
                 setCvTemplates(data || []);
                 setLoading(false);
             })
@@ -72,18 +70,26 @@ const CvTemplateLibrary = () => {
             });
     }, []);
 
+    // FIX LỖI 2: Ép ngôn ngữ về Chữ Hoa khi lọc để tránh kẹt dữ liệu
     const filteredCVs = cvTemplates.filter(cv => {
-        const matchLang = language === 'ALL' || cv.ngonNgu === language;
+        const cvLangUpper = cv.ngonNgu ? cv.ngonNgu.toUpperCase() : '';
+        const matchLang = language === 'ALL' || cvLangUpper === language.toUpperCase();
         const matchCategory = activeFilter === 'Tất cả' || (cv.tags && cv.tags.includes(activeFilter));
         return matchLang && matchCategory;
     });
 
-    const handleTemplateClick = (currentId) => {
+    // 🌟 ĐÃ SỬA: Nhận thêm tham số chosenColor để đính kèm lên URL hướng trang Builder
+    const handleTemplateClick = (currentId, chosenColor) => {
         const token = localStorage.getItem('token');
         if (!token) {
             setIsModalOpen(true);
         } else {
-            navigate(`/xem-truoc-cv/${currentId}`);
+            if (chosenColor) {
+                // Đóng gói mã màu Hex (chuyển dấu # thành %23 an toàn trên trình duyệt)
+                navigate(`/xem-truoc-cv/${currentId}?color=${encodeURIComponent(chosenColor)}`);
+            } else {
+                navigate(`/xem-truoc-cv/${currentId}`);
+            }
         }
     };
 
@@ -128,7 +134,6 @@ const CvTemplateLibrary = () => {
 
     return (
         <div style={{ backgroundColor: '#1a1a1a', minHeight: '100vh', padding: '40px' }}>
-
             <style>{`
                 /* ================= CSS CÁC NÚT PHÂN LOẠI ================= */
                 .filter-pill { 
@@ -146,54 +151,30 @@ const CvTemplateLibrary = () => {
                     transform: translateY(-4px); box-shadow: 0 6px 16px rgba(24, 144, 255, 0.3); 
                 }
 
-                /* ================= CSS SỬA LỖI MENU DROP NGÔN NGỮ ================= */
+                /* ================= CSS MENUDROP NGÔN NGỮ ================= */
                 .custom-dark-select .ant-select-selector {
-                    background-color: #242424 !important;
-                    border: 1px solid #333 !important;
-                    color: #fff !important;
-                    border-radius: 24px !important; 
-                    height: 38px !important;
-                    align-items: center;
-                    transition: all 0.3s;
+                    background-color: #242424 !important; border: 1px solid #333 !important;
+                    color: #fff !important; border-radius: 24px !important; height: 38px !important;
+                    align-items: center; transition: all 0.3s;
                 }
                 .custom-dark-select:hover .ant-select-selector {
-                    border-color: #1890ff !important;
-                    box-shadow: 0 0 8px rgba(24, 144, 255, 0.2) !important;
+                    border-color: #1890ff !important; box-shadow: 0 0 8px rgba(24, 144, 255, 0.2) !important;
                 }
                 .custom-dark-select .ant-select-arrow { color: #a6a6a6 !important; }
                 
-                /* Menu xổ xuống (Fix lỗi nền xám trắng) */
-                .custom-dark-dropdown {
-                    background-color: #242424 !important;
-                    border: 1px solid #333 !important;
-                    border-radius: 12px !important;
-                    padding: 4px !important;
-                }
-                .custom-dark-dropdown .ant-select-item {
-                    color: #a6a6a6 !important;
-                    border-radius: 8px !important;
-                    margin-bottom: 2px;
-                    transition: all 0.2s;
-                }
-                /* Khi rê chuột vào Option (Hover) */
+                .custom-dark-dropdown { background-color: #242424 !important; border: 1px solid #333 !important; border-radius: 12px !important; padding: 4px !important; }
+                .custom-dark-dropdown .ant-select-item { color: #a6a6a6 !important; border-radius: 8px !important; margin-bottom: 2px; transition: all 0.2s; }
+                
                 .custom-dark-dropdown .ant-select-item-option-active:not(.ant-select-item-option-disabled),
-                .custom-dark-dropdown .ant-select-item:hover {
-                    background-color: rgba(24, 144, 255, 0.1) !important;
-                    color: #1890ff !important;
-                }
-                /* Khi Option đang được chọn sẵn (Selected) */
-                .custom-dark-dropdown .ant-select-item-option-selected {
-                    background-color: #1890ff !important;
-                    color: #fff !important;
-                    font-weight: 600 !important;
-                }
+                .custom-dark-dropdown .ant-select-item:hover { background-color: rgba(24, 144, 255, 0.1) !important; color: #1890ff !important; }
+                .custom-dark-dropdown .ant-select-item-option-selected { background-color: #1890ff !important; color: #fff !important; font-weight: 600 !important; }
 
                 /* ================= CSS GIAO DIỆN KHÁC ================= */
                 .cv-card { background-color: #242424 !important; border: 1px solid #333 !important; border-radius: 8px !important; overflow: hidden; transition: transform 0.3s ease, border-color 0.3s ease; }
                 .cv-card:hover { transform: translateY(-5px); border-color: #1890ff !important; }
                 .cv-card .ant-card-body { padding: 16px !important; }
-                .color-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; cursor: pointer; border: 2px solid transparent; }
-                .color-dot:hover { border-color: #fff; }
+                .color-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; cursor: pointer; border: 2px solid transparent; transition: all 0.15s ease; }
+                .color-dot:hover { border-color: #ffffff !important; transform: scale(1.15); }
                 .dark-login-modal .ant-modal-content { background-color: #1f1f1f !important; color: #fff !important; border-radius: 12px !important; border: 1px solid #303030; padding: 24px !important; }
                 .dark-login-modal .ant-modal-header { background: transparent !important; border-bottom: none !important; margin-bottom: 8px !important; }
                 .dark-login-modal .ant-modal-title { color: #fff !important; text-align: center; font-size: 22px; font-weight: bold; background: transparent !important; }
@@ -204,7 +185,6 @@ const CvTemplateLibrary = () => {
 
             {/* THANH LỌC DANH MỤC & NGÔN NGỮ */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
-                
                 <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '8px 4px 12px 4px', flex: 1 }}>
                     {filterOptions.map(filter => (
                         <div
@@ -230,20 +210,10 @@ const CvTemplateLibrary = () => {
                         <GlobalOutlined style={{ marginRight: '8px', color: '#fff', verticalAlign: 'middle' }} /> Tất cả
                     </Option>
                     <Option value="VI">
-                        <img 
-                            src="https://flagcdn.com/w20/vn.png" 
-                            alt="Vietnam Flag" 
-                            style={{ width: '18px', marginRight: '8px', borderRadius: '2px', verticalAlign: 'middle' }} 
-                        /> 
-                        Tiếng Việt
+                        <img src="https://flagcdn.com/w20/vn.png" alt="Vietnam Flag" style={{ width: '18px', marginRight: '8px', borderRadius: '2px', verticalAlign: 'middle' }} /> Tiếng Việt
                     </Option>
                     <Option value="EN">
-                        <img 
-                            src="https://flagcdn.com/w20/gb.png" 
-                            alt="UK Flag" 
-                            style={{ width: '18px', marginRight: '8px', borderRadius: '2px', verticalAlign: 'middle' }} 
-                        /> 
-                        Tiếng Anh
+                        <img src="https://flagcdn.com/w20/gb.png" alt="UK Flag" style={{ width: '18px', marginRight: '8px', borderRadius: '2px', verticalAlign: 'middle' }} /> Tiếng Anh
                     </Option>
                 </Select>
             </div>
@@ -271,7 +241,6 @@ const CvTemplateLibrary = () => {
                                         cover={
                                             <div style={{ padding: '0', backgroundColor: '#333', position: 'relative' }}>
                                                 <img alt={currentTitle} src={currentImage} style={{ width: '100%', height: '360px', objectFit: 'cover', objectPosition: 'top' }} />
-
                                                 {cv.isATS && (
                                                     <div style={{ position: 'absolute', top: 12, left: 12, backgroundColor: '#00b14f', color: '#fff', padding: '4px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
                                                         <CheckCircleFilled style={{ marginRight: '4px' }} /> Chuẩn ATS
@@ -283,7 +252,15 @@ const CvTemplateLibrary = () => {
                                         {cv.colors && cv.colors.length > 0 && (
                                             <Space size={8} style={{ marginBottom: '12px' }}>
                                                 {cv.colors.map((color, index) => (
-                                                    <span key={index} className="color-dot" style={{ backgroundColor: color }}></span>
+                                                    <span 
+                                                        key={index} 
+                                                        className="color-dot" 
+                                                        style={{ backgroundColor: color }}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation(); // 🛡️ Ngăn click lây lan ra Card cha
+                                                            handleTemplateClick(currentId, color); // Hướng về Builder kèm màu chỉ định
+                                                        }}
+                                                    ></span>
                                                 ))}
                                             </Space>
                                         )}
@@ -293,10 +270,10 @@ const CvTemplateLibrary = () => {
                                         <Space size={[0, 8]} wrap>
                                             <Tag color="blue" style={{ border: 'none', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 <GlobalOutlined />
-                                                {cv.ngonNgu === 'VI' ? 'Tiếng Việt' : 'Tiếng Anh'}
+                                                {cv.ngonNgu && cv.ngonNgu.toUpperCase() === 'VI' ? 'Tiếng Việt' : 'Tiếng Anh'}
                                             </Tag>
-                                            {cv.tags && cv.tags.split(',').map(tag => (
-                                                <Tag key={tag.trim()} color="#333" style={{ color: '#a6a6a6', border: 'none' }}>
+                                            {cv.tags && cv.tags.split(',').map((tag, idx) => (
+                                                <Tag key={idx} color="#333" style={{ color: '#a6a6a6', border: 'none' }}>
                                                     {tag.trim()}
                                                 </Tag>
                                             ))}

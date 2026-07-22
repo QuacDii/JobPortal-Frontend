@@ -1,35 +1,33 @@
+// src/Pages/candidate/CvBuilder.jsx
 import React, { useState, useEffect } from 'react';
 import useCvStore from '../store/useCvStore';
 import apiClient from '../api/apiClient';
-import LayoutManager from '../components/LayoutManager';
 import html2canvas from 'html2canvas';
 import html2pdf from 'html2pdf.js';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Row, Col, Card, Form, Input, Typography, Divider, Button, Space, Upload, message, Spin, Select, Slider, Tooltip } from 'antd';
+import { ConfigProvider, theme, Input, Typography, Button, Space, message, Spin, Select, Slider, Tooltip } from 'antd';
 import {
-    PlusOutlined,
-    DeleteOutlined,
     DownloadOutlined,
     SaveOutlined,
     ArrowLeftOutlined,
     FileTextFilled,
     FormatPainterOutlined,
-    AppstoreAddOutlined,
+    PlusSquareOutlined,
     LayoutOutlined,
     SwapOutlined,
-    LoadingOutlined,
     CloseOutlined,
     UndoOutlined,
     RedoOutlined,
     EyeOutlined,
-    EditOutlined
+    BulbOutlined,
+    BookOutlined,
+    CheckOutlined
 } from '@ant-design/icons';
 
 import MasterTemplate from '../components/MasterTemplate';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 const { Option } = Select;
-const { TextArea } = Input;
 
 const getUserInfoFromToken = (token) => {
     if (!token) return null;
@@ -51,15 +49,73 @@ const getUserInfoFromToken = (token) => {
     }
 };
 
+const cvDictionary = {
+    "Học vấn": { vi: "Học vấn", en: "Education" },
+    "Kỹ năng": { vi: "Kỹ năng", en: "Skills" },
+    "Sở thích": { vi: "Sở thích", en: "Hobbies" },
+    "Mục tiêu nghề nghiệp": { vi: "Mục tiêu nghề nghiệp", en: "Career Objective" },
+    "Kinh nghiệm làm việc": { vi: "Kinh nghiệm làm việc", en: "Work Experience" },
+    "Danh hiệu và giải thưởng": { vi: "Danh hiệu và giải thưởng", en: "Honors & Awards" },
+    "Chứng chỉ": { vi: "Chứng chỉ", en: "Certificates" },
+    "Hoạt động": { vi: "Hoạt động", en: "Activities" },
+    "Giới tính": { vi: "Giới tính", en: "Sex" },
+    "Dự án": { vi: "Dự án", en: "Projects" },
+    "Vị trí ứng tuyển": { vi: "Vị trí ứng tuyển", en: "Target Position" },
+    "Ngày sinh": { vi: "Ngày sinh", en: "Date of Birth" },
+    "Ngành học / Môn học": { vi: "Ngành học / Môn học", en: "Major / Field of Study" },
+    "Bắt đầu": { vi: "Bắt đầu", en: "Start Date" },
+    "Kết thúc": { vi: "Kết thúc", en: "End Date" },
+    "Tên trường học": { vi: "Tên trường học", en: "School / University Name" },
+    "Mô tả quá trình học tập...": { vi: "Mô tả quá trình học tập...", en: "Describe your education process..." },
+    "Tên kỹ năng": { vi: "Tên kỹ năng", en: "Skill Name" },
+    "Sở thích của bạn...": { vi: "Sở thích của bạn...", en: "Your hobbies..." },
+    "Mục tiêu nghề nghiệp của bạn, bao gồm mục tiêu ngắn hạn và dài hạn...": { vi: "Mục tiêu nghề nghiệp của bạn, bao gồm mục tiêu ngắn hạn và dài hạn...", en: "Your career objectives, including short-term and long-term goals..." },
+    "Vị trí công việc": { vi: "Vị trí công việc", en: "Job Title / Position" },
+    "Tên công ty": { vi: "Tên công ty", en: "Company Name" },
+    "Mô tả công việc...": { vi: "Mô tả công việc...", en: "Job description..." },
+    "Thời gian": { vi: "Thời gian", en: "Timeline / Period" },
+    "Tên giải thưởng": { vi: "Tên giải thưởng", en: "Award Name" },
+    "Tên chứng chỉ": { vi: "Tên chứng chỉ", en: "Certificate Name" },
+    "Vị trí của bạn": { vi: "Vị trí của bạn", en: "Your Role" },
+    "Tên tổ chức": { vi: "Tên tổ chức", en: "Organization Name" },
+    "Mô tả hoạt động...": { vi: "Mô tả hoạt động...", en: "Describe your activities..." },
+    "Vị trí của bạn trong dự án": { vi: "Vị trí của bạn trong dự án", en: "Your role in the project" },
+    "Tên dự án": { vi: "Tên dự án", en: "Project Name" },
+    "Mô tả ngắn gọn về dự án...": { vi: "Mô tả ngắn gọn về dự án...", en: "Brief description of the project..." }
+};
+
+const translateText = (text, targetLang) => {
+    if (!text) return text;
+    const entry = Object.values(cvDictionary).find(item => item.vi === text || item.en === text);
+    return entry ? entry[targetLang] : text;
+};
+
+const translateLayoutTree = (node, targetLang) => {
+    if (!node) return null;
+    const newNode = { ...node, styles: { ...node.styles } };
+    if (newNode.content) newNode.content = translateText(newNode.content, targetLang);
+    if (newNode.placeholder) newNode.placeholder = translateText(newNode.placeholder, targetLang);
+    if (newNode.children) {
+        newNode.children = newNode.children.map(child => translateLayoutTree(child, targetLang));
+    }
+    if (newNode.itemTemplate) {
+        newNode.itemTemplate = translateLayoutTree(newNode.itemTemplate, targetLang);
+    }
+    return newNode;
+};
+
 const CvBuilder = () => {
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
 
     const templateId = searchParams.get('templateId') || '1';
     const cvId = searchParams.get('cvId');
     const source = searchParams.get('source');
-    const lang = searchParams.get('lang');
-    const positionId = searchParams.get('position');
+    
+    // 🌟 MỚI: Bắt tín hiệu mã màu được truyền sang từ URL tĩnh (?color=#...)
+    const colorParam = searchParams.get('color');
+
+    const [lang, setLang] = useState(searchParams.get('lang') || 'vi');
 
     const token = localStorage.getItem('token');
     const userInfo = getUserInfoFromToken(token);
@@ -67,25 +123,42 @@ const CvBuilder = () => {
 
     const [cvTitle, setCvTitle] = useState('CV chưa đặt tên');
     const [pageLoading, setPageLoading] = useState(false);
-    const [imageLoading, setImageLoading] = useState(false);
-
-    // Mặc định mở tab Nội dung để người dùng dễ nhập liệu
-    const [activeMenu, setActiveMenu] = useState('content');
+    const [activeMenu, setActiveMenu] = useState('design');
 
     const cvData = useCvStore(state => state.cvData);
-    const { fontFamily, fontSize, lineHeight, themeColor } = useCvStore(state => state.layoutSettings);
+    const { fontFamily, fontSize, lineHeight, themeColor, backgroundStyle } = useCvStore(state => state.layoutSettings || {});
 
     const setInitialData = useCvStore(state => state.setInitialData);
-    const updateCvData = useCvStore(state => state.updateCvData);
     const updateLayoutSetting = useCvStore(state => state.updateLayoutSetting);
 
-    // Bảng màu giống TopCV
-    const themeColors = ['#00b14f', '#1890ff', '#f5222d', '#fa8c16', '#722ed1', '#262626'];
+    const themeColors = ['#574040', '#4e7b8b', '#4e8b7d', '#518b4e', '#6f4e8b', '#8b4e4e'];
+
     const fontOptions = [
+        { label: 'Be Vietnam Pro', value: '"Be Vietnam Pro", sans-serif' },
         { label: 'Roboto', value: 'Roboto, sans-serif' },
         { label: 'Arial', value: 'Arial, sans-serif' },
-        { label: 'Times New Roman', value: '"Times New Roman", serif' },
         { label: 'Nunito', value: 'Nunito, sans-serif' }
+    ];
+
+    const fontSizeMarks = {
+        12: 'Nhỏ',
+        14: { style: { color: '#00b14f' }, label: 'Trung bình' },
+        17: 'Siêu lớn'
+    };
+
+    const lineHeightMarks = {
+        1.0: '1.0', 1.15: '', 1.3: '', 1.45: '', 1.6: '', 1.75: '', 1.9: '', 2.0: '2.0'
+    };
+
+    const bgPatterns = [
+        { id: 'none', name: 'Mặc định', value: 'none', css: '#141414' },
+        { id: 'pt1', name: 'Gradient Classic', value: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)', css: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)' },
+        { id: 'pt2', name: 'Dark Abstract', value: 'linear-gradient(to right, #243b55, #141e30)', css: 'linear-gradient(to right, #243b55, #141e30)' },
+        { id: 'pt3', name: 'Deep Purple', value: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)', css: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)' },
+        { id: 'pt4', name: 'Premium Mesh', value: 'linear-gradient(45deg, #859398 0%, #283048 100%)', css: 'linear-gradient(45deg, #859398 0%, #283048 100%)' },
+        { id: 'pt5', name: 'Cyberpunk Dark', value: 'linear-gradient(60deg, #29323c 0%, #485563 100%)', css: 'linear-gradient(60deg, #29323c 0%, #485563 100%)' },
+        { id: 'pt6', name: 'Luxury Wine', value: 'linear-gradient(135deg, #e65245 0%, #240b36 100%)', css: 'linear-gradient(135deg, #e65245 0%, #240b36 100%)' },
+        { id: 'pt7', name: 'Soft Dark', value: 'linear-gradient(to top, #1e3c72 0%, #1e3c72 1%, #111111 100%)', css: 'linear-gradient(to top, #1e3c72 0%, #1e3c72 1%, #111111 100%)' }
     ];
 
     useEffect(() => {
@@ -93,122 +166,58 @@ const CvBuilder = () => {
             setPageLoading(true);
             try {
                 if (cvId && token) {
-                    // KỊCH BẢN 1: CHỈNH SỬA CV ĐÃ LƯU
+                    // 1. LUỒNG TẢI LẠI CV ĐÃ LƯU CŨ
                     const res = await apiClient.get(`/Cv/${cvId}`);
-                    
-                    // Giải pháp phòng vệ đa tầng: Tự động tương thích với mọi loại Interceptor bóc tách
                     const actualCv = res?.data ? res.data : res;
-                    
+
                     if (actualCv) {
                         if (actualCv.tieuDe) setCvTitle(actualCv.tieuDe);
-                        
-                        // Tiến hành chuyển đổi chuỗi JSON thô sang Object cấu trúc bản vẽ
-                        const layoutJson = actualCv.customLayoutJson 
-                            ? (typeof actualCv.customLayoutJson === 'string' ? JSON.parse(actualCv.customLayoutJson) : actualCv.customLayoutJson) 
+                        if (actualCv.maHex || actualCv.MaHex) {
+                            updateLayoutSetting('themeColor', actualCv.maHex || actualCv.MaHex);
+                        }
+                        const layoutJson = actualCv.customLayoutJson
+                            ? (typeof actualCv.customLayoutJson === 'string' ? JSON.parse(actualCv.customLayoutJson) : actualCv.customLayoutJson)
                             : null;
-                            
-                        const contentData = actualCv.duLieuCv 
-                            ? (typeof actualCv.duLieuCv === 'string' ? JSON.parse(actualCv.duLieuCv) : actualCv.duLieuCv) 
+                        const contentData = actualCv.duLieuCv
+                            ? (typeof actualCv.duLieuCv === 'string' ? JSON.parse(actualCv.duLieuCv) : actualCv.duLieuCv)
                             : null;
-                            
+
                         setInitialData(layoutJson, contentData);
                     }
                 } else {
-                    let initialContent = {};
-
-                    // ⚡ KIỂM TRA LỰA CHỌN CỦA NGƯỜI DÙNG TỪ URL
-                    if (source === 'scratch') {
-                        // LỰA CHỌN 1: TỜ GIẤY TRẮNG TINH
-                        initialContent = {
-                            personalInfo: { fullName: '', jobTitle: '', email: '', phone: '', address: '', avatar: '' },
-                            summary: '', skills: '', experience: [], education: [], activities: [], projects: [], awards: [], certificates: [], references: [], hobbies: ''
-                        };
-                    }
-                    else if (source === 'suggested') {
-                        // LỰA CHỌN 2: BƠM DỮ LIỆU MỒI ĐÚNG CHUYÊN NGÀNH
-                        initialContent = {
-                            personalInfo: {
-                                fullName: 'Đặng Quốc Duy',
-                                jobTitle: 'Software Engineer Intern',
-                                email: userInfo?.email || 'dangquocduy2004@gmail.com',
-                                phone: '0123 456 789',
-                                address: 'TP.HCM / Cần Thơ',
-                                avatar: ''
-                            },
-                            summary: 'Định hướng phát triển chuyên sâu về Backend và hệ thống nhúng (Embedded). Trải qua quá trình học tập, tôi đã tích lũy kinh nghiệm làm việc với Java, .NET và quản lý mã nguồn qua GitHub. Mục tiêu của tôi là áp dụng kiến thức vào các dự án thực tế và không ngừng học hỏi để trở thành một Software Engineer toàn diện.',
-                            skills: 'Ngôn ngữ: Java, C# (.NET)\nCông cụ: GitHub, Git\nĐịnh hướng: Backend, Frontend, Embedded Software',
-                            experience: [],
-                            education: [
-                                { id: 1, time: '2022 - Hiện tại', school: 'Đại học / Học viện', major: 'Kỹ thuật phần mềm (Software Engineering)', description: '• Tham gia các khóa học chuyên sâu về thuật toán và phát triển phần mềm.' }
-                            ],
-                            projects: [
-                                {
-                                    id: 1,
-                                    name: 'Thực tập chuyên ngành: Hệ thống vé rạp chiếu phim',
-                                    technologies: 'Java, .NET',
-                                    role: 'Backend Developer',
-                                    description: '• Tham gia kiểm thử (testing) và quản lý hệ thống đặt vé đa nền tảng.\n• Tối ưu luồng dữ liệu xử lý vé cho các suất chiếu khung giờ tối (19:30 - 22:40).',
-                                    link: 'https://github.com/your-profile'
-                                }
-                            ],
-                            activities: [], awards: [], certificates: [], references: [], hobbies: 'Đọc sách, Cập nhật công nghệ mới'
-                        };
-
-                        // Nếu người dùng chọn ngôn ngữ tiếng Anh
-                        if (lang === 'en') {
-                            initialContent.summary = 'Software Engineering student oriented towards Backend and Embedded systems...';
-                            initialContent.personalInfo.jobTitle = 'Software Engineer Intern';
-                            // (Bạn có thể thêm logic dịch tiếng Anh cho các trường khác tại đây)
-                        }
-                    }
-                    else if (source === 'upload-linkedin') {
-                        // LỰA CHỌN 3: BÓC TÁCH DỮ LIỆU TỪ FILE ĐÃ TẢI LÊN
-                        message.info("Hệ thống đang trích xuất dữ liệu từ CV của bạn...");
-                        // Tạm thời trả về form trống cho đến khi Backend làm xong API bóc tách
-                        initialContent = {
-                            personalInfo: { fullName: '', jobTitle: '', email: '', phone: '', address: '', avatar: '' },
-                            summary: '', skills: '', experience: [], education: [], activities: [], projects: [], awards: [], certificates: [], references: [], hobbies: ''
-                        };
-                    }
+                    // 2. LUỒNG KHỞI TẠO MỘT MẪU CV MỚI TINH
+                    let initialContent = {
+                        personalInfo: {
+                            fullName: userInfo?.fullName || '', jobTitle: '', email: userInfo?.email || '',
+                            phone: '', address: '', avatar: '', dob: '', website: ''
+                        },
+                        summary: '', skills: [{ name: '' }, { name: '' }, { name: '' }], experience: [],
+                        education: [{ id: 1, startDate: '', endDate: '', school: '', major: '', description: '' }],
+                        projects: [], activities: [], awards: [], certificates: [], hobbies: ''
+                    };
                     setCvTitle(`CV_${(userInfo?.fullName || 'UngVien').replace(/\s+/g, '')}_Moi`);
 
                     let templateLayout = null;
-
-                    // 👉 2. LẤY BẢN VẼ JSON TỪ DATABASE
                     if (templateId) {
                         try {
                             const templateRes = await apiClient.get(`/MauCv/${templateId}`);
-                            let rawData = templateRes?.layoutJson || templateRes?.LayoutJson || templateRes?.data?.layoutJson;
+                            const actualTemplate = templateRes?.data ? templateRes.data : templateRes;
+
+                            // 🌟 ĐÃ SỬA: Ưu tiên mã màu người dùng chọn từ URL trước, nếu không có mới lấy màu DB mặc định
+                            const defaultColor = colorParam || actualTemplate?.colors?.[0] || (templateId === '3' ? '#574040' : '#00b14f');
+                            updateLayoutSetting('themeColor', defaultColor);
+
+                            let rawData = actualTemplate?.layoutJson || actualTemplate?.LayoutJson;
                             if (rawData) {
-                                try {
-                                    // BƯỚC 1: Dọn dẹp ký tự ẩn (BOM) và khoảng trắng thừa do Copy/Paste
-                                    if (typeof rawData === 'string') {
-                                        rawData = rawData.replace(/^\uFEFF/, '').trim();
-                                    }
-
-                                    // BƯỚC 2: Dịch chuỗi thành Object
-                                    let parsedData = typeof rawData === 'object' ? rawData : JSON.parse(rawData);
-
-                                    // BƯỚC 3: Chống lỗi Double-Serialization từ Backend (.NET)
-                                    if (typeof parsedData === 'string') {
-                                        parsedData = JSON.parse(parsedData);
-                                    }
-
-                                    templateLayout = parsedData;
-                                    console.log("✅ NẠP BẢN VẼ THÀNH CÔNG:", templateLayout);
-
-                                } catch (parseError) {
-                                    console.error("🔴 LỖI CÚ PHÁP JSON TỪ DATABASE:", parseError);
-                                    console.log("CHUỖI BỊ LỖI LÀ:", rawData);
-                                    alert("Mã JSON trong SQL Server bị lỗi cú pháp! Hãy mở tab Console (F12) để xem chi tiết.");
-                                }
+                                if (typeof rawData === 'string') rawData = rawData.replace(/^\uFEFF/, '').trim();
+                                let parsedData = typeof rawData === 'object' ? rawData : JSON.parse(rawData);
+                                if (typeof parsedData === 'string') parsedData = JSON.parse(parsedData);
+                                templateLayout = parsedData;
                             }
                         } catch (err) {
-                            console.error("Lỗi gọi API lấy Mẫu CV:", err);
+                            console.error("Lỗi gọi API hoặc định dạng JSON:", err);
                         }
                     }
-
-                    // 👉 3. BƠM CẢ BẢN VẼ VÀ DỮ LIỆU MỒI VÀO CỖ MÁY
                     setInitialData(templateLayout, initialContent);
                 }
             } catch (err) {
@@ -218,60 +227,30 @@ const CvBuilder = () => {
             }
         };
         initializeCvData();
-    }, [cvId, templateId, token, source, lang, positionId, userInfo?.fullName, userInfo?.email, setInitialData]);
+    }, [cvId, templateId, token, source, userInfo?.fullName, userInfo?.email, setInitialData, colorParam]);
 
-    const handleCvImageUpload = (info) => {
-        if (info.file.status === 'uploading') { setImageLoading(true); return; }
-        if (info.file.status === 'done') {
-            setImageLoading(false);
-            updateCvData('personalInfo', { ...cvData.personalInfo, avatar: info.file.response.url });
-            message.success('Tải ảnh thành công!');
-        } else if (info.file.status === 'error') {
-            setImageLoading(false); message.error('Tải ảnh thất bại!');
+    const handleLanguageToggle = (selectedLang) => {
+        setLang(selectedLang);
+        setSearchParams({ templateId, source, lang: selectedLang, ...(colorParam && { color: colorParam }) });
+        const currentLayout = useCvStore.getState().layoutSchema;
+        if (currentLayout) {
+            const translatedLayout = translateLayoutTree(currentLayout, selectedLang);
+            setInitialData(translatedLayout, cvData);
         }
-    };
-
-    const handlePersonalInfoChange = (e) => {
-        const { name, value } = e.target;
-        updateCvData('personalInfo', { ...cvData.personalInfo, [name]: value });
-    };
-
-    const handleTextChange = (e) => {
-        const { name, value } = e.target;
-        updateCvData(name, value);
-    };
-
-    const addExperience = () => {
-        const newExp = { id: Date.now(), time: '', title: '', description: '' };
-        updateCvData('experience', [...cvData.experience, newExp]);
-    };
-
-    const removeExperience = (id) => {
-        updateCvData('experience', cvData.experience.filter(item => item.id !== id));
-    };
-
-    const handleExperienceChange = (id, field, value) => {
-        const updatedExp = cvData.experience.map(item => item.id === id ? { ...item, [field]: value } : item);
-        updateCvData('experience', updatedExp);
+        message.success(`Đã chuyển đổi cấu trúc ngôn ngữ: ${selectedLang === 'vi' ? 'Tiếng Việt' : 'Tiếng Anh'}`);
     };
 
     const handleDownloadPDF = () => {
         const element = document.querySelector('.cv-preview-page');
-
         const opt = {
-            margin: 0,
-            filename: `${cvTitle || 'CV_Cua_Toi'}.pdf`,
-            image: { type: 'jpeg', quality: 1 },
+            margin: 0, filename: `${cvTitle || 'CV_Cua_Toi'}.pdf`, image: { type: 'jpeg', quality: 1 },
             html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
-
         message.loading({ content: 'Đang tạo PDF...', key: 'pdf_loading' });
-
         html2pdf().set(opt).from(element).save().then(() => {
             message.success({ content: 'Tải PDF thành công!', key: 'pdf_loading', duration: 2 });
         }).catch(err => {
-            console.error("Lỗi xuất PDF:", err);
             message.error({ content: 'Có lỗi xảy ra khi tải PDF!', key: 'pdf_loading', duration: 2 });
         });
     };
@@ -299,13 +278,13 @@ const CvBuilder = () => {
                 maCv: cvId ? parseInt(cvId) : null, maUser: parseInt(userId), maMau: parseInt(templateId),
                 maHex: themeColor, tieuDe: cvTitle, duLieuCv: JSON.stringify(contentDataToSave),
                 customLayoutJson: JSON.stringify(layoutJsonData), isPublic: true, duongDan: uploadedImageUrl,
-                fontChu: fontFamily, ngonNgu: lang || 'vi'
+                fontChu: fontFamily, ngonNgu: lang
             };
 
             await apiClient.post('/Cv', payload);
             hideLoading(); message.success('Lưu hồ sơ thành công!'); navigate('/manage-cv');
         } catch (err) {
-            hideLoading(); 
+            hideLoading();
             const errorMessage = err.response?.data?.message || err.data?.message || 'Lỗi hệ thống khi lưu dữ liệu CV!';
             message.error(errorMessage);
         }
@@ -315,46 +294,41 @@ const CvBuilder = () => {
 
     return (
         <div className="cv-builder-wrapper" style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#141414', overflow: 'hidden' }}>
-
             <style>{`
-                /* HEADER TOPCV STYLE */
                 .cv-builder-header { background-color: #1a1a1a; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; z-index: 10; }
                 .cv-title-input { color: #fff !important; font-weight: 500; font-size: 15px; background-color: transparent !important; border: 1px solid transparent !important; padding: 4px 8px; width: 300px; transition: 0.3s; }
                 .cv-title-input:hover, .cv-title-input:focus { border-color: #333 !important; background-color: #242424 !important; border-radius: 4px; }
-                
                 .builder-body { display: flex; flex: 1; height: calc(100vh - 65px); overflow: hidden; }
-                
-                /* SIDEBAR TOPCV STYLE */
-                .sidebar-menu { width: 90px; min-width: 90px; flex-shrink: 0; background-color: #1a1a1a; border-right: 1px solid #333; display: flex; flex-direction: column; align-items: center; padding-top: 16px; }
-                .menu-btn { width: 100%; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #a6a6a6; cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; }
+                .sidebar-menu { width: 90px; min-width: 90px; flex-shrink: 0; background-color: #1a1a1a; border-right: 1px solid #333; display: flex; flex-direction: column; align-items: center; padding-top: 16px; overflow-y: auto; }
+                .sidebar-menu::-webkit-scrollbar { display: none; }
+                .menu-btn { width: 100%; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #a6a6a6; cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; }
                 .menu-btn:hover { background-color: #242424; color: #fff; }
                 .menu-btn.active { background-color: rgba(0, 177, 79, 0.1); color: #00b14f; border-left: 3px solid #00b14f; }
-                .menu-btn .anticon { font-size: 22px; margin-bottom: 6px; }
+                .menu-btn .anticon { font-size: 20px; margin-bottom: 6px; }
                 .menu-btn span { font-size: 11px; text-align: center; font-weight: 500; }
-
-                /* SETTINGS / CONTENT PANEL */
-                .settings-panel { width: 380px; min-width: 380px; background-color: #1f1f1f; border-right: 1px solid #333; display: flex; flex-direction: column; transition: all 0.3s ease; }
+                .settings-panel { width: 340px; min-width: 340px; background-color: #1f1f1f; border-right: 1px solid #333; display: flex; flex-direction: column; transition: all 0.3s ease; }
                 .settings-panel.hidden { width: 0; min-width: 0; border: none; overflow: hidden; }
                 .panel-header { padding: 16px 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
                 .panel-content { flex: 1; overflow-y: auto; padding: 20px; }
                 .panel-content::-webkit-scrollbar { width: 6px; }
                 .panel-content::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
-
-                /* WORKSPACE (CV PREVIEW) */
                 .workspace-area { flex: 1; background-color: #0f0f0f; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: 40px; }
-                .workspace-area::-webkit-scrollbar { width: 8px; }
-                .workspace-area::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
-                
-                .cv-preview-page { background-color: #ffffff !important; width: 210mm; min-height: 297mm; border-radius: 4px; box-shadow: 0 12px 48px rgba(0,0,0,0.6); color: #333; overflow: hidden; flex-shrink: 0; }
-                
-                /* CUSTOM FORMS & SLIDERS */
-                .custom-form-label { color: #a6a6a6 !important; font-size: 13px; margin-bottom: 4px; display: block; }
+                .cv-preview-page { background-color: #ffffff !important; color: #333333 !important; color-scheme: light !important; width: 210mm; min-height: 297mm; border-radius: 4px; box-shadow: 0 12px 48px rgba(0,0,0,0.6); overflow: hidden; flex-shrink: 0; position: relative; }
+                .cv-preview-page * { color-scheme: light !important; }
+                .custom-form-label { color: #a6a6a6 !important; font-size: 12px; margin-bottom: 10px; display: block; font-weight: bold; text-transform: uppercase;}
                 .custom-input { background-color: #141414 !important; color: #fff !important; border: 1px solid #333 !important; border-radius: 6px; }
                 .custom-input:focus { border-color: #00b14f !important; box-shadow: none !important; }
-                
                 .color-circle { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; display: inline-block; }
                 .color-circle:hover { transform: scale(1.1); }
                 .color-circle.active { border-color: #fff; box-shadow: 0 0 0 2px #00b14f; }
+                .topcv-lang-button { background: #262626; border: 1px solid #434343; color: #a6a6a6; font-weight: 500; padding: 6px 16px; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+                .topcv-lang-button:hover { color: #fff; border-color: #595959; }
+                .topcv-lang-button.active { background: rgba(0, 177, 79, 0.08); border-color: #00b14f; color: #00b14f; }
+                .bg-pattern-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
+                .bg-pattern-item { height: 75px; border-radius: 4px; cursor: pointer; position: relative; border: 2px solid transparent; overflow: hidden; transition: 0.15s; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+                .bg-pattern-item:hover { transform: translateY(-2px); }
+                .bg-pattern-item.active { border-color: #00b14f; }
+                .bg-pattern-check-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.2); display: flex; justify-content: center; align-items: center; color: #00b14f; font-size: 18px; font-weight: bold; }
             `}</style>
 
             {/* HEADER */}
@@ -381,292 +355,129 @@ const CvBuilder = () => {
                     <div className={`menu-btn ${activeMenu === 'design' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'design' ? null : 'design')}>
                         <FormatPainterOutlined /><span>Thiết kế & Font</span>
                     </div>
-                    <div className={`menu-btn ${activeMenu === 'content' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'content' ? null : 'content')}>
-                        <EditOutlined /><span>Nội dung CV</span>
+                    <div className={`menu-btn ${activeMenu === 'add-section' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'add-section' ? null : 'add-section')}>
+                        <PlusSquareOutlined /><span>Thêm mục</span>
                     </div>
                     <div className={`menu-btn ${activeMenu === 'layout' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'layout' ? null : 'layout')}>
                         <LayoutOutlined /><span>Bố cục</span>
                     </div>
-                    <div className={`menu-btn ${activeMenu === 'templates' ? 'active' : ''}`} onClick={() => navigate('/thu-vien-cv')}>
+                    <div className={`menu-btn ${activeMenu === 'change-template' ? 'active' : ''}`} onClick={() => navigate('/thu-vien-cv')}>
                         <SwapOutlined /><span>Đổi mẫu CV</span>
+                    </div>
+                    <div className={`menu-btn ${activeMenu === 'tips' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'tips' ? null : 'tips')}>
+                        <BulbOutlined /><span>Gợi ý viết CV</span>
+                    </div>
+                    <div className="menu-btn" onClick={() => navigate('/thu-vien-cv')}>
+                        <BookOutlined /><span>Thư viện CV</span>
                     </div>
                 </div>
 
-                {/* SETTINGS / CONTENT PANEL */}
+                {/* SETTINGS PANEL */}
                 <div className={`settings-panel no-print ${!activeMenu ? 'hidden' : ''}`}>
                     {activeMenu && (
                         <div className="panel-header">
                             <Title level={5} style={{ color: '#fff', margin: 0 }}>
                                 {activeMenu === 'design' && 'Thiết kế & Font'}
-                                {activeMenu === 'content' && 'Chỉnh sửa Nội dung'}
+                                {activeMenu === 'add-section' && 'Thêm mục CV'}
                                 {activeMenu === 'layout' && 'Quản lý Bố cục'}
+                                {activeMenu === 'tips' && 'Gợi ý viết CV'}
                             </Title>
                             <Button type="text" icon={<CloseOutlined />} style={{ color: '#8c8c8c' }} onClick={() => setActiveMenu(null)} />
                         </div>
                     )}
 
                     <div className="panel-content">
-                        {/* TAB 1: THIẾT KẾ */}
+                        {/* TAB 1: THIẾT KẾ & FONT */}
                         {activeMenu === 'design' && (
                             <div>
+                                <div style={{ marginBottom: '24px' }}>
+                                    <span className="custom-form-label">NGÔN NGỮ CV</span>
+                                    <Space size="small">
+                                        <button className={`topcv-lang-button ${lang === 'vi' ? 'active' : ''}`} onClick={() => handleLanguageToggle('vi')}>Tiếng Việt</button>
+                                        <button className={`topcv-lang-button ${lang === 'en' ? 'active' : ''}`} onClick={() => handleLanguageToggle('en')}>Tiếng Anh</button>
+                                    </Space>
+                                </div>
+
                                 <div style={{ marginBottom: '24px' }}>
                                     <span className="custom-form-label">FONT CHỮ</span>
                                     <Select value={fontFamily} onChange={(val) => updateLayoutSetting && updateLayoutSetting('fontFamily', val)} style={{ width: '100%' }} dropdownStyle={{ backgroundColor: '#242424', color: '#fff' }} className="custom-input">
                                         {fontOptions.map(font => <Option key={font.value} value={font.value}><span style={{ fontFamily: font.value }}>{font.label}</span></Option>)}
                                     </Select>
                                 </div>
-                                <div style={{ marginBottom: '24px' }}>
+
+                                <div style={{ marginBottom: '28px' }}>
                                     <span className="custom-form-label">CỠ CHỮ</span>
-                                    <Slider min={0} max={100} value={fontSize} onChange={(val) => updateLayoutSetting && updateLayoutSetting('fontSize', val)} tooltip={{ formatter: null }} trackStyle={{ backgroundColor: '#00b14f' }} handleStyle={{ borderColor: '#00b14f' }} />
+                                    <Slider min={12} max={17} step={1} value={fontSize || 14} marks={fontSizeMarks} onChange={(val) => updateLayoutSetting && updateLayoutSetting('fontSize', val)} tooltip={{ formatter: null }} trackStyle={{ backgroundColor: '#00b14f' }} handleStyle={{ borderColor: '#00b14f', backgroundColor: '#00b14f' }} />
                                 </div>
-                                <div style={{ marginBottom: '32px' }}>
+
+                                <div style={{ marginBottom: '32px', paddingTop: '8px' }}>
                                     <span className="custom-form-label">KHOẢNG CÁCH DÒNG</span>
-                                    <Slider min={1.0} max={2.0} step={0.1} value={lineHeight} onChange={(val) => updateLayoutSetting && updateLayoutSetting('lineHeight', val)} tooltip={{ formatter: null }} trackStyle={{ backgroundColor: '#00b14f' }} handleStyle={{ borderColor: '#00b14f' }} />
+                                    <Slider min={1.0} max={2.0} step={0.14} value={lineHeight || 1.45} marks={lineHeightMarks} onChange={(val) => updateLayoutSetting && updateLayoutSetting('lineHeight', val)} tooltip={{ formatter: null }} trackStyle={{ backgroundColor: '#00b14f' }} handleStyle={{ borderColor: '#00b14f', backgroundColor: '#00b14f' }} />
                                 </div>
-                                <div>
+
+                                <div style={{ marginBottom: '28px' }}>
                                     <span className="custom-form-label" style={{ marginBottom: '12px' }}>MÀU CHỦ ĐỀ</span>
-                                    <Space size="middle" wrap>
+                                    <Space size="middle" wrap style={{ marginBottom: '14px' }}>
                                         {themeColors.map(color => (
                                             <div key={color} className={`color-circle ${themeColor === color ? 'active' : ''}`} style={{ backgroundColor: color }} onClick={() => updateLayoutSetting && updateLayoutSetting('themeColor', color)} />
                                         ))}
                                     </Space>
 
-                                    {/* Khối gradient màu sắc mô phỏng TopCV */}
-                                    <div style={{ marginTop: '20px', height: '150px', borderRadius: '8px', background: 'linear-gradient(to right, #00b14f, #1890ff)', position: 'relative', border: '1px solid #333' }}>
-                                        <div style={{ position: 'absolute', bottom: '10px', right: '10px', color: '#fff', fontSize: '12px', background: 'rgba(0,0,0,0.5)', padding: '2px 8px', borderRadius: '4px' }}>Tùy chỉnh màu</div>
+                                    <div style={{ background: '#262626', padding: '12px', borderRadius: '6px', border: '1px solid #333' }}>
+                                        <div style={{ position: 'relative', width: '100%', height: '110px', borderRadius: '4px', overflow: 'hidden', background: 'linear-gradient(to right, #fff, transparent), linear-gradient(to top, #000, rgba(255,0,0,0)), red', marginBottom: '10px' }}>
+                                            <input type="color" value={themeColor || '#574040'} onChange={(e) => updateLayoutSetting && updateLayoutSetting('themeColor', e.target.value)} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} />
+                                            <div style={{ width: '100%', height: '100%', background: `linear-gradient(to top, #000000cc, transparent), linear-gradient(to right, #ffffffcc, ${themeColor || '#574040'})` }} />
+                                        </div>
+                                        <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                                            <div style={{ width: '45px', height: '28px', borderRadius: '4px', backgroundColor: themeColor || '#574040', border: '1px solid #434343' }} />
+                                            <Input size="small" value={(themeColor || '#574040').replace('#', '').toUpperCase()} onChange={(e) => {
+                                                const val = e.target.value;
+                                                if (val.length <= 6) updateLayoutSetting && updateLayoutSetting('themeColor', `#${val}`);
+                                            }} style={{ width: '180px', textAlign: 'center', fontFamily: 'monospace' }} className="custom-input" prefix="#" />
+                                        </Space>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <span className="custom-form-label">HÌNH NỀN CV</span>
+                                    <div className="bg-pattern-grid">
+                                        {bgPatterns.map(pattern => (
+                                            <div key={pattern.id} className={`bg-pattern-item ${backgroundStyle === pattern.value ? 'active' : ''}`} style={{ background: pattern.css }} onClick={() => updateLayoutSetting && updateLayoutSetting('backgroundStyle', pattern.value)}>
+                                                {backgroundStyle === pattern.value && (
+                                                    <div className="bg-pattern-check-overlay">
+                                                        <CheckOutlined />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* TAB 2: NỘI DUNG CV (Đưa cụm Form cũ vào đây) */}
-                        {activeMenu === 'content' && (
-                            <Space direction="vertical" size="large" style={{ display: 'flex' }}>
-                                <Card title={<span style={{ color: '#fff' }}>Thông tin cá nhân</span>} size="small" bordered={false} style={{ backgroundColor: '#242424', borderRadius: '8px' }}>
-                                    <Form layout="vertical" requiredMark={false}>
-                                        <Form.Item label={<span className="custom-form-label">Ảnh đại diện</span>}>
-                                            <Upload 
-                                                name="file" 
-                                                listType="picture-card" 
-                                                showUploadList={false} 
-                                                action="http://localhost:5279/api/Upload/image" 
-                                                headers={{
-                                                    Authorization: `Bearer ${localStorage.getItem('token')}`
-                                                }}
-                                                
-                                                onChange={handleCvImageUpload}
-                                            >
-                                                {cvData?.personalInfo?.avatar ? (
-                                                    <img src={cvData.personalInfo.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '4px' }} />
-                                                ) : (
-                                                    <span style={{ color: '#a6a6a6' }}>
-                                                        {imageLoading ? <LoadingOutlined /> : <PlusOutlined />}
-                                                        <div style={{ marginTop: 8 }}>Tải ảnh</div>
-                                                    </span>
-                                                )}
-                                            </Upload>
-                                        </Form.Item>
-                                        <Form.Item label={<span className="custom-form-label">Họ và Tên</span>}><Input name="fullName" value={cvData.personalInfo.fullName} onChange={handlePersonalInfoChange} className="custom-input" /></Form.Item>
-                                        <Form.Item label={<span className="custom-form-label">Vị trí ứng tuyển</span>}><Input name="jobTitle" value={cvData.personalInfo.jobTitle} onChange={handlePersonalInfoChange} className="custom-input" /></Form.Item>
-                                        <Form.Item label={<span className="custom-form-label">Email</span>}><Input name="email" value={cvData.personalInfo.email} onChange={handlePersonalInfoChange} className="custom-input" /></Form.Item>
-                                        <Form.Item label={<span className="custom-form-label">Số điện thoại</span>}><Input name="phone" value={cvData.personalInfo.phone} onChange={handlePersonalInfoChange} className="custom-input" /></Form.Item>
-                                        <Form.Item label={<span className="custom-form-label">Địa chỉ</span>}><Input name="address" value={cvData.personalInfo.address} onChange={handlePersonalInfoChange} className="custom-input" /></Form.Item>
-                                    </Form>
-                                </Card>
-
-                                <Card title={<span style={{ color: '#fff' }}>Tóm tắt & Kỹ năng</span>} size="small" bordered={false} style={{ backgroundColor: '#242424', borderRadius: '8px' }}>
-                                    <Form layout="vertical">
-                                        <Form.Item label={<span className="custom-form-label">Mục tiêu nghề nghiệp</span>}>
-                                            <TextArea rows={5} name="summary" value={cvData.summary} onChange={handleTextChange} className="custom-input" />
-                                        </Form.Item>
-                                        <Form.Item label={<span className="custom-form-label">Kỹ năng & Ngoại ngữ</span>}>
-                                            <TextArea rows={4} name="skills" value={cvData.skills} onChange={handleTextChange} className="custom-input" />
-                                        </Form.Item>
-                                    </Form>
-                                </Card>
-
-                                <Card title={<span style={{ color: '#fff' }}>Kinh nghiệm làm việc</span>} size="small" bordered={false} style={{ backgroundColor: '#242424', borderRadius: '8px' }}>
-                                    {cvData.experience.map((exp) => (
-                                        <div key={exp.id} style={{ marginBottom: '16px', padding: '16px', border: '1px solid #333', borderRadius: '8px', backgroundColor: '#1a1a1a' }}>
-                                            <Form layout="vertical" size="small">
-                                                <Form.Item label={<span className="custom-form-label">Thời gian</span>}><Input value={exp.time} onChange={(e) => handleExperienceChange(exp.id, 'time', e.target.value)} className="custom-input" /></Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Công ty / Vị trí</span>}><Input value={exp.title} onChange={(e) => handleExperienceChange(exp.id, 'title', e.target.value)} className="custom-input" /></Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Mô tả công việc</span>}><TextArea rows={4} value={exp.description} onChange={(e) => handleExperienceChange(exp.id, 'description', e.target.value)} className="custom-input" /></Form.Item>
-                                            </Form>
-                                            <div style={{ textAlign: 'right' }}><Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => removeExperience(exp.id)}>Xóa</Button></div>
-                                        </div>
-                                    ))}
-                                    <Button type="dashed" block icon={<PlusOutlined />} onClick={addExperience} style={{ color: '#00b14f', borderColor: '#00b14f', backgroundColor: 'rgba(0,177,79,0.1)' }}>Thêm kinh nghiệm</Button>
-                                </Card>
-                                <Card title={<span style={{ color: '#fff' }}>Học vấn</span>} size="small" bordered={false} style={{ backgroundColor: '#242424', borderRadius: '8px' }}>
-                                    {(cvData.education || []).map((edu) => (
-                                        <div key={edu.id} style={{ marginBottom: '16px', padding: '16px', border: '1px solid #333', borderRadius: '8px', backgroundColor: '#1a1a1a' }}>
-                                            <Form layout="vertical" size="small">
-                                                <Form.Item label={<span className="custom-form-label">Thời gian</span>}>
-                                                    <Input value={edu.time} onChange={(e) => {
-                                                        const updated = cvData.education.map(item => item.id === edu.id ? { ...item, time: e.target.value } : item);
-                                                        updateCvData('education', updated);
-                                                    }} className="custom-input" placeholder="Ví dụ: 09/2022 - Hiện tại" />
-                                                </Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Trường / Trung tâm</span>}>
-                                                    <Input value={edu.school} onChange={(e) => {
-                                                        const updated = cvData.education.map(item => item.id === edu.id ? { ...item, school: e.target.value } : item);
-                                                        updateCvData('education', updated);
-                                                    }} className="custom-input" placeholder="Ví dụ: Đại học Công nghệ thông tin" />
-                                                </Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Chuyên ngành</span>}>
-                                                    <Input value={edu.major} onChange={(e) => {
-                                                        const updated = cvData.education.map(item => item.id === edu.id ? { ...item, major: e.target.value } : item);
-                                                        updateCvData('education', updated);
-                                                    }} className="custom-input" placeholder="Ví dụ: Kỹ thuật phần mềm (Software Engineering)" />
-                                                </Form.Item>
-                                            </Form>
-                                            <div style={{ textAlign: 'right' }}><Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => updateCvData('education', cvData.education.filter(item => item.id !== edu.id))}>Xóa</Button></div>
-                                        </div>
-                                    ))}
-                                    <Button type="dashed" block icon={<PlusOutlined />} onClick={() => updateCvData('education', [...(cvData.education || []), { id: Date.now(), time: '', school: '', major: '', description: '' }])} style={{ color: '#00b14f', borderColor: '#00b14f', backgroundColor: 'rgba(0,177,79,0.1)' }}>Thêm học vấn</Button>
-                                </Card>
-
-                                {/* 👉 FORM DỰ ÁN */}
-                                <Card title={<span style={{ color: '#fff' }}>Dự án</span>} size="small" bordered={false} style={{ backgroundColor: '#242424', borderRadius: '8px' }}>
-                                    {(cvData.projects || []).map((proj) => (
-                                        <div key={proj.id} style={{ marginBottom: '16px', padding: '16px', border: '1px solid #333', borderRadius: '8px', backgroundColor: '#1a1a1a' }}>
-                                            <Form layout="vertical" size="small">
-                                                <Form.Item label={<span className="custom-form-label">Tên dự án</span>}>
-                                                    <Input value={proj.name} onChange={(e) => {
-                                                        const updated = cvData.projects.map(item => item.id === proj.id ? { ...item, name: e.target.value } : item);
-                                                        updateCvData('projects', updated);
-                                                    }} className="custom-input" placeholder="Ví dụ: Hệ thống quản lý vé rạp chiếu phim (Thực tập chuyên ngành)" />
-                                                </Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Công nghệ sử dụng</span>}>
-                                                    <Input value={proj.technologies} onChange={(e) => {
-                                                        const updated = cvData.projects.map(item => item.id === proj.id ? { ...item, technologies: e.target.value } : item);
-                                                        updateCvData('projects', updated);
-                                                    }} className="custom-input" placeholder="Ví dụ: Java, .NET, GitHub, Backend" />
-                                                </Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Vị trí ứng tuyển / Khu vực</span>}>
-                                                    <Input value={proj.role} onChange={(e) => {
-                                                        const updated = cvData.projects.map(item => item.id === proj.id ? { ...item, role: e.target.value } : item);
-                                                        updateCvData('projects', updated);
-                                                    }} className="custom-input" placeholder="Ví dụ: .NET Intern - Khu vực TP.HCM / Cần Thơ" />
-                                                </Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Mô tả chi tiết</span>}>
-                                                    <TextArea rows={3} value={proj.description} onChange={(e) => {
-                                                        const updated = cvData.projects.map(item => item.id === proj.id ? { ...item, description: e.target.value } : item);
-                                                        updateCvData('projects', updated);
-                                                    }} className="custom-input" />
-                                                </Form.Item>
-                                            </Form>
-                                            <div style={{ textAlign: 'right' }}><Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => updateCvData('projects', cvData.projects.filter(item => item.id !== proj.id))}>Xóa</Button></div>
-                                        </div>
-                                    ))}
-                                    <Button type="dashed" block icon={<PlusOutlined />} onClick={() => updateCvData('projects', [...(cvData.projects || []), { id: Date.now(), name: '', technologies: '', role: '', description: '', link: '' }])} style={{ color: '#00b14f', borderColor: '#00b14f', backgroundColor: 'rgba(0,177,79,0.1)' }}>Thêm dự án</Button>
-                                </Card>
-                                {/* 👉 FORM HOẠT ĐỘNG */}
-                                <Card title={<span style={{ color: '#fff' }}>Hoạt động</span>} size="small" bordered={false} style={{ backgroundColor: '#242424', borderRadius: '8px' }}>
-                                    {(cvData.activities || []).map((act) => (
-                                        <div key={act.id} style={{ marginBottom: '16px', padding: '16px', border: '1px solid #333', borderRadius: '8px', backgroundColor: '#1a1a1a' }}>
-                                            <Form layout="vertical" size="small">
-                                                <Form.Item label={<span className="custom-form-label">Thời gian</span>}>
-                                                    <Input value={act.time} onChange={(e) => updateCvData('activities', cvData.activities.map(item => item.id === act.id ? { ...item, time: e.target.value } : item))} className="custom-input" placeholder="Ví dụ: 03/2024 - Hiện tại" />
-                                                </Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Tổ chức / Sự kiện</span>}>
-                                                    <Input value={act.organization} onChange={(e) => updateCvData('activities', cvData.activities.map(item => item.id === act.id ? { ...item, organization: e.target.value } : item))} className="custom-input" placeholder="Ví dụ: CLB Tin học sinh viên TP.HCM hoặc Cần Thơ" />
-                                                </Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Vai trò</span>}>
-                                                    <Input value={act.role} onChange={(e) => updateCvData('activities', cvData.activities.map(item => item.id === act.id ? { ...item, role: e.target.value } : item))} className="custom-input" placeholder="Ví dụ: Thành viên Ban Kỹ thuật" />
-                                                </Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Mô tả chi tiết</span>}>
-                                                    <TextArea rows={3} value={act.description} onChange={(e) => updateCvData('activities', cvData.activities.map(item => item.id === act.id ? { ...item, description: e.target.value } : item))} className="custom-input" />
-                                                </Form.Item>
-                                            </Form>
-                                            <div style={{ textAlign: 'right' }}><Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => updateCvData('activities', cvData.activities.filter(item => item.id !== act.id))}>Xóa</Button></div>
-                                        </div>
-                                    ))}
-                                    <Button type="dashed" block icon={<PlusOutlined />} onClick={() => updateCvData('activities', [...(cvData.activities || []), { id: Date.now(), time: '', organization: '', role: '', description: '' }])} style={{ color: '#00b14f', borderColor: '#00b14f', backgroundColor: 'rgba(0,177,79,0.1)' }}>Thêm hoạt động</Button>
-                                </Card>
-
-                                {/* 👉 FORM GIẢI THƯỞNG */}
-                                <Card title={<span style={{ color: '#fff' }}>Danh hiệu & Giải thưởng</span>} size="small" bordered={false} style={{ backgroundColor: '#242424', borderRadius: '8px' }}>
-                                    {(cvData.awards || []).map((award) => (
-                                        <div key={award.id} style={{ marginBottom: '16px', padding: '16px', border: '1px solid #333', borderRadius: '8px', backgroundColor: '#1a1a1a' }}>
-                                            <Form layout="vertical" size="small">
-                                                <Form.Item label={<span className="custom-form-label">Thời gian</span>}>
-                                                    <Input value={award.time} onChange={(e) => updateCvData('awards', cvData.awards.map(item => item.id === award.id ? { ...item, time: e.target.value } : item))} className="custom-input" />
-                                                </Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Tên giải thưởng</span>}>
-                                                    <Input value={award.name} onChange={(e) => updateCvData('awards', cvData.awards.map(item => item.id === award.id ? { ...item, name: e.target.value } : item))} className="custom-input" placeholder="Ví dụ: Giải Nhất Hackathon 2025" />
-                                                </Form.Item>
-                                            </Form>
-                                            <div style={{ textAlign: 'right' }}><Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => updateCvData('awards', cvData.awards.filter(item => item.id !== award.id))}>Xóa</Button></div>
-                                        </div>
-                                    ))}
-                                    <Button type="dashed" block icon={<PlusOutlined />} onClick={() => updateCvData('awards', [...(cvData.awards || []), { id: Date.now(), time: '', name: '' }])} style={{ color: '#00b14f', borderColor: '#00b14f', backgroundColor: 'rgba(0,177,79,0.1)' }}>Thêm giải thưởng</Button>
-                                </Card>
-
-                                {/* 👉 FORM CHỨNG CHỈ */}
-                                <Card title={<span style={{ color: '#fff' }}>Chứng chỉ</span>} size="small" bordered={false} style={{ backgroundColor: '#242424', borderRadius: '8px' }}>
-                                    {(cvData.certificates || []).map((cert) => (
-                                        <div key={cert.id} style={{ marginBottom: '16px', padding: '16px', border: '1px solid #333', borderRadius: '8px', backgroundColor: '#1a1a1a' }}>
-                                            <Form layout="vertical" size="small">
-                                                <Form.Item label={<span className="custom-form-label">Thời gian</span>}>
-                                                    <Input value={cert.time} onChange={(e) => updateCvData('certificates', cvData.certificates.map(item => item.id === cert.id ? { ...item, time: e.target.value } : item))} className="custom-input" />
-                                                </Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Tên chứng chỉ</span>}>
-                                                    <Input value={cert.name} onChange={(e) => updateCvData('certificates', cvData.certificates.map(item => item.id === cert.id ? { ...item, name: e.target.value } : item))} className="custom-input" placeholder="Ví dụ: TOEIC 800, AWS Certified Developer" />
-                                                </Form.Item>
-                                            </Form>
-                                            <div style={{ textAlign: 'right' }}><Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => updateCvData('certificates', cvData.certificates.filter(item => item.id !== cert.id))}>Xóa</Button></div>
-                                        </div>
-                                    ))}
-                                    <Button type="dashed" block icon={<PlusOutlined />} onClick={() => updateCvData('certificates', [...(cvData.certificates || []), { id: Date.now(), time: '', name: '' }])} style={{ color: '#00b14f', borderColor: '#00b14f', backgroundColor: 'rgba(0,177,79,0.1)' }}>Thêm chứng chỉ</Button>
-                                </Card>
-
-                                {/* 👉 FORM NGƯỜI GIỚI THIỆU */}
-                                <Card title={<span style={{ color: '#fff' }}>Người giới thiệu</span>} size="small" bordered={false} style={{ backgroundColor: '#242424', borderRadius: '8px' }}>
-                                    {(cvData.references || []).map((ref) => (
-                                        <div key={ref.id} style={{ marginBottom: '16px', padding: '16px', border: '1px solid #333', borderRadius: '8px', backgroundColor: '#1a1a1a' }}>
-                                            <Form layout="vertical" size="small">
-                                                <Form.Item label={<span className="custom-form-label">Họ tên người giới thiệu</span>}>
-                                                    <Input value={ref.name} onChange={(e) => updateCvData('references', cvData.references.map(item => item.id === ref.id ? { ...item, name: e.target.value } : item))} className="custom-input" placeholder="Ví dụ: Anh Nguyễn Văn A" />
-                                                </Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Chức vụ / Công ty</span>}>
-                                                    <Input value={ref.position} onChange={(e) => updateCvData('references', cvData.references.map(item => item.id === ref.id ? { ...item, position: e.target.value } : item))} className="custom-input" placeholder="Ví dụ: Quản lý dự án hệ thống vé rạp chiếu phim" />
-                                                </Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Số điện thoại</span>}>
-                                                    <Input value={ref.phone} onChange={(e) => updateCvData('references', cvData.references.map(item => item.id === ref.id ? { ...item, phone: e.target.value } : item))} className="custom-input" />
-                                                </Form.Item>
-                                                <Form.Item label={<span className="custom-form-label">Email</span>}>
-                                                    <Input value={ref.email} onChange={(e) => updateCvData('references', cvData.references.map(item => item.id === ref.id ? { ...item, email: e.target.value } : item))} className="custom-input" />
-                                                </Form.Item>
-                                            </Form>
-                                            <div style={{ textAlign: 'right' }}><Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => updateCvData('references', cvData.references.filter(item => item.id !== ref.id))}>Xóa</Button></div>
-                                        </div>
-                                    ))}
-                                    <Button type="dashed" block icon={<PlusOutlined />} onClick={() => updateCvData('references', [...(cvData.references || []), { id: Date.now(), name: '', position: '', phone: '', email: '' }])} style={{ color: '#00b14f', borderColor: '#00b14f', backgroundColor: 'rgba(0,177,79,0.1)' }}>Thêm người giới thiệu</Button>
-                                </Card>
-
-                                {/* 👉 FORM SỞ THÍCH */}
-                                <Card title={<span style={{ color: '#fff' }}>Sở thích</span>} size="small" bordered={false} style={{ backgroundColor: '#242424', borderRadius: '8px' }}>
-                                    <Form layout="vertical">
-                                        <TextArea rows={3} value={cvData.hobbies} onChange={(e) => updateCvData('hobbies', e.target.value)} className="custom-input" placeholder="Ví dụ: Đọc sách công nghệ, Thể thao..." />
-                                    </Form>
-                                </Card>
-                            </Space>
+                        {/* TAB THÊM MỤC */}
+                        {activeMenu === 'add-section' && (
+                            <div style={{ color: '#a6a6a6', textAlign: 'center', marginTop: '20px' }}>
+                                <p>Bật/tắt các mục phụ trong CV (Giải thưởng, Sở thích, Chứng chỉ...)</p>
+                                <Button type="dashed" style={{ borderColor: '#333', color: '#fff', background: 'transparent' }} block>+ Hoạt động</Button>
+                                <Button type="dashed" style={{ borderColor: '#333', color: '#fff', background: 'transparent', marginTop: 10 }} block>+ Chứng chỉ</Button>
+                            </div>
                         )}
 
-                        {/* TAB 3: BỐ CỤC (Kéo thả) */}
+                        {/* TAB BỐ CỤC */}
                         {activeMenu === 'layout' && (
-                            <LayoutManager />
+                            <div style={{ color: '#fff' }}>Tính năng quản lý cột bố cục</div>
                         )}
                     </div>
                 </div>
 
-                {/* WORKSPACE - NƠI HIỂN THỊ CV */}
-                <div className="workspace-area">
-                    <div className="cv-preview-page">
-                        <MasterTemplate />
-                    </div>
+                {/* WORKSPACE AREA */}
+                <div className="workspace-area" style={{ background: backgroundStyle !== 'none' ? backgroundStyle : '#0f0f0f' }}>
+                    <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }}>
+                        <div className="cv-preview-page" style={{ '--theme-color': themeColor }}>
+                            <MasterTemplate />
+                        </div>
+                    </ConfigProvider>
                 </div>
             </div>
         </div>
