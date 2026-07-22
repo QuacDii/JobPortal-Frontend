@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Row, Col, Card, Tag, Progress, Input, Button, message, 
-    Spin, Select, Typography, Space, Divider 
+    Spin, Select, Typography, Space, Divider, Modal, Alert
 } from 'antd';
 import { 
     RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, 
@@ -22,6 +22,9 @@ const CandidateAiDetail = () => {
     const [aiDetail, setAiDetail] = useState(null);
     const [noteText, setNoteText] = useState("");
 
+    // Các State phục vụ Modal hẹn phỏng vấn trực tiếp từ màn hình chi tiết AI
+    const [isInterviewModalVisible, setIsInterviewModalVisible] = useState(false);
+    const [interviewData, setInterviewData] = useState({ thoiGian: '', diaDiem: '', linkBaiTest: '', ghiChu: '' });
     useEffect(() => {
         if (maDon) {
             fetchAiDetails();
@@ -49,15 +52,43 @@ const CandidateAiDetail = () => {
     };
 
     const handleStatusChange = async (newStatus) => {
+        // Giải pháp: Khởi tạo chuỗi rỗng độc lập, gỡ bỏ noteText để tránh nghẽn luồng State của Antd
+        if (newStatus === 2) {
+            setInterviewData({ thoiGian: '', diaDiem: '', ghiChu: '' });
+            setIsInterviewModalVisible(true);
+            return;
+        }
+
+        // Xử lý các trạng thái khác (Đã xem, Từ chối) trực tiếp qua API
         try {
             await apiClient.put(`/employer/applications/${maDon}/status`, {
                 status: newStatus,
                 ghiChu: null 
             });
             message.success("Cập nhật trạng thái ứng viên thành công!");
+            fetchAiDetails(); 
+        } catch (error) {
+            // Đọc thông báo chặn đi lùi trả về từ Backend (nếu NTD cố tình chọn từ 3 về 1 hoặc 0)
+            const msg = error.response?.data?.message || "Không thể cập nhật trạng thái do vi phạm logic phễu";
+            message.error(msg);
+        }
+    };
+
+    // Hàm gửi lịch hẹn phỏng vấn kèm dữ liệu cấu trúc thời gian/địa điểm lên API chuẩn Backend
+    const handleSendInterviewInvite = async () => {
+        try {
+            await apiClient.put(`/employer/applications/${maDon}/status`, {
+                status: 2,
+                thoiGian: interviewData.thoiGian,
+                diaDiem: interviewData.diaDiem,
+                linkBaiTest: interviewData.linkBaiTest, 
+                ghiChu: interviewData.ghiChu || null
+            });
+            message.success("Đã cập nhật trạng thái và gửi thư mời phỏng vấn thành công!");
+            setIsInterviewModalVisible(false);
             fetchAiDetails();
         } catch (error) {
-            message.error("Không thể cập nhật trạng thái");
+            message.error("Lỗi hệ thống khi gửi thư mời phỏng vấn");
         }
     };
 
@@ -136,18 +167,22 @@ const CandidateAiDetail = () => {
 
                         <Divider style={{ margin: '20px 0' }} />
                         <div style={{ textAlign: 'left' }}>
-                            <Text strong type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 8 }}>TRẠNG THÁI HIỆN TẠI</Text>
-                            <Select 
-                                value={aiDetail?.trangThaiHienTai} 
-                                style={{ width: '100%' }}
-                                onChange={handleStatusChange}
-                            >
-                                <Option value={0}>Mới nộp (New)</Option>
-                                <Option value={1}>Đã xem (Reviewed)</Option>
-                                <Option value={2}>Hẹn phỏng vấn (Interviewing)</Option>
-                                <Option value={3}>Từ chối (Rejected)</Option>
-                            </Select>
-                        </div>
+                        <Text strong type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 8 }}>TRẠNG THÁI HIỆN TẠI</Text>
+                        <Select 
+                            value={aiDetail?.trangThaiHienTai} 
+                            style={{ width: '100%' }}
+                            onChange={handleStatusChange}
+                        >
+                            {/* Chặn không cho quay lại trạng thái Mới nộp (0) nếu trạng thái hiện tại lớn hơn 0 */}
+                            <Option value={0} disabled={aiDetail?.trangThaiHienTai > 0}>Mới nộp</Option>
+                            
+                            {/* Trạng thái Đã xem (1) chỉ khả dụng khi đang ở Mới nộp (0) hoặc chính nó */}
+                            <Option value={1} disabled={aiDetail?.trangThaiHienTai > 1}>Đã xem</Option>
+                            
+                            <Option value={2}>Hẹn phỏng vấn (Kích hoạt gửi Email)</Option>
+                            <Option value={3}>Từ chối</Option>
+                        </Select>
+                    </div>
                     </Card>
                 </Col>
 
@@ -241,6 +276,51 @@ const CandidateAiDetail = () => {
                     </Card>
                 </Col>
             </Row>
+            {/* BỔ SUNG: MODAL THIẾT LẬP LỊCH HẸN PHỎNG VẤN TRỰC TIẾP TỪ TRANG CHI TIẾT AI */}
+            <Modal
+                title="Thiết lập Lịch hẹn Phỏng vấn & Gửi Email"
+                open={isInterviewModalVisible}
+                onOk={handleSendInterviewInvite}
+                onCancel={() => setIsInterviewModalVisible(false)}
+                okText="Xác nhận & Gửi Mail"
+                cancelText="Hủy bộ"
+            >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: 15 }}>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Thời gian phỏng vấn:</label>
+                        <Input 
+                            placeholder="VD: 09:30 - Thứ Hai, ngày 15/07/2026" 
+                            value={interviewData.thoiGian}
+                            onChange={(e) => setInterviewData({...interviewData, thoiGian: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Địa điểm:</label>
+                        <Input 
+                            placeholder="VD: Văn phòng công ty hoặc link Google Meet" 
+                            value={interviewData.diaDiem}
+                            onChange={(e) => setInterviewData({...interviewData, diaDiem: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Đường dẫn bài kiểm tra / Test đầu vào (Nếu có):</label>
+                        <Input 
+                            placeholder="VD: https://hackerrank.com/company-test-abc hoặc Google Forms" 
+                            value={interviewData.linkBaiTest}
+                            onChange={(e) => setInterviewData({...interviewData, linkBaiTest: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Ghi chú / Lời nhắn thêm:</label>
+                        <TextArea 
+                            rows={3} 
+                            placeholder="Yêu cầu trang phục hoặc tài liệu cần mang theo..." 
+                            value={interviewData.ghiChu}
+                            onChange={(e) => setInterviewData({...interviewData, ghiChu: e.target.value})}
+                        />
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };

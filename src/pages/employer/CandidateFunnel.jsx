@@ -180,19 +180,15 @@ const CandidateFunnel = () => {
         },
         {
             title: 'Trạng thái phễu',
+            dataIndex: 'trangThai',
             key: 'trangThai',
-            render: (text, record) => (
-                <Select 
-                    value={record.trangThai} 
-                    style={{ width: 140 }} 
-                    onChange={(val) => handleStatusChange(record.maDon, val)}
-                >
-                    <Option value={0}>Mới nộp</Option>
-                    <Option value={1}>Đã xem</Option>
-                    <Option value={2}>Hẹn phỏng vấn</Option>
-                    <Option value={3}>Từ chối</Option>
-                </Select>
-            )
+            render: (status) => {
+                if (status === 0) return <Tag color="blue">Mới nộp</Tag>;
+                if (status === 1) return <Tag color="orange">Đã xem</Tag>;
+                if (status === 2) return <Tag color="green">Hẹn phỏng vấn</Tag>;
+                if (status === 3) return <Tag color="error">Từ chối</Tag>;
+                return <Tag color="default">Không rõ</Tag>;
+            }
         },
         {
             title: 'Hành động',

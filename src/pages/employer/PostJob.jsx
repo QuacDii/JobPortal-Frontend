@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Input, Button, Card, Select, DatePicker, Typography, Row, Col, Divider, message, InputNumber, Cascader } from 'antd';
+import { Form, Input, Button, Card, Select, DatePicker, Typography, Row, Col, Divider, message, InputNumber, Cascader, Alert } from 'antd';
 import { PlusOutlined, DeleteOutlined, SendOutlined, RocketOutlined } from '@ant-design/icons';
 import apiClient from '../../api/apiClient';
 
@@ -75,6 +75,14 @@ const PostJob = () => {
                 <RocketOutlined style={{ fontSize: '28px', color: '#1890ff', marginRight: 15 }} />
                 <Title level={3} style={{ margin: 0 }}>Tạo Chiến dịch Tuyển dụng mới</Title>
             </div>
+
+            <Alert
+                message="Lưu ý về tính năng Phân tích hồ sơ bằng AI (HR Tech):"
+                description="Vui lòng mô tả thông tin vị trí việc làm, yêu cầu ứng viên và quyền lợi đầy đủ để hệ thống AI có thể đối chiếu chéo và chấm điểm matching chính xác nhất. Đối với tài khoản doanh nghiệp chưa kích hoạt hoặc hết hạn gói Premium, tính năng AI phân tích tự động này sẽ không khả dụng."
+                type="info"
+                showIcon
+                style={{ marginBottom: 24, borderRadius: 6 }}
+            />
 
             <Form 
                 layout="vertical" 

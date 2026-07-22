@@ -157,7 +157,9 @@ const CompanyProfile = () => {
                                             <span style={{ color: '#c41d7f', fontWeight: 'bold', marginRight: 15 }}>{`{TenViTri}`}</span>
                                             <span style={{ color: '#c41d7f', fontWeight: 'bold', marginRight: 15 }}>{`{ThoiGian}`}</span>
                                             <span style={{ color: '#c41d7f', fontWeight: 'bold', marginRight: 15 }}>{`{DiaDiem}`}</span>
-                                            <span style={{ color: '#c41d7f', fontWeight: 'bold' }}>{`{TenCongTy}`}</span>
+                                            <span style={{ color: '#c41d7f', fontWeight: 'bold', marginRight: 15 }}>{`{TenCongTy}`}</span>
+                                            <span style={{ color: '#c41d7f', fontWeight: 'bold', marginRight: 15 }}>{`{LinkBaiTest}`}</span>
+                                            <span style={{ color: '#c41d7f', fontWeight: 'bold', marginRight: 15 }}>{`{ChuKyEmail}`}</span>
                                         </div>
                                     </div>
                                 }

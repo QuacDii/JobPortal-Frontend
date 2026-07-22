@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Tag, Button, Space, message, Badge } from 'antd';
-import { FilterOutlined } from '@ant-design/icons';
+import { FilterOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 
@@ -72,6 +72,13 @@ const EmployerJobs = () => {
             key: 'action',
             render: (text, record) => (
                 <Space size="middle">
+                    <Button 
+                        type="default"
+                        icon={<EyeOutlined />}
+                        onClick={() => window.open(`/jobs/${record.maTin}`, '_blank')}
+                    >
+                        Xem chi tiết
+                    </Button>
                     {record.trangThai === 1 && (
                         <Button 
                             type="primary" 
