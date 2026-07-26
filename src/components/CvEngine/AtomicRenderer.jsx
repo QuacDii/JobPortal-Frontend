@@ -5,17 +5,18 @@ import ContainerNode from '../CvEngine/Elements/ContainerNode';
 import LoopNode from '../CvEngine/Elements/LoopNode';
 import ImageNode from '../CvEngine/Elements/ImageNode';
 import { resolveContent } from './utils/stringInterpolator';
+import '../css/AtomicRenderer.css';
 import useCvStore from '../../store/useCvStore';
-import { Popover, Checkbox } from 'antd'; 
+import { Popover, Checkbox } from 'antd';
 import {
-  PhoneOutlined, CalendarOutlined, MailOutlined, EnvironmentOutlined, GlobalOutlined, UserOutlined, 
-  ArrowUpOutlined, ArrowDownOutlined, DeleteOutlined, DragOutlined, EyeOutlined, InfoCircleOutlined 
+  PhoneOutlined, CalendarOutlined, MailOutlined, EnvironmentOutlined, GlobalOutlined, UserOutlined,
+  ArrowUpOutlined, ArrowDownOutlined, DeleteOutlined, DragOutlined, EyeOutlined, InfoCircleOutlined
 } from '@ant-design/icons';
 
 const hiddenSectionsListeners = new Set();
 window.__hiddenCvSections = window.__hiddenCvSections || [];
-window.__customCvSections = window.__customCvSections || []; 
-window.__contactChildrenOrder = window.__contactChildrenOrder || []; 
+window.__customCvSections = window.__customCvSections || [];
+window.__contactChildrenOrder = window.__contactChildrenOrder || [];
 
 const ThemeContext = createContext({ columnIndex: -1, isInsideColoredBg: false, isInsideLoopItem: false });
 
@@ -25,7 +26,7 @@ window.__cleanupCvDrag = () => {
   const ghost = document.getElementById('cv-custom-drag-ghost');
   if (ghost) ghost.remove();
   if (window.__cvDragState && window.__cvDragState.el) {
-    window.__cvDragState.el.style.display = ''; 
+    window.__cvDragState.el.style.display = '';
   }
   window.__cvDragState = null;
 };
@@ -69,14 +70,18 @@ const moveContactSection = (id, direction) => {
 
 const getSectionLabel = (id) => {
   if (!id) return 'Mục con';
+
+  const currentLang = (new URLSearchParams(window.location.search).get('lang') || 'vi').toLowerCase();
+  const isEn = currentLang === 'en';
+
   const lower = id.toLowerCase();
-  if (lower.includes('phone') || lower.includes('dienthoai')) return 'Số điện thoại';
+  if (lower.includes('phone') || lower.includes('dienthoai')) return isEn ? 'Phone' : 'Số điện thoại';
   if (lower.includes('email')) return 'Email';
-  if (lower.includes('address') || lower.includes('diachi')) return 'Địa chỉ';
-  if (lower.includes('dob') || lower.includes('birth') || lower.includes('ngaysinh')) return 'Ngày sinh';
+  if (lower.includes('address') || lower.includes('diachi')) return isEn ? 'Address' : 'Địa chỉ';
+  if (lower.includes('dob') || lower.includes('birth') || lower.includes('ngaysinh')) return isEn ? 'Date of Birth' : 'Ngày sinh';
   if (lower.includes('website') || lower.includes('web')) return 'Website';
-  if (lower.includes('gender') || lower.includes('gioitinh')) return 'Giới tính';
-  return 'Mục tự nhập';
+  if (lower.includes('gender') || lower.includes('gioitinh')) return isEn ? 'Gender' : 'Giới tính';
+  return isEn ? 'Custom Field' : 'Mục tự nhập';
 };
 
 const getMacroSectionTitle = (id) => {
@@ -92,7 +97,10 @@ const getMacroSectionTitle = (id) => {
     'section-activities': 'Hoạt động',
     'section-projects': 'Dự án',
     'section-contact-info': 'Thông tin liên hệ',
-    'section-avatar-profile': 'Ảnh đại diện'
+    'section-avatar-profile': 'Ảnh đại diện',
+    'section-references': 'Người tham chiếu',
+    'section-additional': 'Thông tin thêm',
+    'section-business-card': 'Danh thiếp'
   };
   if (map[id]) return map[id];
   if (id.startsWith('section-contact-')) return getSectionLabel(id);
@@ -127,62 +135,60 @@ const findDataPathInsideNode = (n) => {
 };
 
 const extractLoopIndexSafely = (n) => {
-    if (!n) return -1;
-    if (n.index !== undefined) return parseInt(n.index, 10);
-    if (n.dataPath) {
-        const m = n.dataPath.match(/\[(\d+)\]/); 
-        if (m) return parseInt(m[1], 10);
+  if (!n) return -1;
+  if (n.index !== undefined) return parseInt(n.index, 10);
+  if (n.dataPath) {
+    const m = n.dataPath.match(/\[(\d+)\]/);
+    if (m) return parseInt(m[1], 10);
+  }
+  if (n.children && Array.isArray(n.children)) {
+    for (const child of n.children) {
+      const idx = extractLoopIndexSafely(child);
+      if (idx !== -1) return idx;
     }
-    if (n.children && Array.isArray(n.children)) {
-        for (const child of n.children) {
-            const idx = extractLoopIndexSafely(child);
-            if (idx !== -1) return idx;
-        }
-    }
-    return -1;
+  }
+  return -1;
 };
 
 const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
-  const [popoverOpen, setPopoverOpen] = useState(false); 
+  const [popoverOpen, setPopoverOpen] = useState(false);
   const wrapperRef = useRef(null);
   const themeCtx = useContext(ThemeContext);
-  const layoutSchema = useCvStore((state) => state.layoutSchema || state.schema);
-  
-  // 🚀 BẢN VÁ: Lắng nghe cấu hình Font chữ để ép xuống CSS của khối
-  const layoutSettings = useCvStore((state) => state.layoutSettings);
+  const layoutSchema = useCvStore(state => state.layoutSchema || state.schema);
 
   const isReq = isSectionRequired(node.id);
   const exactDataPath = isReq ? findDataPathInsideNode(node) : null;
   const storeValue = useCvStore(state => {
-      if (!isReq || !exactDataPath) return null;
-      const data = state.cvData || state.data || {};
-      return exactDataPath.split('.').reduce((acc, part) => (acc ? acc[part] : undefined), data);
+    if (!isReq || !exactDataPath) return null;
+    const data = state.cvData || state.data || {};
+    return exactDataPath.split('.').reduce((acc, part) => (acc ? acc[part] : undefined), data);
   });
 
   let isEmptyRequired = false;
   if (isReq) {
-      if (storeValue === undefined || storeValue === null || String(storeValue).trim() === "") {
-          isEmptyRequired = true;
-      }
+    if (storeValue === undefined || storeValue === null || String(storeValue).trim() === "") {
+      isEmptyRequired = true;
+    }
   }
 
   const mainSections = [
     'section-contact-info', 'section-education', 'section-experience',
     'section-awards', 'section-certificates', 'section-activities',
     'section-projects', 'section-hobbies', 'section-skills',
-    'section-summary', 'section-avatar-profile'
+    'section-summary', 'section-avatar-profile',
+    'section-references', 'section-additional', 'section-business-card'
   ];
 
   const isLargeBlock = node.id && mainSections.includes(node.id);
   const isContactChild = node.id && node.id.startsWith('section-contact-') && !isLargeBlock;
-  const isLoopRow = node._isLoopRowRoot === true; 
-  
+  const isLoopRow = node._isLoopRowRoot === true;
+
   const isAnyChildBlock = isContactChild || isLoopRow;
   const isValidNode = isLargeBlock || isAnyChildBlock;
 
   if (!isValidNode) return children;
 
-  const undeletableSections = ['section-avatar-profile', 'section-contact-info'];
+  const undeletableSections = ['section-avatar-profile', 'section-contact-info', 'section-business-card'];
   const canDeleteMacro = !undeletableSections.includes(node.id);
 
   let canDeleteChild = true;
@@ -191,35 +197,35 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
   }
 
   const isAvatar = node.id === 'section-avatar-profile';
-  const hasMacroToolbar = isLargeBlock && !isAvatar;
-  const hasChildToolbar = isAnyChildBlock;    
+  const hasMacroToolbar = isLargeBlock;
+  const hasChildToolbar = isAnyChildBlock;
 
-  let isFirst = false; let isLast = false; 
+  let isFirst = false; let isLast = false;
   let loopBaseString = null; let isSingleItem = false;
   let computedIndex = -1;
 
   if (isLoopRow) {
     loopBaseString = node._loopBasePath || (node.dataPath ? node.dataPath.replace(/\[\d+\].*/, '').replace(/\.\d+\..*/, '') : null);
-    
-    computedIndex = (dataScope && dataScope.index !== undefined) 
-      ? dataScope.index 
+
+    computedIndex = (dataScope && dataScope.index !== undefined)
+      ? dataScope.index
       : extractLoopIndexSafely(node);
 
     const storeState = useCvStore.getState();
     const currentData = storeState.cvData || storeState.data || {};
     let arr = currentData;
     if (loopBaseString && arr) {
-        const parts = loopBaseString.split('.');
-        for (const p of parts) {
-            if (arr) arr = arr[p];
-        }
+      const parts = loopBaseString.split('.');
+      for (const p of parts) {
+        if (arr) arr = arr[p];
+      }
     }
     const actualArrayLength = Array.isArray(arr) ? arr.length : 0;
 
-    isSingleItem = actualArrayLength <= 1; 
+    isSingleItem = actualArrayLength <= 1;
     isFirst = computedIndex === 0;
     isLast = computedIndex === actualArrayLength - 1;
-    
+
   } else if (isContactChild) {
     const visibleIds = window.__contactChildrenOrder.filter(x => x && !window.__hiddenCvSections.includes(x) && !(x.startsWith('section-contact-custom-') && !window.__customCvSections.some(z => z.id === x)));
     const vIdx = visibleIds.indexOf(node.id);
@@ -240,7 +246,7 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
       if (computedIndex === -1) return;
 
       const store = useCvStore.getState();
-      
+
       if (typeof store.moveArrayItem === 'function') {
         store.moveArrayItem(loopBaseString, computedIndex, direction);
       } else if (typeof store.moveLoopItem === 'function') {
@@ -249,15 +255,15 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
       } else {
         const currentData = store.cvData || store.data;
         if (!currentData) return;
-        const newData = JSON.parse(JSON.stringify(currentData)); 
-        
+        const newData = JSON.parse(JSON.stringify(currentData));
+
         let arr = newData;
         const parts = loopBaseString.split('.');
         for (let i = 0; i < parts.length; i++) {
           if (!arr[parts[i]]) arr[parts[i]] = [];
           arr = arr[parts[i]];
         }
-        
+
         if (Array.isArray(arr)) {
           if (direction === 'up' && computedIndex > 0) {
             const temp = arr[computedIndex];
@@ -269,7 +275,7 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
             arr[computedIndex + 1] = temp;
           }
           if (store.setCvData) store.setCvData(newData);
-          else useCvStore.setState({ cvData: newData, data: newData }); 
+          else useCvStore.setState({ cvData: newData, data: newData });
         }
       }
       hiddenSectionsListeners.forEach(listener => listener());
@@ -278,25 +284,25 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
 
   const handleAddClick = () => {
     if (isLoopRow && loopBaseString) {
-        const store = useCvStore.getState();
-        if (typeof store.addLoopItem === 'function') {
-            store.addLoopItem(loopBaseString);
-        } else {
-            const currentData = store.cvData || store.data;
-            if (!currentData) return;
-            const newData = JSON.parse(JSON.stringify(currentData));
-            let arr = newData;
-            const parts = loopBaseString.split('.');
-            for (let i = 0; i < parts.length; i++) {
-                if (!arr[parts[i]]) arr[parts[i]] = [];
-                arr = arr[parts[i]];
-            }
-            if (Array.isArray(arr)) {
-                arr.push({}); 
-                if (store.setCvData) store.setCvData(newData);
-                else useCvStore.setState({ cvData: newData, data: newData });
-            }
+      const store = useCvStore.getState();
+      if (typeof store.addLoopItem === 'function') {
+        store.addLoopItem(loopBaseString);
+      } else {
+        const currentData = store.cvData || store.data;
+        if (!currentData) return;
+        const newData = JSON.parse(JSON.stringify(currentData));
+        let arr = newData;
+        const parts = loopBaseString.split('.');
+        for (let i = 0; i < parts.length; i++) {
+          if (!arr[parts[i]]) arr[parts[i]] = [];
+          arr = arr[parts[i]];
         }
+        if (Array.isArray(arr)) {
+          arr.push({});
+          if (store.setCvData) store.setCvData(newData);
+          else useCvStore.setState({ cvData: newData, data: newData });
+        }
+      }
     } else if (isContactChild) {
       const newId = 'section-contact-custom-' + Date.now();
       window.__customCvSections.push({ id: newId });
@@ -309,39 +315,38 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
 
   const handleDeleteClick = () => {
     if (isLoopRow && loopBaseString) {
-        const store = useCvStore.getState();
-        if (computedIndex > -1) {
-            if (typeof store.removeLoopItem === 'function') {
-                store.removeLoopItem(`${loopBaseString}[${computedIndex}]`);
-            } else {
-                const currentData = store.cvData || store.data;
-                if (!currentData) return;
-                const newData = JSON.parse(JSON.stringify(currentData));
-                let arr = newData;
-                const parts = loopBaseString.split('.');
-                for (let i = 0; i < parts.length; i++) {
-                    if (!arr[parts[i]]) arr[parts[i]] = [];
-                    arr = arr[parts[i]];
-                }
-                if (Array.isArray(arr)) {
-                    arr.splice(computedIndex, 1);
-                    if (store.setCvData) store.setCvData(newData);
-                    else useCvStore.setState({ cvData: newData, data: newData });
-                }
-            }
+      const store = useCvStore.getState();
+      if (computedIndex > -1) {
+        if (typeof store.removeLoopItem === 'function') {
+          store.removeLoopItem(`${loopBaseString}[${computedIndex}]`);
+        } else {
+          const currentData = store.cvData || store.data;
+          if (!currentData) return;
+          const newData = JSON.parse(JSON.stringify(currentData));
+          let arr = newData;
+          const parts = loopBaseString.split('.');
+          for (let i = 0; i < parts.length; i++) {
+            if (!arr[parts[i]]) arr[parts[i]] = [];
+            arr = arr[parts[i]];
+          }
+          if (Array.isArray(arr)) {
+            arr.splice(computedIndex, 1);
+            if (store.setCvData) store.setCvData(newData);
+            else useCvStore.setState({ cvData: newData, data: newData });
+          }
         }
+      }
     } else if (node.id && node.id.startsWith('section-contact-custom-')) {
-        window.__customCvSections = window.__customCvSections.filter(x => x.id !== node.id);
+      window.__customCvSections = window.__customCvSections.filter(x => x.id !== node.id);
     } else if (isContactChild) {
-        toggleSectionVisibility(node.id, false);
+      toggleSectionVisibility(node.id, false);
     }
     hiddenSectionsListeners.forEach(listener => listener());
   };
 
   const handleDragStart = (e) => {
-    if (isAvatar) return; 
     e.stopPropagation();
-    window.__cleanupCvDrag(); 
+    window.__cleanupCvDrag();
 
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData("text/plain", node.id);
@@ -375,8 +380,8 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
   };
 
   const handleDragOver = (e) => {
-    e.preventDefault(); 
-    
+    e.preventDefault();
+
     const currentEl = wrapperRef.current;
     if (currentEl) {
       let scrollContainer = currentEl.parentElement;
@@ -390,8 +395,8 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
 
       if (scrollContainer && scrollContainer !== document.body) {
         const rect = scrollContainer.getBoundingClientRect();
-        const edgeSize = 60; 
-        const scrollSpeed = 15; 
+        const edgeSize = 60;
+        const scrollSpeed = 15;
         const mouseY = e.clientY;
 
         if (mouseY - rect.top < edgeSize && mouseY >= rect.top) {
@@ -407,7 +412,7 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
 
     const dragState = window.__cvDragState;
     if (!dragState || !dragState.el) return;
-    
+
     if (currentEl === dragState.el) return;
     if (dragState.isLargeBlock !== isLargeBlock || dragState.isContactChild !== isContactChild) return;
     if (dragState.isContactChild && currentEl.parentNode !== dragState.el.parentNode) return;
@@ -430,7 +435,7 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
   const handleDragEnd = () => {
     const dragState = window.__cvDragState;
     const placeholder = document.getElementById('cv-drag-placeholder');
-    
+
     if (!dragState || !dragState.el || !placeholder) {
       window.__cleanupCvDrag(); return;
     }
@@ -438,7 +443,7 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
     const draggedId = dragState.id;
     const newParentNode = placeholder.parentNode;
     const newOrderIds = [];
-    
+
     Array.from(newParentNode.children).forEach(child => {
       if (child.id === 'cv-drag-placeholder') newOrderIds.push(draggedId);
       else if (child.hasAttribute('data-cv-id') && child.style.display !== 'none') newOrderIds.push(child.getAttribute('data-cv-id'));
@@ -454,7 +459,7 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
         return idxA - idxB;
       });
       hiddenSectionsListeners.forEach(l => l());
-    } 
+    }
     else if (dragState.isLargeBlock) {
       const store = useCvStore.getState();
       const currentSchema = store.layoutSchema || store.schema;
@@ -481,7 +486,7 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
       if (draggedItemObj) {
         let targetArray = null;
         const siblingId = newOrderIds.find(id => id !== draggedId);
-        
+
         if (siblingId) {
           const findTargetArray = (parent) => {
             if (!parent || !parent.children) return false;
@@ -507,7 +512,7 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
             };
             findContainerArray(newSchema);
           }
-          if (!targetArray) targetArray = sourceArray; 
+          if (!targetArray) targetArray = sourceArray;
         }
 
         if (targetArray) {
@@ -549,22 +554,21 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
       data-cv-id={node.id}
       data-column-index={themeCtx.columnIndex}
       className={`cv-macro-section-block ${isEmptyRequired ? 'has-empty-required' : ''}`}
-      style={{ 
-        position: 'relative', 
-        padding: '6px', 
-        margin: '-6px',
-        width: isAnyChildBlock ? '100%' : 'auto',
-        display: isAnyChildBlock ? 'block' : 'initial'
+      style={{
+        position: 'relative',
+        width: '100%',
+        display: 'block',
+        boxSizing: 'border-box'
       }}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
       {hasMacroToolbar && (
-        <div 
+        <div
           className={`cv-macro-toolbar no-print ${popoverOpen ? 'force-show' : ''}`}
-          style={{ 
+          style={{
             position: 'absolute', alignItems: 'center', gap: '2px',
-            top: '-32px', left: '10px', zIndex: 999
+            top: isAvatar ? '10px' : '-32px', left: '10px', zIndex: 999
           }}
         >
           <div draggable={true} onDragStart={handleDragStart} onDragEnd={handleDragEnd} className="cv-btn-item" style={{ cursor: 'move' }}>
@@ -582,9 +586,9 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
       )}
 
       {hasChildToolbar && (
-        <div 
+        <div
           className="cv-macro-toolbar no-print"
-          style={{ 
+          style={{
             position: 'absolute', alignItems: 'center', gap: '2px',
             top: '-32px', right: '10px', zIndex: 999
           }}
@@ -601,153 +605,7 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
           )}
         </div>
       )}
-      
       {children}
-      
-      <style>{`
-        /* 🚀 BẢN VÁ: ÉP TOÀN BỘ FONT CHỮ BÊN TRONG KHỐI ĐỒNG BỘ (TRỪ ICON SVG) */
-        div[data-cv-id="${node.id}"],
-        div[data-cv-id="${node.id}"] *:not(.anticon) {
-            font-family: ${layoutSettings?.fontFamily ? `${layoutSettings.fontFamily} !important` : 'inherit'};
-        }
-
-        .cv-macro-section-block > .cv-macro-toolbar { display: none !important; }
-        .cv-macro-section-block:hover > .cv-macro-toolbar { display: flex !important; }
-        .cv-macro-toolbar.force-show { display: flex !important; }
-
-        .cv-macro-toolbar { 
-          background: rgba(36, 36, 36, 0.85) !important; 
-          backdrop-filter: blur(8px) !important;
-          border: 1px solid rgba(255, 255, 255, 0.08) !important;
-          border-radius: 8px !important; 
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25) !important; 
-          padding: 4px !important;
-          color-scheme: dark !important; 
-        }
-        
-        .cv-btn-item { 
-          background: transparent !important; 
-          border: none !important; 
-          color: #a0a0a0 !important; 
-          width: 28px; height: 28px; 
-          display: flex; align-items: center; justify-content: center; 
-          border-radius: 6px; cursor: pointer; 
-          transition: all 0.2s ease; 
-        }
-        .cv-btn-item:hover { 
-          background: rgba(255, 255, 255, 0.12) !important; 
-          color: #ffffff !important; 
-        }
-        .cv-btn-item .anticon { font-size: 14px !important; }
-
-        .cv-btn-delete { 
-          background: transparent !important; 
-          border: none !important; 
-          color: #ff4d4f !important; 
-          padding: 0 12px; height: 28px; 
-          display: flex; align-items: center; justify-content: center; 
-          border-radius: 6px; cursor: pointer; 
-          font-size: 12px !important; font-weight: 600; 
-          transition: all 0.2s ease; 
-        }
-        .cv-btn-delete:hover { 
-          background: #ff4d4f !important; 
-          color: #ffffff !important; 
-        }
-
-        .cv-btn-add { 
-          background: #00b14f !important; 
-          border: 1px solid #00b14f !important; 
-          color: #ffffff !important; 
-          padding: 0 14px; height: 28px; 
-          display: flex; align-items: center; justify-content: center; 
-          border-radius: 14px !important; 
-          cursor: pointer; 
-          font-size: 12px !important; font-weight: 600; 
-          box-shadow: 0 2px 8px rgba(0, 177, 79, 0.25);
-          transition: all 0.2s ease; 
-        }
-        .cv-btn-add:hover { 
-          background: #009845 !important;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(0, 177, 79, 0.4);
-        }
-
-        .cv-drag-placeholder-style {
-          background-color: rgba(0, 177, 79, 0.1) !important;
-          border: 1px dashed #00b14f !important; border-radius: 4px !important;
-          opacity: 1 !important; box-shadow: none !important; pointer-events: none !important; 
-        }
-        .cv-drag-placeholder-style * { opacity: 0.3 !important; pointer-events: none !important; }
-        .cv-drag-placeholder-style .cv-macro-toolbar { display: none !important; }
-        
-        :root body #section-avatar-profile img, :root body [id="section-avatar-profile"] img {
-          border: 10px solid rgba(35, 23, 23, 0.99) !important; outline: none !important;
-        }
-        :root body .cv-macro-section-block [contenteditable="true"], :root body .cv-macro-section-block input, :root body .cv-macro-section-block textarea {
-          box-shadow: none !important; outline: none !important;
-        }
-        
-        :root body .cv-macro-section-block:not(.has-empty-required) *[style*="red"],
-        :root body .cv-macro-section-block:not(.has-empty-required) *[style*="rgb(255, 77, 79)"] {
-            border-color: transparent !important; outline-color: transparent !important; background-color: transparent !important;
-        }
-
-        :root body .cv-macro-section-block [contenteditable="true"]:not(:hover):not(:focus),
-        :root body .cv-macro-section-block input:not(:hover):not(:focus), 
-        :root body .cv-macro-section-block textarea:not(:hover):not(:focus), 
-        :root body .cv-macro-section-block .ProseMirror:not(:hover):not(:focus) {
-            border-color: transparent !important; 
-            outline-color: transparent !important; 
-            outline: none !important;
-            background-color: transparent !important;
-            background-image: none !important;
-        }
-
-        :root body .cv-macro-section-block [contenteditable="true"]:hover, 
-        :root body .cv-macro-section-block [contenteditable="true"]:focus,
-        :root body .cv-macro-section-block input:hover, 
-        :root body .cv-macro-section-block input:focus,
-        :root body .cv-macro-section-block textarea:hover, 
-        :root body .cv-macro-section-block textarea:focus,
-        :root body .cv-macro-section-block .ProseMirror:hover, 
-        :root body .cv-macro-section-block .ProseMirror:focus {
-            outline: 1px dashed currentColor !important; 
-            outline-offset: 2px !important; 
-            border-radius: 4px !important;
-            background-color: transparent !important; 
-            background-image: none !important; 
-            border-color: transparent !important;
-            cursor: text !important;
-        }
-
-        :root body .cv-macro-section-block.has-empty-required [contenteditable="true"]:not(.ProseMirror), 
-        :root body .cv-macro-section-block.has-empty-required input, 
-        :root body .cv-macro-section-block.has-empty-required .ProseMirror {
-          border-color: rgba(255, 77, 79, 0.99) !important; outline-color: rgba(255, 77, 79, 0.99) !important;
-          outline: 1px dashed rgba(255, 77, 79, 0.99) !important; outline-offset: 3px !important; border-radius: 3px !important; 
-          background-color: transparent !important;
-          background-image: linear-gradient(rgba(255, 77, 79, 0.05), rgba(255, 77, 79, 0.05)) !important;
-        }
-
-        :root body .cv-macro-section-block .rich-text-force-dynamic, 
-        :root body .cv-macro-section-block .rich-text-force-dynamic:hover, 
-        :root body .cv-macro-section-block .rich-text-force-dynamic:focus {
-          border: none !important; outline: none !important; background-color: transparent !important; background-image: none !important;
-        }
-
-        div.cv-macro-section-block:hover, div.cv-macro-section-block { outline: none !important; }
-        
-        .cv-macro-section-block [class*="toolbar"]:not(.cv-macro-toolbar), 
-        .cv-macro-section-block [class*="action"]:not(.cv-macro-toolbar), 
-        .cv-macro-section-block button:not(.cv-btn-item):not(.cv-btn-delete):not(.cv-btn-add):not(.ant-checkbox-wrapper):not(.ant-switch) {
-            display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important;
-        }
-        
-        .custom-cv-popover-wrapper .ant-popover-inner { background-color: #1f1f1f !important; border: 1px solid #333333 !important; border-radius: 6px !important; padding: 12px !important; }
-        .rich-text-force-dynamic * { font-size: inherit !important; }
-        .cv-column-dropzone { opacity: 0; pointer-events: auto !important; background: transparent; }
-      `}</style>
     </div>
   );
 };
@@ -755,8 +613,7 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
 const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = false }) => {
   const [_, forceUpdate] = useState(0);
   const themeCtx = useContext(ThemeContext);
-  
-  // 🚀 BẢN VÁ: Lắng nghe cấu hình Font chữ để ép xuống Style nội tuyến (Inline Style)
+
   const layoutSettings = useCvStore((state) => state.layoutSettings);
 
   useEffect(() => {
@@ -780,7 +637,6 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
     if (!styles) return styles;
     const processed = { ...styles };
 
-    // 🚀 BẢN VÁ: Ghi đè cấu hình font mặc định của JSON bằng Font chữ bạn chọn
     if (layoutSettings?.fontFamily) {
       processed.fontFamily = layoutSettings.fontFamily;
     }
@@ -790,44 +646,31 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
       if (!isNaN(px)) processed.fontSize = `calc(var(--base-font-size, 13px) * (${px} / 13))`;
     }
 
-    if (!insideColor) {
-      const swapColor = (colorStr) => {
-        if (!colorStr) return colorStr;
-        const c = colorStr.replace(/\s/g, '').toLowerCase();
-        const whites = ['#ffffff', '#fff', 'white', 'rgb(255,255,255)', 'rgba(255,255,255,1)'];
-        const lightGrays = ['#cccccc', '#ccc', '#e0e0e0', '#dddddd', '#ddd', '#bbbbbb', '#bbb', '#eeeeee', '#eee', '#f5f5f5', '#d9d9d9', 'rgb(204,204,204)', 'rgb(224,224,224)', 'rgb(221,221,221)'];
-        const blacks = ['#000000', '#000', 'black', '#333333', '#333', '#222222', '#222', '#111111', '#111', '#242424', 'rgb(0,0,0)', 'rgb(51,51,51)', 'rgba(0,0,0,1)'];
-        const darkGrays = ['#666666', '#666', '#777777', '#777', '#555555', '#555', '#888888', '#888', '#999999', '#999', 'rgb(102,102,102)', 'rgb(119,119,119)', 'rgb(85,85,85)'];
-        
-        if (colIdx > 0) {
-          if (whites.includes(c) || c.startsWith('rgba(255,255,255,1')) return '#333333';
-          if (lightGrays.includes(c) || c.startsWith('rgba(255,255,255,0.')) return '#777777';
-        } else if (colIdx === 0) {
-          if (blacks.includes(c) || c.startsWith('rgba(0,0,0,1')) return '#ffffff';
-          if (darkGrays.includes(c) || c.startsWith('rgba(0,0,0,0.')) return '#cccccc';
-        }
-        return colorStr;
-      };
+    if (layoutSettings?.backgroundStyle && layoutSettings.backgroundStyle !== 'none') {
+      if (isRoot) {
+        processed.background = layoutSettings.backgroundStyle;
+        delete processed.backgroundColor;
+      }
 
-      if (processed.color) processed.color = swapColor(processed.color);
-      if (processed.borderColor) processed.borderColor = swapColor(processed.borderColor);
-      if (processed.backgroundColor) processed.backgroundColor = swapColor(processed.backgroundColor); 
+      if (node.id === 'right-col') {
+        processed.background = 'transparent';
+        processed.backgroundColor = 'transparent';
+      }
     }
     return processed;
   };
 
   const dynamicStyles = processDynamicStyles(node.styles, themeCtx.columnIndex, nextIsInsideColoredBg);
-
   const renderCoreNode = () => {
     switch (node.type) {
       case 'Container':
         if (node.id === 'section-contact-info') {
           const STANDARD_CONTACTS = [
-            'section-contact-dob', 
+            'section-contact-dob',
             'section-contact-gender',
-            'section-contact-phone', 
-            'section-contact-email', 
-            'section-contact-website', 
+            'section-contact-phone',
+            'section-contact-email',
+            'section-contact-website',
             'section-contact-address'
           ];
 
@@ -858,47 +701,53 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
             return true;
           });
 
+          // Kiểm tra xem các mục liên hệ sẵn có trong mẫu này dùng Icon hay dùng Text nhãn
+          const isIconTemplate = node.children && node.children.some(c => c && c.children && c.children.some(sub => sub.type === 'Icon'));
+
           const mixedChildren = visibleIds.map(id => {
             const standard = node.children ? node.children.find(c => c && c.id === id) : null;
             if (standard) return standard;
 
             if (STANDARD_CONTACTS.includes(id)) {
-                const templateChild = node.children ? node.children.find(c => c && STANDARD_CONTACTS.includes(c.id)) : null;
-                
-                if (templateChild) {
-                    const clonedChild = JSON.parse(JSON.stringify(templateChild));
-                    clonedChild.id = id;
-                    
-                    const metaMap = {
-                        'section-contact-dob': { icon: 'calendar', key: 'dob', placeholder: 'Ngày sinh', label: 'Ngày sinh:' },
-                        'section-contact-gender': { icon: 'user', key: 'gender', placeholder: 'Giới tính', label: 'Giới tính:' },
-                        'section-contact-phone': { icon: 'phone', key: 'phone', placeholder: 'Số điện thoại', label: 'Số điện thoại:' },
-                        'section-contact-email': { icon: 'mail', key: 'email', placeholder: 'Email', label: 'Email:' },
-                        'section-contact-website': { icon: 'website', key: 'website', placeholder: 'Website', label: 'Website:' },
-                        'section-contact-address': { icon: 'address', key: 'address', placeholder: 'Địa chỉ', label: 'Địa chỉ:' }
-                    };
-                    
-                    const replaceData = (n) => {
-                        if (!n) return;
-                        if (n.type === 'Icon') n.name = metaMap[id].icon;
-                        if (n.type === 'Text' && n.dataPath) {
-                            const parts = n.dataPath.split('.');
-                            parts.pop(); 
-                            const prefix = parts.length > 0 ? parts.join('.') + '.' : '';
-                            n.dataPath = prefix + metaMap[id].key;
-                            n.placeholder = metaMap[id].placeholder;
-                        }
-                        if (n.type === 'Text' && n.content && (n.content.includes(':') || /Website|Email|Phone|Ngày/i.test(n.content))) {
-                             n.content = metaMap[id].label;
-                        }
-                        if (n.children) n.children.forEach(replaceData);
-                    };
-                    
-                    replaceData(clonedChild);
-                    return clonedChild;
-                }
+              const templateChild = node.children ? node.children.find(c => c && STANDARD_CONTACTS.includes(c.id)) : null;
+
+              if (templateChild) {
+                const clonedChild = JSON.parse(JSON.stringify(templateChild));
+                clonedChild.id = id;
+
+                const currentLang = new URLSearchParams(window.location.search).get('lang') || 'vi';
+                const t = (viText, enText) => currentLang === 'en' ? enText : viText;
+
+                const metaMap = {
+                  'section-contact-dob': { icon: 'calendar', key: 'dob', placeholder: t('Ngày sinh', 'Date of Birth'), label: t('Ngày sinh:', 'Date of Birth:') },
+                  'section-contact-gender': { icon: 'user', key: 'gender', placeholder: t('Giới tính', 'Gender'), label: t('Giới tính:', 'Gender:') },
+                  'section-contact-phone': { icon: 'phone', key: 'phone', placeholder: t('Số điện thoại', 'Phone'), label: t('Số điện thoại:', 'Phone:') },
+                  'section-contact-email': { icon: 'mail', key: 'email', placeholder: 'Email', label: 'Email:' },
+                  'section-contact-website': { icon: 'website', key: 'website', placeholder: 'Website', label: 'Website:' },
+                  'section-contact-address': { icon: 'address', key: 'address', placeholder: t('Địa chỉ', 'Address'), label: t('Địa chỉ:', 'Address:') }
+                };
+
+                const replaceData = (n) => {
+                  if (!n) return;
+                  if (n.type === 'Icon') n.name = metaMap[id].icon;
+                  if (n.type === 'Text' && n.dataPath) {
+                    const parts = n.dataPath.split('.');
+                    parts.pop();
+                    const prefix = parts.length > 0 ? parts.join('.') + '.' : '';
+                    n.dataPath = prefix + metaMap[id].key;
+                    n.placeholder = metaMap[id].placeholder;
+                  }
+                  if (n.type === 'Text' && n.content && (n.content.includes(':') || /Website|Email|Phone|Ngày/i.test(n.content))) {
+                    n.content = metaMap[id].label;
+                  }
+                  if (n.children) n.children.forEach(replaceData);
+                };
+
+                replaceData(clonedChild);
+                return clonedChild;
+              }
             }
-            return { id: id, type: 'CustomInputRow' };
+            return { id: id, type: 'CustomInputRow', _useIcon: isIconTemplate };
           });
 
           return (
@@ -912,18 +761,37 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
           );
         }
 
-        const visibleChildren = node.children 
-          ? node.children.filter(child => !child || !child.id || !window.__hiddenCvSections.includes(child.id)) 
+        const visibleChildren = node.children
+          ? node.children.filter(child => !child || !child.id || !window.__hiddenCvSections.includes(child.id))
           : [];
 
         const responsiveStyles = { ...dynamicStyles };
-        if (themeCtx.columnIndex === 0 && themeCtx.isInsideLoopItem) {
-            if (responsiveStyles.display === 'flex' && responsiveStyles.justifyContent === 'space-between') {
-                responsiveStyles.flexDirection = 'column';
-                responsiveStyles.alignItems = 'flex-start';
-                delete responsiveStyles.justifyContent;
-                responsiveStyles.gap = '2px'; 
+        const isMainColumn = isRoot || isDirectColumn || node.id === 'left-col' || node.id === 'right-col' || node.id === 'main-col';
+        const isContactItem = node.id && node.id.startsWith('section-contact-');
+
+        if (!isMainColumn && themeCtx.columnIndex === 0) {
+          if (isContactItem) {
+            if (responsiveStyles.display === 'flex') {
+              responsiveStyles.flexDirection = 'row';
+              responsiveStyles.alignItems = 'center';
             }
+          } else {
+            const hasNarrowChild = node.children && node.children.some(
+              c => c && c.styles && c.styles.width && c.styles.width.includes('%') && parseFloat(c.styles.width) <= 30
+            );
+            const isSpaceBetween = responsiveStyles.justifyContent === 'space-between';
+
+            if ((hasNarrowChild || isSpaceBetween) && responsiveStyles.display === 'flex') {
+              responsiveStyles.flexDirection = 'column';
+              responsiveStyles.alignItems = 'flex-start';
+              delete responsiveStyles.justifyContent;
+              responsiveStyles.gap = '4px';
+            }
+
+            if (responsiveStyles.width && responsiveStyles.width.includes('%') && parseFloat(responsiveStyles.width) <= 30) {
+              responsiveStyles.width = '100%';
+            }
+          }
         }
 
         return (
@@ -936,7 +804,7 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
                 </ThemeContext.Provider>
               );
             })}
-            
+
             {visibleChildren.length === 0 && !isRoot && (
               <div
                 className="cv-column-dropzone no-print"
@@ -959,15 +827,40 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
         );
 
       case 'CustomInputRow':
+        const hasIconMode = node._useIcon === true;
+
+        if (hasIconMode) {
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', minHeight: '28px' }}>
+              <InfoCircleOutlined style={{ color: 'inherit', opacity: 0.9, fontSize: '14px' }} />
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+                <TextNode
+                  dataPath={`contact.custom.${node.id}`}
+                  placeholder="Nhập nội dung"
+                  styles={{ width: '100%', fontSize: '13.5px', fontFamily: 'inherit', color: 'inherit', background: 'transparent', border: 'none', padding: 0, margin: 0 }}
+                  dataScope={dataScope}
+                />
+              </div>
+            </div>
+          );
+        }
+
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 0', width: '100%', minHeight: '28px' }}>
-            <InfoCircleOutlined style={{ color: 'inherit', opacity: 0.8 }} />
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-              <TextNode 
-                dataPath={`contact.custom.${node.id}`} 
-                placeholder="Nhập nội dung" 
-                styles={{ width: '100%', fontSize: 'inherit', fontFamily: 'inherit', lineHeight: 'inherit', color: 'inherit', background: 'transparent', border: 'none', padding: 0, margin: 0 }} 
-                dataScope={dataScope} 
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', width: '100%', minHeight: '28px' }}>
+            <div style={{ fontWeight: 'bold', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              <TextNode
+                dataPath={`contact.custom_label.${node.id}`}
+                placeholder="Tiêu đề:"
+                styles={{ fontWeight: 'bold', color: 'inherit', background: 'transparent', border: 'none', padding: 0, margin: 0 }}
+                dataScope={dataScope}
+              />
+            </div>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'baseline' }}>
+              <TextNode
+                dataPath={`contact.custom.${node.id}`}
+                placeholder="Nhập nội dung"
+                styles={{ width: '100%', color: 'inherit', background: 'transparent', border: 'none', padding: 0, margin: 0 }}
+                dataScope={dataScope}
               />
             </div>
           </div>
@@ -1000,17 +893,32 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
 
       case 'LoopContainer':
         if (node.itemTemplate) {
-            node.itemTemplate._isLoopRowRoot = true;
-            node.itemTemplate._loopBasePath = node.dataPath;
+          node.itemTemplate._isLoopRowRoot = true;
+          node.itemTemplate._loopBasePath = node.dataPath;
         }
+
+        const loopStyles = { ...dynamicStyles };
+
+        const parentNodeContainer = node; 
+        const isHobbiesSection =
+          node.dataPath === 'hobbies' ||
+          node.dataPath === 'Hobby' ||
+          JSON.stringify(node).toLowerCase().includes('hobbie') ||
+          JSON.stringify(node).toLowerCase().includes('sở thích');
+
+        if (isHobbiesSection) {
+          loopStyles.flexDirection = 'column';
+          loopStyles.flexWrap = 'nowrap';
+          loopStyles.gap = '8px';
+        }
+
         return (
-          <div style={dynamicStyles}>
+          <div style={loopStyles}>
             <ThemeContext.Provider value={{ columnIndex: themeCtx.columnIndex, isInsideColoredBg: nextIsInsideColoredBg, isInsideLoopItem: true }}>
-              <LoopNode dataPath={node.dataPath} styles={dynamicStyles} itemTemplate={node.itemTemplate} />
+              <LoopNode dataPath={node.dataPath} styles={loopStyles} itemTemplate={node.itemTemplate} />
             </ThemeContext.Provider>
           </div>
         );
-
       case 'Divider':
         return <div style={{ width: '100%', height: '1px', backgroundColor: 'currentColor', opacity: 0.3, ...dynamicStyles }} />;
 

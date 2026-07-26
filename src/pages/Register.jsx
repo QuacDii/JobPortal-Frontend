@@ -14,7 +14,6 @@ const Register = () => {
     const { roleType } = useParams(); 
     const [loading, setLoading] = useState(false);
 
-    // Tự động cấu hình Vai Trò dựa theo URL (/register/employer hoặc /register/candidate)
     const isEmployer = roleType === 'employer';
     const finalRoleValue = isEmployer ? 1 : 2; // 1: Nhà tuyển dụng, 2: Ứng viên
     const themeColor = isEmployer ? '#52c41a' : '#1890ff';

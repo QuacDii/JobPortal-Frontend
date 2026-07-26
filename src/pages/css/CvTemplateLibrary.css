@@ -1,0 +1,144 @@
+                /* ================= CSS CÁC NÚT PHÂN LOẠI ================= */
+                .filter-pill {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 8px 18px;
+                    border-radius: 24px;
+                    background-color: #242424;
+                    color: #a6a6a6;
+                    cursor: pointer;
+                    font-weight: 500;
+                    white-space: nowrap;
+                    border: 1px solid #333;
+                    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+                }
+
+                .filter-pill:hover {
+                    background-color: rgba(24, 144, 255, 0.1);
+                    color: #1890ff;
+                    border-color: #1890ff;
+                    transform: translateY(-4px);
+                    box-shadow: 0 6px 16px rgba(24, 144, 255, 0.15);
+                }
+
+                .filter-pill.active {
+                    background-color: #1890ff;
+                    color: #fff;
+                    border-color: #1890ff;
+                    transform: translateY(-4px);
+                    box-shadow: 0 6px 16px rgba(24, 144, 255, 0.3);
+                }
+
+                /* ================= CSS MENUDROP NGÔN NGỮ ================= */
+                .custom-dark-select .ant-select-selector {
+                    background-color: #242424 !important;
+                    border: 1px solid #333 !important;
+                    color: #fff !important;
+                    border-radius: 24px !important;
+                    height: 38px !important;
+                    align-items: center;
+                    transition: all 0.3s;
+                }
+
+                .custom-dark-select:hover .ant-select-selector {
+                    border-color: #1890ff !important;
+                    box-shadow: 0 0 8px rgba(24, 144, 255, 0.2) !important;
+                }
+
+                .custom-dark-select .ant-select-arrow {
+                    color: #a6a6a6 !important;
+                }
+
+                .custom-dark-dropdown {
+                    background-color: #242424 !important;
+                    border: 1px solid #333 !important;
+                    border-radius: 12px !important;
+                    padding: 4px !important;
+                }
+
+                .custom-dark-dropdown .ant-select-item {
+                    color: #a6a6a6 !important;
+                    border-radius: 8px !important;
+                    margin-bottom: 2px;
+                    transition: all 0.2s;
+                }
+
+                .custom-dark-dropdown .ant-select-item-option-active:not(.ant-select-item-option-disabled),
+                .custom-dark-dropdown .ant-select-item:hover {
+                    background-color: rgba(24, 144, 255, 0.1) !important;
+                    color: #1890ff !important;
+                }
+
+                .custom-dark-dropdown .ant-select-item-option-selected {
+                    background-color: #1890ff !important;
+                    color: #fff !important;
+                    font-weight: 600 !important;
+                }
+
+                /* ================= CSS GIAO DIỆN KHÁC ================= */
+                .cv-card {
+                    background-color: #242424 !important;
+                    border: 1px solid #333 !important;
+                    border-radius: 8px !important;
+                    overflow: hidden;
+                    transition: transform 0.3s ease, border-color 0.3s ease;
+                }
+
+                .cv-card:hover {
+                    transform: translateY(-5px);
+                    border-color: #1890ff !important;
+                }
+
+                .cv-card .ant-card-body {
+                    padding: 16px !important;
+                }
+
+                .color-dot {
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    display: inline-block;
+                    cursor: pointer;
+                    border: 2px solid transparent;
+                    transition: all 0.15s ease;
+                }
+
+                .color-dot:hover {
+                    border-color: #ffffff !important;
+                    transform: scale(1.15);
+                }
+
+                .dark-login-modal .ant-modal-content {
+                    background-color: #1f1f1f !important;
+                    color: #fff !important;
+                    border-radius: 12px !important;
+                    border: 1px solid #303030;
+                    padding: 24px !important;
+                }
+
+                .dark-login-modal .ant-modal-header {
+                    background: transparent !important;
+                    border-bottom: none !important;
+                    margin-bottom: 8px !important;
+                }
+
+                .dark-login-modal .ant-modal-title {
+                    color: #fff !important;
+                    text-align: center;
+                    font-size: 22px;
+                    font-weight: bold;
+                    background: transparent !important;
+                }
+
+                .dark-login-modal .ant-modal-close {
+                    color: #a6a6a6;
+                }
+
+                .dark-login-modal .ant-modal-close:hover {
+                    color: #fff;
+                }
+
+                .dark-login-modal .ant-form-item-label>label {
+                    color: #fff !important;
+                }

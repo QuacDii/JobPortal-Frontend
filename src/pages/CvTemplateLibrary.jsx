@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Row, Col, Card, Typography, Space, Select, Tag, Spin, Modal, Form, Input, Button, message, Divider } from 'antd';
 import {
     AppstoreOutlined,
@@ -14,11 +14,12 @@ import {
     GoogleOutlined,
     FacebookFilled,
     CheckCircleFilled,
-    GlobalOutlined 
+    GlobalOutlined
 } from '@ant-design/icons';
 import apiClient from '../api/apiClient';
 import { useGoogleLogin } from '@react-oauth/google';
 import FacebookLoginRaw from 'react-facebook-login/dist/facebook-login-render-props';
+import './css/CvTemplateLibrary.css';
 
 const FacebookLogin = FacebookLoginRaw.default || FacebookLoginRaw;
 const { Title, Text } = Typography;
@@ -36,7 +37,7 @@ function CheckCircleIcon({ color }) {
 // Danh sách các bộ lọc hiển thị trên thanh ngang
 const filterOptions = [
     { key: 'Tất cả', icon: <AppstoreOutlined /> },
-    { key: 'Đơn giản', icon: <CheckCircleIcon color="currentColor" /> }, 
+    { key: 'Đơn giản', icon: <CheckCircleIcon color="currentColor" /> },
     { key: 'Chuyên nghiệp', icon: <StarOutlined /> },
     { key: 'Hiện đại', icon: <FireOutlined /> },
     { key: 'Ấn tượng', icon: <RocketOutlined /> },
@@ -47,15 +48,28 @@ const filterOptions = [
 const CvTemplateLibrary = () => {
     const navigate = useNavigate();
     const [loginForm] = Form.useForm();
+    
+    // BỘ ĐỌC URL: Lấy từ khóa category từ Header truyền sang
+    const [searchParams] = useSearchParams();
+    const categoryFromUrl = searchParams.get('category');
 
+    // HỢP NHẤT STATE: Chỉ dùng activeFilter cho tất cả các thao tác lọc
+    const [activeFilter, setActiveFilter] = useState(categoryFromUrl || 'Tất cả');
+    
     const [cvTemplates, setCvTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
-
-    const [activeFilter, setActiveFilter] = useState('Tất cả');
     const [language, setLanguage] = useState('ALL');
-
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loginLoading, setLoginLoading] = useState(false);
+
+    // BẮT SỰ KIỆN URL THAY ĐỔI
+    useEffect(() => {
+        if (categoryFromUrl) {
+            setActiveFilter(categoryFromUrl);
+        } else {
+            setActiveFilter('Tất cả');
+        }
+    }, [categoryFromUrl]);
 
     useEffect(() => {
         apiClient.get('/MauCv')
@@ -70,22 +84,32 @@ const CvTemplateLibrary = () => {
             });
     }, []);
 
-    // FIX LỖI 2: Ép ngôn ngữ về Chữ Hoa khi lọc để tránh kẹt dữ liệu
+    // THUẬT TOÁN LỌC DỮ LIỆU ĐÃ ĐƯỢC NÂNG CẤP
     const filteredCVs = cvTemplates.filter(cv => {
+        // 1. Lọc theo ngôn ngữ
         const cvLangUpper = cv.ngonNgu ? cv.ngonNgu.toUpperCase() : '';
         const matchLang = language === 'ALL' || cvLangUpper === language.toUpperCase();
-        const matchCategory = activeFilter === 'Tất cả' || (cv.tags && cv.tags.includes(activeFilter));
+        
+        // 2. Lọc theo Danh mục / Tags
+        let matchCategory = false;
+        if (activeFilter === 'Tất cả') {
+            matchCategory = true;
+        } else {
+            // Quét cả trong trường categories và tags để đảm bảo không bỏ sót
+            const hasCategory = cv.categories && cv.categories.includes(activeFilter);
+            const hasTag = cv.tags && cv.tags.includes(activeFilter);
+            matchCategory = hasCategory || hasTag;
+        }
+
         return matchLang && matchCategory;
     });
 
-    // 🌟 ĐÃ SỬA: Nhận thêm tham số chosenColor để đính kèm lên URL hướng trang Builder
     const handleTemplateClick = (currentId, chosenColor) => {
         const token = localStorage.getItem('token');
         if (!token) {
             setIsModalOpen(true);
         } else {
             if (chosenColor) {
-                // Đóng gói mã màu Hex (chuyển dấu # thành %23 an toàn trên trình duyệt)
                 navigate(`/xem-truoc-cv/${currentId}?color=${encodeURIComponent(chosenColor)}`);
             } else {
                 navigate(`/xem-truoc-cv/${currentId}`);
@@ -134,55 +158,6 @@ const CvTemplateLibrary = () => {
 
     return (
         <div style={{ backgroundColor: '#1a1a1a', minHeight: '100vh', padding: '40px' }}>
-            <style>{`
-                /* ================= CSS CÁC NÚT PHÂN LOẠI ================= */
-                .filter-pill { 
-                    display: inline-flex; align-items: center; gap: 8px; padding: 8px 18px; 
-                    border-radius: 24px; background-color: #242424; color: #a6a6a6; 
-                    cursor: pointer; font-weight: 500; white-space: nowrap; border: 1px solid #333; 
-                    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); 
-                }
-                .filter-pill:hover { 
-                    background-color: rgba(24, 144, 255, 0.1); color: #1890ff; border-color: #1890ff; 
-                    transform: translateY(-4px); box-shadow: 0 6px 16px rgba(24, 144, 255, 0.15); 
-                }
-                .filter-pill.active { 
-                    background-color: #1890ff; color: #fff; border-color: #1890ff;
-                    transform: translateY(-4px); box-shadow: 0 6px 16px rgba(24, 144, 255, 0.3); 
-                }
-
-                /* ================= CSS MENUDROP NGÔN NGỮ ================= */
-                .custom-dark-select .ant-select-selector {
-                    background-color: #242424 !important; border: 1px solid #333 !important;
-                    color: #fff !important; border-radius: 24px !important; height: 38px !important;
-                    align-items: center; transition: all 0.3s;
-                }
-                .custom-dark-select:hover .ant-select-selector {
-                    border-color: #1890ff !important; box-shadow: 0 0 8px rgba(24, 144, 255, 0.2) !important;
-                }
-                .custom-dark-select .ant-select-arrow { color: #a6a6a6 !important; }
-                
-                .custom-dark-dropdown { background-color: #242424 !important; border: 1px solid #333 !important; border-radius: 12px !important; padding: 4px !important; }
-                .custom-dark-dropdown .ant-select-item { color: #a6a6a6 !important; border-radius: 8px !important; margin-bottom: 2px; transition: all 0.2s; }
-                
-                .custom-dark-dropdown .ant-select-item-option-active:not(.ant-select-item-option-disabled),
-                .custom-dark-dropdown .ant-select-item:hover { background-color: rgba(24, 144, 255, 0.1) !important; color: #1890ff !important; }
-                .custom-dark-dropdown .ant-select-item-option-selected { background-color: #1890ff !important; color: #fff !important; font-weight: 600 !important; }
-
-                /* ================= CSS GIAO DIỆN KHÁC ================= */
-                .cv-card { background-color: #242424 !important; border: 1px solid #333 !important; border-radius: 8px !important; overflow: hidden; transition: transform 0.3s ease, border-color 0.3s ease; }
-                .cv-card:hover { transform: translateY(-5px); border-color: #1890ff !important; }
-                .cv-card .ant-card-body { padding: 16px !important; }
-                .color-dot { width: 16px; height: 16px; border-radius: 50%; display: inline-block; cursor: pointer; border: 2px solid transparent; transition: all 0.15s ease; }
-                .color-dot:hover { border-color: #ffffff !important; transform: scale(1.15); }
-                .dark-login-modal .ant-modal-content { background-color: #1f1f1f !important; color: #fff !important; border-radius: 12px !important; border: 1px solid #303030; padding: 24px !important; }
-                .dark-login-modal .ant-modal-header { background: transparent !important; border-bottom: none !important; margin-bottom: 8px !important; }
-                .dark-login-modal .ant-modal-title { color: #fff !important; text-align: center; font-size: 22px; font-weight: bold; background: transparent !important; }
-                .dark-login-modal .ant-modal-close { color: #a6a6a6; }
-                .dark-login-modal .ant-modal-close:hover { color: #fff; }
-                .dark-login-modal .ant-form-item-label > label { color: #fff !important; }
-            `}</style>
-
             {/* THANH LỌC DANH MỤC & NGÔN NGỮ */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
                 <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '8px 4px 12px 4px', flex: 1 }}>
@@ -190,7 +165,11 @@ const CvTemplateLibrary = () => {
                         <div
                             key={filter.key}
                             className={`filter-pill ${activeFilter === filter.key ? 'active' : ''}`}
-                            onClick={() => setActiveFilter(filter.key)}
+                            onClick={() => {
+                                // Xóa param trên URL đi nếu user tự click vào các pill lọc này để tránh lỗi URL đè nhau
+                                navigate('/thu-vien-cv');
+                                setActiveFilter(filter.key);
+                            }}
                         >
                             {filter.icon}
                             {filter.key}
@@ -198,10 +177,10 @@ const CvTemplateLibrary = () => {
                     ))}
                 </div>
 
-                <Select 
-                    value={language} 
-                    onChange={setLanguage} 
-                    style={{ width: 145 }} 
+                <Select
+                    value={language}
+                    onChange={setLanguage}
+                    style={{ width: 145 }}
                     className="custom-dark-select"
                     popupClassName="custom-dark-dropdown"
                     dropdownStyle={{ boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
@@ -252,13 +231,13 @@ const CvTemplateLibrary = () => {
                                         {cv.colors && cv.colors.length > 0 && (
                                             <Space size={8} style={{ marginBottom: '12px' }}>
                                                 {cv.colors.map((color, index) => (
-                                                    <span 
-                                                        key={index} 
-                                                        className="color-dot" 
+                                                    <span
+                                                        key={index}
+                                                        className="color-dot"
                                                         style={{ backgroundColor: color }}
                                                         onClick={(e) => {
-                                                            e.stopPropagation(); // 🛡️ Ngăn click lây lan ra Card cha
-                                                            handleTemplateClick(currentId, color); // Hướng về Builder kèm màu chỉ định
+                                                            e.stopPropagation(); 
+                                                            handleTemplateClick(currentId, color); 
                                                         }}
                                                     ></span>
                                                 ))}

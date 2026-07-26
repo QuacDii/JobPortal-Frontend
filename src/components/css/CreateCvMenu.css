@@ -1,0 +1,54 @@
+ .cv-mega-menu {
+     background-color: #1f1f1f;
+     border-radius: 8px;
+     padding: 24px;
+     width: 500px;
+     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+     border: 1px solid #333;
+ }
+
+ .menu-group-title {
+     color: #1890ff;
+     font-weight: 600;
+     font-size: 14px;
+     margin-bottom: 12px;
+     cursor: pointer;
+     transition: all 0.2s;
+ }
+
+ .menu-group-title:hover {
+     color: #40a9ff;
+     text-decoration: underline;
+ }
+
+ .menu-item {
+     color: #d9d9d9;
+     padding: 8px 12px;
+     border-radius: 4px;
+     cursor: pointer;
+     display: flex;
+     align-items: center;
+     font-size: 14px;
+     transition: all 0.2s;
+     margin-bottom: 4px;
+     white-space: nowrap;
+ }
+
+ .menu-item:hover {
+     background-color: rgba(24, 144, 255, 0.1);
+     color: #1890ff;
+ }
+
+ .menu-icon {
+     margin-right: 12px;
+     font-size: 16px;
+     opacity: 0.8;
+ }
+
+ .menu-left-col {
+     border-right: 1px solid #333;
+ }
+
+ .right-item {
+     padding: 10px 12px;
+ }

@@ -1,11 +1,11 @@
-// src/Pages/candidate/CvBuilder.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import useCvStore from '../store/useCvStore';
+import './css/CvBuilder.css';
 import apiClient from '../api/apiClient';
 import html2canvas from 'html2canvas';
 import html2pdf from 'html2pdf.js';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ConfigProvider, theme, Input, Typography, Button, Space, message, Spin, Select, Slider, Tooltip } from 'antd';
+import { Modal, ConfigProvider, theme, Input, Typography, Button, Space, message, Spin, Select, Slider, Tooltip } from 'antd';
 import {
     DownloadOutlined,
     SaveOutlined,
@@ -20,8 +20,12 @@ import {
     RedoOutlined,
     EyeOutlined,
     BulbOutlined,
+    LockOutlined,
+    RobotOutlined,
+    CopyOutlined,
     BookOutlined,
-    CheckOutlined
+    CheckOutlined,
+    ExclamationCircleOutlined
 } from '@ant-design/icons';
 
 import MasterTemplate from '../components/MasterTemplate';
@@ -52,42 +56,78 @@ const getUserInfoFromToken = (token) => {
 const cvDictionary = {
     "Học vấn": { vi: "Học vấn", en: "Education" },
     "Kỹ năng": { vi: "Kỹ năng", en: "Skills" },
+    "Chuyên ngành:": { vi: "Chuyên ngành:", en: "Major:" },
     "Sở thích": { vi: "Sở thích", en: "Hobbies" },
     "Mục tiêu nghề nghiệp": { vi: "Mục tiêu nghề nghiệp", en: "Career Objective" },
     "Kinh nghiệm làm việc": { vi: "Kinh nghiệm làm việc", en: "Work Experience" },
     "Danh hiệu và giải thưởng": { vi: "Danh hiệu và giải thưởng", en: "Honors & Awards" },
     "Chứng chỉ": { vi: "Chứng chỉ", en: "Certificates" },
     "Hoạt động": { vi: "Hoạt động", en: "Activities" },
-    "Giới tính": { vi: "Giới tính", en: "Sex" },
     "Dự án": { vi: "Dự án", en: "Projects" },
+
+    "HỌ TÊN": { vi: "HỌ TÊN", en: "FULL NAME" },
     "Vị trí ứng tuyển": { vi: "Vị trí ứng tuyển", en: "Target Position" },
     "Ngày sinh": { vi: "Ngày sinh", en: "Date of Birth" },
+    "Giới tính": { vi: "Giới tính", en: "Gender" },
+
+    "Ngày sinh:": { vi: "Ngày sinh:", en: "Date of Birth:" },
+    "Giới tính:": { vi: "Giới tính:", en: "Gender:" },
+    "Số điện thoại:": { vi: "Số điện thoại:", en: "Phone:" },
+    "Email:": { vi: "Email:", en: "Email:" },
+    "Website:": { vi: "Website:", en: "Website:" },
+    "Địa chỉ:": { vi: "Địa chỉ:", en: "Address:" },
+
     "Ngành học / Môn học": { vi: "Ngành học / Môn học", en: "Major / Field of Study" },
-    "Bắt đầu": { vi: "Bắt đầu", en: "Start Date" },
-    "Kết thúc": { vi: "Kết thúc", en: "End Date" },
+    "Bắt đầu": { vi: "Bắt đầu", en: "Start" },
+    "Kết thúc": { vi: "Kết thúc", en: "End" },
+    "Nay": { vi: "Nay", en: "Present" },
     "Tên trường học": { vi: "Tên trường học", en: "School / University Name" },
+
+    "Mô tả quá trình học tập hoặc thành tích của bạn": { vi: "Mô tả quá trình học tập hoặc thành tích của bạn", en: "Describe your education process and achievements" },
     "Mô tả quá trình học tập...": { vi: "Mô tả quá trình học tập...", en: "Describe your education process..." },
+
     "Tên kỹ năng": { vi: "Tên kỹ năng", en: "Skill Name" },
-    "Sở thích của bạn...": { vi: "Sở thích của bạn...", en: "Your hobbies..." },
+    "Tên sở thích": { vi: "Tên sở thích", en: "Hobby Name" },
+    "Mục tiêu nghề nghiệp của bạn, bao gồm mục tiêu ngắn hạn và dài hạn": { vi: "Mục tiêu nghề nghiệp của bạn, bao gồm mục tiêu ngắn hạn và dài hạn", en: "Your career objectives, including short-term and long-term goals" },
     "Mục tiêu nghề nghiệp của bạn, bao gồm mục tiêu ngắn hạn và dài hạn...": { vi: "Mục tiêu nghề nghiệp của bạn, bao gồm mục tiêu ngắn hạn và dài hạn...", en: "Your career objectives, including short-term and long-term goals..." },
-    "Vị trí công việc": { vi: "Vị trí công việc", en: "Job Title / Position" },
+
+    "Vị trí công việc": { vi: "Vị trí công việc", en: "Job Title" },
     "Tên công ty": { vi: "Tên công ty", en: "Company Name" },
+    "Mô tả kinh nghiệm làm việc của bạn": { vi: "Mô tả kinh nghiệm làm việc của bạn", en: "Describe your work experience" },
     "Mô tả công việc...": { vi: "Mô tả công việc...", en: "Job description..." },
-    "Thời gian": { vi: "Thời gian", en: "Timeline / Period" },
+
+    "Thời gian": { vi: "Thời gian", en: "Time / Period" },
     "Tên giải thưởng": { vi: "Tên giải thưởng", en: "Award Name" },
     "Tên chứng chỉ": { vi: "Tên chứng chỉ", en: "Certificate Name" },
+
     "Vị trí của bạn": { vi: "Vị trí của bạn", en: "Your Role" },
     "Tên tổ chức": { vi: "Tên tổ chức", en: "Organization Name" },
+    "Mô tả hoạt động": { vi: "Mô tả hoạt động", en: "Describe your activities" },
     "Mô tả hoạt động...": { vi: "Mô tả hoạt động...", en: "Describe your activities..." },
+
     "Vị trí của bạn trong dự án": { vi: "Vị trí của bạn trong dự án", en: "Your role in the project" },
     "Tên dự án": { vi: "Tên dự án", en: "Project Name" },
-    "Mô tả ngắn gọn về dự án...": { vi: "Mô tả ngắn gọn về dự án...", en: "Brief description of the project..." }
+    "Mô tả ngắn gọn về dự án, mục tiêu, vai trò của bạn, các công nghệ sử dung và những thành tựu bạn đã đạt được trong dự án": { vi: "Mô tả ngắn gọn về dự án, mục tiêu, vai trò của bạn, các công nghệ sử dung và những thành tựu bạn đã đạt được trong dự án", en: "Briefly describe the project, goals, your role, technologies used and achievements" },
+    "Mô tả ngắn gọn về dự án...": { vi: "Mô tả ngắn gọn về dự án...", en: "Brief description of the project..." },
+    "Người giới thiệu": { vi: "Người giới thiệu", en: "References" },
+    "Thông tin thêm": { vi: "Thông tin thêm", en: "Additional Information" },
+    "Tên người giới thiệu": { vi: "Tên người giới thiệu", en: "Reference Name" },
+    "Vị trí / Tên công ty": { vi: "Vị trí / Tên công ty", en: "Position / Company" },
+    "Số điện thoại / Email": { vi: "Số điện thoại / Email", en: "Phone / Email" },
+    "Điền các thông tin thêm của bạn (nếu có)...": { vi: "Điền các thông tin thêm của bạn (nếu có)...", en: "Enter your additional information (if any)..." }
 };
 
 const translateText = (text, targetLang) => {
     if (!text) return text;
-    const entry = Object.values(cvDictionary).find(item => item.vi === text || item.en === text);
-    return entry ? entry[targetLang] : text;
+    const entry = Object.values(cvDictionary).find(
+        item => item.vi.toLowerCase() === text.toLowerCase() || item.en.toLowerCase() === text.toLowerCase()
+    );
+    if (!entry) return text;
+    const translated = entry[targetLang];
+    if (text === text.toUpperCase()) {
+        return translated.toUpperCase();
+    }
+    return translated;
 };
 
 const translateLayoutTree = (node, targetLang) => {
@@ -111,8 +151,6 @@ const CvBuilder = () => {
     const templateId = searchParams.get('templateId') || '1';
     const cvId = searchParams.get('cvId');
     const source = searchParams.get('source');
-    
-    // 🌟 MỚI: Bắt tín hiệu mã màu được truyền sang từ URL tĩnh (?color=#...)
     const colorParam = searchParams.get('color');
 
     const [lang, setLang] = useState(searchParams.get('lang') || 'vi');
@@ -124,8 +162,328 @@ const CvBuilder = () => {
     const [cvTitle, setCvTitle] = useState('CV chưa đặt tên');
     const [pageLoading, setPageLoading] = useState(false);
     const [activeMenu, setActiveMenu] = useState('design');
+    const [isResizingCols, setIsResizingCols] = useState(false);
+    const [tempColWidth, setTempColWidth] = useState(36);
+    const [isPreviewModalVisible, setIsPreviewModalVisible] = useState(false);
+    const [templateList, setTemplateList] = useState([]);
+    const [loadingTemplates, setLoadingTemplates] = useState(false);
+    const sidebarLayoutRef = useRef(null);
+
+    // STATE CHO TÍNH NĂNG AI GEMINI
+    const [isPremium, setIsPremium] = useState(false); 
+    const [aiIndustry, setAiIndustry] = useState('');
+    const [aiDescription, setAiDescription] = useState('');
+    const [aiResult, setAiResult] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    // STATE QUẢN LÝ LỊCH SỬ HOÀN TÁC (UNDO/REDO)
+    const [pastHistory, setPastHistory] = useState([]);
+    const [futureHistory, setFutureHistory] = useState([]);
+    const [isTimeTraveling, setIsTimeTraveling] = useState(false);
 
     const cvData = useCvStore(state => state.cvData);
+    const currentData = useCvStore(state => state.cvData);
+    const layoutSchema = useCvStore(state => state.layoutSchema || state.schema);
+    const currentSchema = useCvStore(state => state.layoutSchema || state.schema);
+
+    useEffect(() => {
+        const fetchTemplates = async () => {
+            setLoadingTemplates(true);
+            try {
+                const res = await apiClient.get('/MauCv');
+                setTemplateList(res.data || res || []);
+            } catch (error) {
+                console.error("Lỗi khi tải danh sách mẫu CV:", error);
+            } finally {
+                setLoadingTemplates(false);
+            }
+        };
+        fetchTemplates();
+    }, []);
+
+    // 🚀 HÀM XỬ LÝ ĐỔI MẪU CV (ĐÃ BỎ CẢNH BÁO POPUP)
+    const handleApplyTemplate = async (newTemplateId, newTemplateName) => {
+        if (String(templateId) === String(newTemplateId)) return;
+
+        const hideLoading = message.loading('Đang tải cấu trúc mẫu mới...', 0);
+        try {
+            const res = await apiClient.get(`/MauCv/${newTemplateId}`);
+            const actualTemplate = res?.data ? res.data : res;
+
+            let rawData = actualTemplate?.layoutJson || actualTemplate?.LayoutJson;
+            if (rawData) {
+                if (typeof rawData === 'string') rawData = rawData.replace(/^\uFEFF/, '').trim();
+                let parsedData = typeof rawData === 'object' ? rawData : JSON.parse(rawData);
+                if (typeof parsedData === 'string') parsedData = JSON.parse(parsedData);
+
+                // ÁP DỤNG ĐỔI MẪU TRỰC TIẾP NGAY LẬP TỨC
+                const translatedLayout = translateLayoutTree(parsedData, lang);
+                setInitialData(translatedLayout, cvData);
+                const defaultColor = actualTemplate?.colors?.[0] || '#00b14f';
+                updateLayoutSetting('themeColor', defaultColor);
+                setSearchParams(prev => { prev.set('templateId', newTemplateId); return prev; }, { replace: true });
+                
+                hideLoading();
+                message.success('Đã đổi mẫu CV thành công!');
+            }
+        } catch (error) {
+            hideLoading();
+            message.error('Lỗi khi áp dụng cấu trúc mẫu mới!');
+            console.error(error);
+        }
+    };
+
+    // Camera tự động chụp lại dữ liệu sau mỗi 600ms
+    useEffect(() => {
+        if (isTimeTraveling) {
+            setIsTimeTraveling(false);
+            return;
+        }
+        if (!currentData || !currentSchema) return;
+
+        const timer = setTimeout(() => {
+            setPastHistory(prev => {
+                const newRecord = {
+                    cvData: JSON.parse(JSON.stringify(currentData)),
+                    layoutSchema: JSON.parse(JSON.stringify(currentSchema))
+                };
+
+                if (prev.length > 0) {
+                    const last = prev[prev.length - 1];
+                    if (JSON.stringify(last) === JSON.stringify(newRecord)) return prev;
+                }
+
+                return [...prev.slice(-15), newRecord];
+            });
+            setFutureHistory([]);
+        }, 600);
+
+        return () => clearTimeout(timer);
+    }, [currentData, currentSchema]);
+
+    const handleUndo = () => {
+        if (pastHistory.length <= 1) return;
+        setIsTimeTraveling(true);
+        const currentState = pastHistory[pastHistory.length - 1];
+        const previousState = pastHistory[pastHistory.length - 2];
+
+        setPastHistory(prev => prev.slice(0, prev.length - 1));
+        setFutureHistory(prev => [currentState, ...prev]);
+        useCvStore.getState().setInitialData(previousState.layoutSchema, previousState.cvData);
+    };
+
+    const handleRedo = () => {
+        if (futureHistory.length === 0) return;
+        setIsTimeTraveling(true);
+        const nextState = futureHistory[0];
+
+        setFutureHistory(prev => prev.slice(1));
+        setPastHistory(prev => [...prev, nextState]);
+        useCvStore.getState().setInitialData(nextState.layoutSchema, nextState.cvData);
+    };
+
+    useEffect(() => {
+        if (activeMenu === 'layout') {
+            const currentSchema = useCvStore.getState().layoutSchema || useCvStore.getState().schema;
+            let initialWidth = 36;
+            const findWidth = (node) => {
+                if (node?.id === 'left-col' && node.styles?.width) initialWidth = parseFloat(node.styles.width);
+                if (node?.children) node.children.forEach(findWidth);
+            };
+            findWidth(currentSchema);
+            setTempColWidth(initialWidth);
+        }
+    }, [activeMenu]);
+
+    // 🚀 HÀM CẬP NHẬT REAL-TIME CHIỀU RỘNG CỘT KHI ĐANG KÉO RÊ
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            if (!isResizingCols || !sidebarLayoutRef.current) return;
+            const rect = sidebarLayoutRef.current.getBoundingClientRect();
+            let newWidth = ((e.clientX - rect.left) / rect.width) * 100;
+            if (newWidth < 20) newWidth = 20;
+            if (newWidth > 80) newWidth = 80;
+
+            setTempColWidth(newWidth);
+
+            const store = useCvStore.getState();
+            const currentSchema = store.layoutSchema || store.schema;
+            if (currentSchema) {
+                const newSchema = JSON.parse(JSON.stringify(currentSchema));
+                let lCol, rCol;
+                const findCols = (node) => {
+                    if (node?.id === 'left-col') lCol = node;
+                    if (node?.id === 'right-col') rCol = node;
+                    if (node?.children) node.children.forEach(findCols);
+                };
+                findCols(newSchema);
+                if (lCol && rCol) {
+                    lCol.styles.width = `${newWidth}%`;
+                    rCol.styles.width = `${100 - newWidth}%`;
+                    if (typeof store.setLayoutSchema === 'function') {
+                        store.setLayoutSchema(newSchema);
+                    } else {
+                        useCvStore.setState({ layoutSchema: newSchema, schema: newSchema });
+                    }
+                }
+            }
+        };
+
+        const handleMouseUp = () => {
+            if (isResizingCols) {
+                setIsResizingCols(false);
+            }
+        };
+
+        if (isResizingCols) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isResizingCols]);
+
+    // 🚀 HÀM NẶN KHỐI MỚI THÔNG MINH (ĐÃ BỔ SUNG ĐẦY ĐỦ CHO TẤT CẢ CÁC MỤC)
+    const getNewSectionJson = (id) => {
+        const store = useCvStore.getState();
+        const schema = store.layoutSchema || store.schema;
+        let headingTemplate = null;
+
+        const findHeading = (node) => {
+            if (node && (node.id === 'section-education' || node.id === 'section-experience') && node.children && node.children.length > 0) {
+                headingTemplate = JSON.parse(JSON.stringify(node.children[0])); 
+            }
+            if (!headingTemplate && node && node.children) {
+                node.children.forEach(findHeading);
+            }
+        };
+        findHeading(schema);
+
+        if (!headingTemplate) {
+            headingTemplate = { "type": "Container", "styles": { "display": "flex", "alignItems": "center", "marginBottom": "24px" }, "children": [{ "type": "Text", "content": "TIÊU ĐỀ", "styles": { "backgroundColor": "var(--heading-bg)", "color": "#ffffff", "padding": "8px 24px", "borderRadius": "20px", "fontWeight": "bold", "fontSize": "15px", "whiteSpace": "nowrap" } }, { "type": "Container", "styles": { "flexGrow": "1", "height": "1px", "backgroundColor": "var(--heading-line)", "marginLeft": "15px", "opacity": "0.3" } }] };
+        }
+
+        const applyHeadingTitle = (root, title) => {
+            if (root.type === 'Text' && root.content !== undefined) root.content = title;
+            if (root.children) root.children.forEach(c => applyHeadingTitle(c, title));
+        };
+
+        const b = { marginBottom: "25px" };
+        let contentChildren = [];
+        let title = "";
+
+        if (id === 'section-summary') {
+            title = "Mục tiêu nghề nghiệp";
+            contentChildren = [{ 
+                "type": "RichText", 
+                "dataPath": "summary", 
+                "placeholder": "Mục tiêu nghề nghiệp của bạn, bao gồm mục tiêu ngắn hạn và dài hạn", 
+                "styles": { "textAlign": "justify", "fontSize": "13.5px", "border": "none", "outline": "none", "width": "100%" } 
+            }];
+        } else if (id === 'section-education') {
+            title = "Học vấn";
+            contentChildren = [{
+                "type": "LoopContainer", "dataPath": "education", "styles": { "display": "flex", "flexDirection": "column", "gap": "16px" },
+                "itemTemplate": {
+                    "type": "Container", "styles": { "display": "flex", "flexDirection": "row", "gap": "20px" }, "children": [
+                        { "type": "Container", "styles": { "width": "20%", "flexShrink": "0" }, "children": [{ "type": "Container", "styles": { "display": "flex", "gap": "4px", "fontSize": "14px", "whiteSpace": "nowrap" }, "children": [{ "type": "Text", "dataPath": "startDate", "placeholder": "Bắt đầu" }, { "type": "Text", "content": "-" }, { "type": "Text", "dataPath": "endDate", "placeholder": "Kết thúc" }] }] },
+                        { "type": "Container", "styles": { "flex": "1", "display": "flex", "flexDirection": "column" }, "children": [{ "type": "Text", "dataPath": "school", "placeholder": "Tên trường học", "styles": { "fontWeight": "bold", "fontSize": "14px", "marginBottom": "6px" } }, { "type": "Container", "styles": { "display": "flex", "gap": "6px", "marginBottom": "6px", "alignItems": "baseline" }, "children": [{ "type": "Text", "content": "Chuyên ngành:", "styles": { "fontWeight": "bold", "whiteSpace": "nowrap", "flexShrink": "0" } }, { "type": "Text", "dataPath": "major", "placeholder": "Ngành học / Môn học", "styles": { "fontWeight": "bold" } }] }, { "type": "RichText", "dataPath": "description", "placeholder": "Mô tả quá trình học tập hoặc thành tích của bạn", "styles": { "fontSize": "13.5px", "border": "none", "outline": "none" } }] }
+                    ]
+                }
+            }];
+        } else if (id === 'section-experience') {
+            title = "Kinh nghiệm làm việc";
+            contentChildren = [{
+                "type": "LoopContainer", "dataPath": "experience", "styles": { "display": "flex", "flexDirection": "column", "gap": "20px" },
+                "itemTemplate": {
+                    "type": "Container", "styles": { "display": "flex", "flexDirection": "row", "gap": "20px" }, "children": [
+                        { "type": "Container", "styles": { "width": "20%", "flexShrink": "0" }, "children": [{ "type": "Container", "styles": { "display": "flex", "gap": "4px", "fontSize": "14px", "whiteSpace": "nowrap" }, "children": [{ "type": "Text", "dataPath": "startDate", "placeholder": "Bắt đầu" }, { "type": "Text", "content": "-" }, { "type": "Text", "dataPath": "endDate", "placeholder": "Kết thúc" }] }] },
+                        { "type": "Container", "styles": { "flex": "1", "display": "flex", "flexDirection": "column" }, "children": [{ "type": "Text", "dataPath": "companyName", "placeholder": "Tên công ty", "styles": { "fontWeight": "bold", "fontSize": "14px", "marginBottom": "6px" } }, { "type": "Text", "dataPath": "title", "placeholder": "Vị trí công việc", "styles": { "fontWeight": "bold", "marginBottom": "8px" } }, { "type": "RichText", "dataPath": "description", "placeholder": "Mô tả kinh nghiệm làm việc của bạn", "styles": { "fontSize": "13.5px", "border": "none", "outline": "none" } }] }
+                    ]
+                }
+            }];
+        } else if (id === 'section-projects') {
+            title = "Dự án";
+            contentChildren = [{ "type": "LoopContainer", "dataPath": "projects", "styles": { "display": "flex", "flexDirection": "column", "gap": "20px" }, "itemTemplate": { "type": "Container", "styles": { "display": "flex", "flexDirection": "column" }, "children": [{ "type": "Container", "styles": { "display": "flex", "justifyContent": "space-between", "alignItems": "flex-start", "marginBottom": "4px" }, "children": [{ "type": "Text", "dataPath": "role", "placeholder": "Vai trò trong dự án", "styles": { "fontWeight": "bold", "fontSize": "15px" } }, { "type": "Container", "styles": { "display": "flex", "gap": "4px", "fontWeight": "bold", "fontSize": "14px", "opacity": "0.8", "whiteSpace": "nowrap" }, "children": [{ "type": "Text", "dataPath": "startDate", "placeholder": "Bắt đầu" }, { "type": "Text", "content": "-" }, { "type": "Text", "dataPath": "endDate", "placeholder": "Kết thúc" }] }] }, { "type": "Text", "dataPath": "projectName", "placeholder": "Tên dự án", "styles": { "fontSize": "14.5px", "marginBottom": "8px", "opacity": "0.9", "fontWeight": "bold" } }, { "type": "RichText", "dataPath": "description", "placeholder": "Mô tả dự án...", "styles": { "fontSize": "13.5px", "border": "none", "outline": "none" } }] } }];
+        } else if (id === 'section-awards') {
+            title = "Danh hiệu và giải thưởng";
+            contentChildren = [{ "type": "LoopContainer", "dataPath": "awards", "styles": { "display": "flex", "flexDirection": "column", "gap": "16px" }, "itemTemplate": { "type": "Container", "styles": { "display": "flex", "flexDirection": "row", "gap": "20px" }, "children": [{ "type": "Container", "styles": { "width": "20%", "flexShrink": "0" }, "children": [{ "type": "Text", "dataPath": "time", "placeholder": "Năm", "styles": { "fontSize": "14px", "fontWeight": "bold" } }] }, { "type": "Container", "styles": { "flex": "1" }, "children": [{ "type": "Text", "dataPath": "name", "placeholder": "Tên giải thưởng", "styles": { "fontSize": "14px" } }] }] } }];
+        } else if (id === 'section-certificates') {
+            title = "Chứng chỉ";
+            contentChildren = [{ "type": "LoopContainer", "dataPath": "certificates", "styles": { "display": "flex", "flexDirection": "column", "gap": "16px" }, "itemTemplate": { "type": "Container", "styles": { "display": "flex", "flexDirection": "row", "gap": "20px" }, "children": [{ "type": "Container", "styles": { "width": "20%", "flexShrink": "0" }, "children": [{ "type": "Text", "dataPath": "time", "placeholder": "Năm", "styles": { "fontSize": "14px", "fontWeight": "bold" } }] }, { "type": "Container", "styles": { "flex": "1" }, "children": [{ "type": "Text", "dataPath": "name", "placeholder": "Tên chứng chỉ", "styles": { "fontSize": "14px" } }] }] } }];
+        } else if (id === 'section-activities') {
+            title = "Hoạt động";
+            contentChildren = [{ "type": "LoopContainer", "dataPath": "activities", "styles": { "display": "flex", "flexDirection": "column", "gap": "20px" }, "itemTemplate": { "type": "Container", "styles": { "display": "flex", "flexDirection": "column" }, "children": [{ "type": "Container", "styles": { "display": "flex", "justifyContent": "space-between", "alignItems": "flex-start", "marginBottom": "4px" }, "children": [{ "type": "Text", "dataPath": "role", "placeholder": "Vị trí của bạn", "styles": { "fontWeight": "bold", "fontSize": "15px" } }, { "type": "Container", "styles": { "display": "flex", "gap": "4px", "fontWeight": "bold", "fontSize": "14px", "opacity": "0.8", "whiteSpace": "nowrap" }, "children": [{ "type": "Text", "dataPath": "startDate", "placeholder": "Bắt đầu" }, { "type": "Text", "content": " - " }, { "type": "Text", "dataPath": "endDate", "placeholder": "Kết thúc" }] }] }, { "type": "Text", "dataPath": "organization", "placeholder": "Tên tổ chức", "styles": { "fontSize": "14.5px", "marginBottom": "8px", "opacity": "0.9", "fontWeight": "bold" } }, { "type": "RichText", "dataPath": "description", "placeholder": "Mô tả hoạt động...", "styles": { "fontSize": "13.5px", "border": "none", "outline": "none" } }] } }];
+        } else if (id === 'section-hobbies') {
+            title = "Sở thích";
+            contentChildren = [{ "type": "LoopContainer", "dataPath": "hobbies", "styles": { "display": "flex", "flexDirection": "column", "gap": "8px" }, "itemTemplate": { "type": "Container", "styles": { "display": "flex", "alignItems": "center", "gap": "8px" }, "children": [{ "type": "Text", "content": "•", "styles": { "fontWeight": "bold", "fontSize": "14px" } }, { "type": "Text", "dataPath": "name", "placeholder": "Tên sở thích", "styles": { "fontSize": "13.5px" } }] } }];
+        } else if (id === 'section-skills') {
+            title = "Kỹ năng";
+            contentChildren = [{ "type": "LoopContainer", "dataPath": "skills", "styles": { "display": "flex", "flexDirection": "column", "gap": "8px" }, "itemTemplate": { "type": "Container", "styles": { "display": "flex", "alignItems": "center", "gap": "8px" }, "children": [{ "type": "Text", "content": "•", "styles": { "fontWeight": "bold", "fontSize": "14px" } }, { "type": "Text", "dataPath": "name", "placeholder": "Tên kỹ năng", "styles": { "fontSize": "13.5px" } }] } }];
+        } else if (id === 'section-references') {
+            title = "Người tham chiếu";
+            contentChildren = [{ "type": "LoopContainer", "dataPath": "references", "styles": { "display": "flex", "flexDirection": "column", "gap": "16px", "width": "100%" }, "itemTemplate": { "type": "Container", "styles": { "display": "flex", "flexDirection": "column", "gap": "4px" }, "children": [{ "type": "Text", "dataPath": "name", "placeholder": "Tên người tham chiếu", "styles": { "fontWeight": "bold", "fontSize": "14px" } }, { "type": "Text", "dataPath": "position", "placeholder": "Vị trí / Tên công ty", "styles": { "fontSize": "13.5px", "opacity": "0.9" } }, { "type": "Text", "dataPath": "contact", "placeholder": "Số điện thoại / Email", "styles": { "fontSize": "13.5px", "opacity": "0.9" } }] } }];
+        } else if (id === 'section-additional') {
+            title = "Thông tin thêm";
+            contentChildren = [{ "type": "RichText", "dataPath": "additionalInfo", "placeholder": "Điền các thông tin thêm của bạn (nếu có)...", "styles": { "fontSize": "13.5px", "border": "none", "outline": "none", "width": "100%" } }];
+        } else {
+            return null;
+        }
+
+        applyHeadingTitle(headingTemplate, title);
+
+        return {
+            "type": "Container",
+            "id": id,
+            "styles": b,
+            "children": [headingTemplate, ...contentChildren]
+        };
+    };
+
+    // 🚀 HÀM GỌI API AI GEMINI
+    const handleGenerateSuggestion = async () => {
+        if (!aiIndustry || !aiDescription) {
+            message.warning("Vui lòng nhập Ngành nghề và Mô tả kinh nghiệm!");
+            return;
+        }
+
+        setIsGenerating(true);
+        setAiResult('');
+
+        try {
+            const API_KEY = "YOUR_GEMINI_API_KEY"; // Thay API Key của bạn vào đây
+            
+            const prompt = `Bạn là một chuyên gia tuyển dụng nhân sự cấp cao. Hãy viết nội dung CV cho ngành "${aiIndustry}" dựa trên mô tả sau của ứng viên: "${aiDescription}". 
+            Hãy viết làm 2 phần rõ ràng:
+            1. Mục tiêu nghề nghiệp (1 đoạn văn ngắn gọn, chuyên nghiệp).
+            2. Kinh nghiệm làm việc nổi bật (3-4 gạch đầu dòng mô tả công việc súc tích, có dùng số liệu nếu có).
+            Không giải thích gì thêm, chỉ in ra kết quả.`;
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.candidates && data.candidates[0].content.parts[0].text) {
+                setAiResult(data.candidates[0].content.parts[0].text);
+            } else {
+                message.error("Không nhận được phản hồi hợp lệ từ AI.");
+            }
+        } catch (error) {
+            console.error("Gemini API Error:", error);
+            message.error("Lỗi khi kết nối với AI Gemini.");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
     const { fontFamily, fontSize, lineHeight, themeColor, backgroundStyle } = useCvStore(state => state.layoutSettings || {});
 
     const setInitialData = useCvStore(state => state.setInitialData);
@@ -137,7 +495,15 @@ const CvBuilder = () => {
         { label: 'Be Vietnam Pro', value: '"Be Vietnam Pro", sans-serif' },
         { label: 'Roboto', value: 'Roboto, sans-serif' },
         { label: 'Arial', value: 'Arial, sans-serif' },
-        { label: 'Nunito', value: 'Nunito, sans-serif' }
+        { label: 'Nunito', value: 'Nunito, sans-serif' },
+        { label: 'Open Sans', value: '"Open Sans", sans-serif' },
+        { label: 'Inter', value: '"Inter", sans-serif' },
+        { label: 'Montserrat', value: '"Montserrat", sans-serif' },
+        { label: 'Quicksand', value: '"Quicksand", sans-serif' },
+        { label: 'Poppins', value: '"Poppins", sans-serif' },
+        { label: 'Lora', value: '"Lora", serif' },
+        { label: 'Merriweather', value: '"Merriweather", serif' },
+        { label: 'Times New Roman', value: '"Times New Roman", Times, serif' }
     ];
 
     const fontSizeMarks = {
@@ -151,14 +517,21 @@ const CvBuilder = () => {
     };
 
     const bgPatterns = [
-        { id: 'none', name: 'Mặc định', value: 'none', css: '#141414' },
-        { id: 'pt1', name: 'Gradient Classic', value: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)', css: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)' },
-        { id: 'pt2', name: 'Dark Abstract', value: 'linear-gradient(to right, #243b55, #141e30)', css: 'linear-gradient(to right, #243b55, #141e30)' },
-        { id: 'pt3', name: 'Deep Purple', value: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)', css: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)' },
-        { id: 'pt4', name: 'Premium Mesh', value: 'linear-gradient(45deg, #859398 0%, #283048 100%)', css: 'linear-gradient(45deg, #859398 0%, #283048 100%)' },
-        { id: 'pt5', name: 'Cyberpunk Dark', value: 'linear-gradient(60deg, #29323c 0%, #485563 100%)', css: 'linear-gradient(60deg, #29323c 0%, #485563 100%)' },
-        { id: 'pt6', name: 'Luxury Wine', value: 'linear-gradient(135deg, #e65245 0%, #240b36 100%)', css: 'linear-gradient(135deg, #e65245 0%, #240b36 100%)' },
-        { id: 'pt7', name: 'Soft Dark', value: 'linear-gradient(to top, #1e3c72 0%, #1e3c72 1%, #111111 100%)', css: 'linear-gradient(to top, #1e3c72 0%, #1e3c72 1%, #111111 100%)' }
+        { id: 'none', name: 'Mặc định', value: 'none', css: '#1a1a1a' },
+        { id: 'bg1', name: 'Dark Ocean', value: 'linear-gradient(to bottom right, #001528, #00456c)', css: 'linear-gradient(to bottom right, #001528, #00456c)' },
+        { id: 'bg2', name: 'Deep Space', value: 'linear-gradient(to bottom right, #0f2027, #203a43, #2c5364)', css: 'linear-gradient(to bottom right, #0f2027, #203a43, #2c5364)' },
+        { id: 'bg3', name: 'Midnight Blue', value: 'linear-gradient(135deg, #141e30, #243b55)', css: 'linear-gradient(135deg, #141e30, #243b55)' },
+        { id: 'bg4', name: 'Purple Night', value: 'linear-gradient(to bottom, #2b5876, #4e4376)', css: 'linear-gradient(to bottom, #2b5876, #4e4376)' },
+        { id: 'bg5', name: 'Navy', value: 'linear-gradient(to right, #112240, #0a192f)', css: 'linear-gradient(to right, #112240, #0a192f)' },
+        { id: 'bg6', name: 'Blood Moon', value: 'linear-gradient(45deg, #240b36, #c31432)', css: 'linear-gradient(45deg, #240b36, #c31432)' },
+        { id: 'bg7', name: 'Charcoal', value: 'linear-gradient(to bottom, #000000, #434343)', css: 'linear-gradient(to bottom, #000000, #434343)' },
+        { id: 'bg8', name: 'Neon Pink', value: 'radial-gradient(circle at top left, #33001b, #ff0084)', css: 'radial-gradient(circle at top left, #33001b, #ff0084)' },
+        { id: 'bg9', name: 'Soft Dark', value: 'linear-gradient(to right, #141E30, #243B55)', css: 'linear-gradient(to right, #141E30, #243B55)' },
+        { id: 'bg10', name: 'Matrix', value: 'radial-gradient(circle, #000000, #0f9b0f)', css: 'radial-gradient(circle, #000000, #0f9b0f)' },
+        { id: 'bg11', name: 'Deep Sea', value: 'linear-gradient(to right, #000428, #004e92)', css: 'linear-gradient(to right, #000428, #004e92)' },
+        { id: 'bg12', name: 'Dark Red', value: 'linear-gradient(to bottom right, #000000, #1a0000)', css: 'linear-gradient(to bottom right, #000000, #1a0000)' },
+        { id: 'bg13', name: 'Vignette', value: 'radial-gradient(circle, #1a1a1a, #000000)', css: 'radial-gradient(circle, #1a1a1a, #000000)' },
+        { id: 'bg14', name: 'Steel', value: 'linear-gradient(to top, #232526, #414345)', css: 'linear-gradient(to top, #232526, #414345)' }
     ];
 
     useEffect(() => {
@@ -166,7 +539,6 @@ const CvBuilder = () => {
             setPageLoading(true);
             try {
                 if (cvId && token) {
-                    // 1. LUỒNG TẢI LẠI CV ĐÃ LƯU CŨ
                     const res = await apiClient.get(`/Cv/${cvId}`);
                     const actualCv = res?.data ? res.data : res;
 
@@ -178,6 +550,16 @@ const CvBuilder = () => {
                         const layoutJson = actualCv.customLayoutJson
                             ? (typeof actualCv.customLayoutJson === 'string' ? JSON.parse(actualCv.customLayoutJson) : actualCv.customLayoutJson)
                             : null;
+
+                        const jsonString = JSON.stringify(layoutJson || {});
+                        const isEn = jsonString.includes('Work Experience') || jsonString.includes('Target Position') || jsonString.includes('Education');
+
+                        const dbLang = actualCv.ngonNgu || actualCv.NgonNgu;
+                        const finalLang = (dbLang || (isEn ? 'en' : 'vi')).toLowerCase();
+
+                        setLang(finalLang);
+                        setSearchParams(prev => { prev.set('lang', finalLang); return prev; }, { replace: true });
+
                         const contentData = actualCv.duLieuCv
                             ? (typeof actualCv.duLieuCv === 'string' ? JSON.parse(actualCv.duLieuCv) : actualCv.duLieuCv)
                             : null;
@@ -185,7 +567,6 @@ const CvBuilder = () => {
                         setInitialData(layoutJson, contentData);
                     }
                 } else {
-                    // 2. LUỒNG KHỞI TẠO MỘT MẪU CV MỚI TINH
                     let initialContent = {
                         personalInfo: {
                             fullName: userInfo?.fullName || '', jobTitle: '', email: userInfo?.email || '',
@@ -203,7 +584,6 @@ const CvBuilder = () => {
                             const templateRes = await apiClient.get(`/MauCv/${templateId}`);
                             const actualTemplate = templateRes?.data ? templateRes.data : templateRes;
 
-                            // 🌟 ĐÃ SỬA: Ưu tiên mã màu người dùng chọn từ URL trước, nếu không có mới lấy màu DB mặc định
                             const defaultColor = colorParam || actualTemplate?.colors?.[0] || (templateId === '3' ? '#574040' : '#00b14f');
                             updateLayoutSetting('themeColor', defaultColor);
 
@@ -213,6 +593,17 @@ const CvBuilder = () => {
                                 let parsedData = typeof rawData === 'object' ? rawData : JSON.parse(rawData);
                                 if (typeof parsedData === 'string') parsedData = JSON.parse(parsedData);
                                 templateLayout = parsedData;
+
+                                const jsonString = JSON.stringify(templateLayout);
+                                const isEn = jsonString.includes('Work Experience') || jsonString.includes('Target Position') || jsonString.includes('Education');
+
+                                const dbLangTemplate = actualTemplate?.ngonNgu || actualTemplate?.NgonNgu;
+                                const targetLang = (searchParams.get('lang') || dbLangTemplate || (isEn ? 'en' : 'vi')).toLowerCase();
+
+                                setLang(targetLang);
+                                setSearchParams(prev => { prev.set('lang', targetLang); return prev; }, { replace: true });
+
+                                templateLayout = translateLayoutTree(templateLayout, targetLang);
                             }
                         } catch (err) {
                             console.error("Lỗi gọi API hoặc định dạng JSON:", err);
@@ -242,94 +633,90 @@ const CvBuilder = () => {
 
     const handleDownloadPDF = () => {
         const element = document.querySelector('.cv-preview-page');
+        if (element) element.classList.add('is-exporting');
+
         const opt = {
             margin: 0, filename: `${cvTitle || 'CV_Cua_Toi'}.pdf`, image: { type: 'jpeg', quality: 1 },
             html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
         message.loading({ content: 'Đang tạo PDF...', key: 'pdf_loading' });
+
         html2pdf().set(opt).from(element).save().then(() => {
+            if (element) element.classList.remove('is-exporting');
             message.success({ content: 'Tải PDF thành công!', key: 'pdf_loading', duration: 2 });
         }).catch(err => {
+            if (element) element.classList.remove('is-exporting');
             message.error({ content: 'Có lỗi xảy ra khi tải PDF!', key: 'pdf_loading', duration: 2 });
         });
     };
 
-    const handleSaveCV = async () => {
+    const handleSaveCV = () => {
         if (!token || !userId) { message.warning('Vui lòng đăng nhập tài khoản!'); navigate('/login'); return; }
-        const hideLoading = message.loading('Đang xử lý lưu hồ sơ...', 0);
-        try {
-            const cvPageElement = document.querySelector('.cv-preview-page');
-            let uploadedImageUrl = cvData.personalInfo.avatar || "";
 
-            if (cvPageElement) {
-                const canvas = await html2canvas(cvPageElement, { useCORS: true, scale: 2, logging: false });
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-                const formData = new FormData();
-                formData.append('file', blob, 'cv_screenshot.png');
-                const uploadRes = await apiClient.post('/Upload/image', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-                uploadedImageUrl = uploadRes?.url || uploadRes?.data?.url || uploadRes;
+        const executeSave = async () => {
+            const hideLoading = message.loading('Đang xử lý lưu hồ sơ...', 0);
+            try {
+                const cvPageElement = document.querySelector('.cv-preview-page');
+                let uploadedImageUrl = cvData.personalInfo.avatar || "";
+
+                if (cvPageElement) {
+                    cvPageElement.classList.add('is-exporting');
+                    const canvas = await html2canvas(cvPageElement, { useCORS: true, scale: 2, logging: false });
+                    cvPageElement.classList.remove('is-exporting');
+
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                    const formData = new FormData();
+                    formData.append('file', blob, 'cv_screenshot.png');
+                    const uploadRes = await apiClient.post('/Upload/image', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                    uploadedImageUrl = uploadRes?.url || uploadRes?.data?.url || uploadRes;
+                }
+
+                const layoutJsonData = useCvStore.getState().layoutSchema;
+                const contentDataToSave = useCvStore.getState().cvData;
+
+                const payload = {
+                    maCv: cvId ? parseInt(cvId) : null, maUser: parseInt(userId), maMau: parseInt(templateId),
+                    maHex: themeColor, tieuDe: cvTitle, duLieuCv: JSON.stringify(contentDataToSave),
+                    customLayoutJson: JSON.stringify(layoutJsonData), isPublic: true, duongDan: uploadedImageUrl,
+                    fontChu: fontFamily, ngonNgu: lang
+                };
+
+                await apiClient.post('/Cv', payload);
+                hideLoading(); message.success('Lưu hồ sơ thành công!'); navigate('/manage-cv');
+            } catch (err) {
+                hideLoading();
+                const cvPageElement = document.querySelector('.cv-preview-page');
+                if (cvPageElement) cvPageElement.classList.remove('is-exporting');
+
+                const errorMessage = err.response?.data?.message || err.data?.message || 'Lỗi hệ thống khi lưu dữ liệu CV!';
+                message.error(errorMessage);
             }
+        };
 
-            const layoutJsonData = useCvStore.getState().layoutSchema;
-            const contentDataToSave = useCvStore.getState().cvData;
+        const emptyRequiredFields = document.querySelectorAll('.has-empty-required');
 
-            const payload = {
-                maCv: cvId ? parseInt(cvId) : null, maUser: parseInt(userId), maMau: parseInt(templateId),
-                maHex: themeColor, tieuDe: cvTitle, duLieuCv: JSON.stringify(contentDataToSave),
-                customLayoutJson: JSON.stringify(layoutJsonData), isPublic: true, duongDan: uploadedImageUrl,
-                fontChu: fontFamily, ngonNgu: lang
-            };
-
-            await apiClient.post('/Cv', payload);
-            hideLoading(); message.success('Lưu hồ sơ thành công!'); navigate('/manage-cv');
-        } catch (err) {
-            hideLoading();
-            const errorMessage = err.response?.data?.message || err.data?.message || 'Lỗi hệ thống khi lưu dữ liệu CV!';
-            message.error(errorMessage);
+        if (emptyRequiredFields.length > 0) {
+            Modal.confirm({
+                title: 'Cảnh báo: Thiếu thông tin bắt buộc',
+                icon: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
+                content: 'Bạn đang để trống một số thông tin liên hệ bắt buộc (các ô bị viền đỏ nét đứt). Bạn có chắc chắn muốn tiếp tục lưu CV không?',
+                okText: 'Vẫn lưu CV',
+                cancelText: 'Quay lại sửa',
+                okButtonProps: { danger: true },
+                onOk: () => {
+                    executeSave();
+                }
+            });
+        } else {
+            executeSave();
         }
-    };
+    }
 
     if (pageLoading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#1a1a1a' }}><Spin size="large" /></div>;
 
     return (
         <div className="cv-builder-wrapper" style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#141414', overflow: 'hidden' }}>
-            <style>{`
-                .cv-builder-header { background-color: #1a1a1a; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; z-index: 10; }
-                .cv-title-input { color: #fff !important; font-weight: 500; font-size: 15px; background-color: transparent !important; border: 1px solid transparent !important; padding: 4px 8px; width: 300px; transition: 0.3s; }
-                .cv-title-input:hover, .cv-title-input:focus { border-color: #333 !important; background-color: #242424 !important; border-radius: 4px; }
-                .builder-body { display: flex; flex: 1; height: calc(100vh - 65px); overflow: hidden; }
-                .sidebar-menu { width: 90px; min-width: 90px; flex-shrink: 0; background-color: #1a1a1a; border-right: 1px solid #333; display: flex; flex-direction: column; align-items: center; padding-top: 16px; overflow-y: auto; }
-                .sidebar-menu::-webkit-scrollbar { display: none; }
-                .menu-btn { width: 100%; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #a6a6a6; cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; }
-                .menu-btn:hover { background-color: #242424; color: #fff; }
-                .menu-btn.active { background-color: rgba(0, 177, 79, 0.1); color: #00b14f; border-left: 3px solid #00b14f; }
-                .menu-btn .anticon { font-size: 20px; margin-bottom: 6px; }
-                .menu-btn span { font-size: 11px; text-align: center; font-weight: 500; }
-                .settings-panel { width: 340px; min-width: 340px; background-color: #1f1f1f; border-right: 1px solid #333; display: flex; flex-direction: column; transition: all 0.3s ease; }
-                .settings-panel.hidden { width: 0; min-width: 0; border: none; overflow: hidden; }
-                .panel-header { padding: 16px 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
-                .panel-content { flex: 1; overflow-y: auto; padding: 20px; }
-                .panel-content::-webkit-scrollbar { width: 6px; }
-                .panel-content::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
-                .workspace-area { flex: 1; background-color: #0f0f0f; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: 40px; }
-                .cv-preview-page { background-color: #ffffff !important; color: #333333 !important; color-scheme: light !important; width: 210mm; min-height: 297mm; border-radius: 4px; box-shadow: 0 12px 48px rgba(0,0,0,0.6); overflow: hidden; flex-shrink: 0; position: relative; }
-                .cv-preview-page * { color-scheme: light !important; }
-                .custom-form-label { color: #a6a6a6 !important; font-size: 12px; margin-bottom: 10px; display: block; font-weight: bold; text-transform: uppercase;}
-                .custom-input { background-color: #141414 !important; color: #fff !important; border: 1px solid #333 !important; border-radius: 6px; }
-                .custom-input:focus { border-color: #00b14f !important; box-shadow: none !important; }
-                .color-circle { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; display: inline-block; }
-                .color-circle:hover { transform: scale(1.1); }
-                .color-circle.active { border-color: #fff; box-shadow: 0 0 0 2px #00b14f; }
-                .topcv-lang-button { background: #262626; border: 1px solid #434343; color: #a6a6a6; font-weight: 500; padding: 6px 16px; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
-                .topcv-lang-button:hover { color: #fff; border-color: #595959; }
-                .topcv-lang-button.active { background: rgba(0, 177, 79, 0.08); border-color: #00b14f; color: #00b14f; }
-                .bg-pattern-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
-                .bg-pattern-item { height: 75px; border-radius: 4px; cursor: pointer; position: relative; border: 2px solid transparent; overflow: hidden; transition: 0.15s; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
-                .bg-pattern-item:hover { transform: translateY(-2px); }
-                .bg-pattern-item.active { border-color: #00b14f; }
-                .bg-pattern-check-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.2); display: flex; justify-content: center; align-items: center; color: #00b14f; font-size: 18px; font-weight: bold; }
-            `}</style>
 
             {/* HEADER */}
             <div className="cv-builder-header no-print">
@@ -341,9 +728,21 @@ const CvBuilder = () => {
                     </Space>
                 </Space>
                 <Space size="middle">
-                    <Tooltip title="Hoàn tác"><Button type="text" icon={<UndoOutlined />} style={{ color: '#8c8c8c' }} /></Tooltip>
-                    <Tooltip title="Làm lại"><Button type="text" icon={<RedoOutlined />} style={{ color: '#8c8c8c' }} /></Tooltip>
-                    <Button type="default" icon={<EyeOutlined />} style={{ backgroundColor: '#242424', borderColor: '#333', color: '#fff' }}>Xem trước</Button>
+                    <Tooltip title="Hoàn tác">
+                        <Button type="text" icon={<UndoOutlined />} onClick={handleUndo} disabled={pastHistory.length <= 1} style={{ color: pastHistory.length <= 1 ? '#444' : '#8c8c8c' }} />
+                    </Tooltip>
+                    <Tooltip title="Làm lại">
+                        <Button type="text" icon={<RedoOutlined />} onClick={handleRedo} disabled={futureHistory.length === 0} style={{ color: futureHistory.length === 0 ? '#444' : '#8c8c8c' }} />
+                    </Tooltip>
+
+                    <Button
+                        type="default"
+                        icon={<EyeOutlined />}
+                        onClick={() => setIsPreviewModalVisible(true)}
+                        style={{ backgroundColor: '#242424', borderColor: '#333', color: '#fff' }}
+                    >
+                        Xem trước
+                    </Button>
                     <Button type="primary" icon={<DownloadOutlined />} onClick={handleDownloadPDF} style={{ backgroundColor: '#1890ff', borderColor: '#1890ff' }}>Tải PDF</Button>
                     <Button type="primary" icon={<SaveOutlined />} onClick={handleSaveCV} style={{ backgroundColor: '#00b14f', borderColor: '#00b14f', fontWeight: 500 }}>Lưu CV</Button>
                 </Space>
@@ -355,20 +754,14 @@ const CvBuilder = () => {
                     <div className={`menu-btn ${activeMenu === 'design' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'design' ? null : 'design')}>
                         <FormatPainterOutlined /><span>Thiết kế & Font</span>
                     </div>
-                    <div className={`menu-btn ${activeMenu === 'add-section' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'add-section' ? null : 'add-section')}>
-                        <PlusSquareOutlined /><span>Thêm mục</span>
-                    </div>
                     <div className={`menu-btn ${activeMenu === 'layout' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'layout' ? null : 'layout')}>
                         <LayoutOutlined /><span>Bố cục</span>
                     </div>
-                    <div className={`menu-btn ${activeMenu === 'change-template' ? 'active' : ''}`} onClick={() => navigate('/thu-vien-cv')}>
+                    <div className={`menu-btn ${activeMenu === 'change-template' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'change-template' ? null : 'change-template')}>
                         <SwapOutlined /><span>Đổi mẫu CV</span>
                     </div>
                     <div className={`menu-btn ${activeMenu === 'tips' ? 'active' : ''}`} onClick={() => setActiveMenu(activeMenu === 'tips' ? null : 'tips')}>
                         <BulbOutlined /><span>Gợi ý viết CV</span>
-                    </div>
-                    <div className="menu-btn" onClick={() => navigate('/thu-vien-cv')}>
-                        <BookOutlined /><span>Thư viện CV</span>
                     </div>
                 </div>
 
@@ -378,8 +771,8 @@ const CvBuilder = () => {
                         <div className="panel-header">
                             <Title level={5} style={{ color: '#fff', margin: 0 }}>
                                 {activeMenu === 'design' && 'Thiết kế & Font'}
-                                {activeMenu === 'add-section' && 'Thêm mục CV'}
-                                {activeMenu === 'layout' && 'Quản lý Bố cục'}
+                                {activeMenu === 'change-template' && 'Mẫu CV'}
+                                {activeMenu === 'layout' && 'Bố cục CV'}
                                 {activeMenu === 'tips' && 'Gợi ý viết CV'}
                             </Title>
                             <Button type="text" icon={<CloseOutlined />} style={{ color: '#8c8c8c' }} onClick={() => setActiveMenu(null)} />
@@ -455,31 +848,531 @@ const CvBuilder = () => {
                             </div>
                         )}
 
-                        {/* TAB THÊM MỤC */}
-                        {activeMenu === 'add-section' && (
-                            <div style={{ color: '#a6a6a6', textAlign: 'center', marginTop: '20px' }}>
-                                <p>Bật/tắt các mục phụ trong CV (Giải thưởng, Sở thích, Chứng chỉ...)</p>
-                                <Button type="dashed" style={{ borderColor: '#333', color: '#fff', background: 'transparent' }} block>+ Hoạt động</Button>
-                                <Button type="dashed" style={{ borderColor: '#333', color: '#fff', background: 'transparent', marginTop: 10 }} block>+ Chứng chỉ</Button>
+                        {/* TAB ĐỔI MẪU CV */}
+                        {activeMenu === 'change-template' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', paddingBottom: '20px' }}>
+                                    {loadingTemplates ? (
+                                        <div style={{ gridColumn: 'span 2', textAlign: 'center', padding: '40px 0' }}><Spin /></div>
+                                    ) : templateList.length > 0 ? (
+                                        templateList.map(tpl => {
+                                            const id = tpl.id;
+                                            const name = tpl.title || 'Mẫu chưa đặt tên';
+                                            let image = tpl.image;
+
+                                            if (!image) {
+                                                image = 'https://via.placeholder.com/210x297/333333/8c8c8c?text=No+Image';
+                                            }
+
+                                            const isActive = String(templateId) === String(id);
+
+                                            return (
+                                                <div
+                                                    key={id}
+                                                    onClick={() => handleApplyTemplate(id, name)}
+                                                    style={{
+                                                        background: '#242424',
+                                                        borderRadius: '8px',
+                                                        overflow: 'hidden',
+                                                        cursor: 'pointer',
+                                                        border: `2px solid ${isActive ? '#00b14f' : 'transparent'}`,
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        transition: 'all 0.2s',
+                                                        boxShadow: isActive ? '0 4px 12px rgba(0, 177, 79, 0.2)' : 'none'
+                                                    }}
+                                                >
+                                                    <div style={{ width: '100%', aspectRatio: '1 / 1.414', background: '#fff', overflow: 'hidden', borderBottom: '1px solid #333' }}>
+                                                        <img
+                                                            src={image}
+                                                            alt={name}
+                                                            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }}
+                                                            onError={(e) => {
+                                                                e.target.onerror = null;
+                                                                e.target.src = 'https://via.placeholder.com/210x297/333333/8c8c8c?text=Image+Error';
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div style={{ padding: '12px 8px', color: '#fff', fontSize: '13px', fontWeight: '500', textAlign: 'center' }}>
+                                                        {name}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div style={{ gridColumn: 'span 2', textAlign: 'center', color: '#8c8c8c', fontStyle: 'italic' }}>
+                                            Chưa có dữ liệu mẫu CV.
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
 
                         {/* TAB BỐ CỤC */}
-                        {activeMenu === 'layout' && (
-                            <div style={{ color: '#fff' }}>Tính năng quản lý cột bố cục</div>
-                        )}
+                        {activeMenu === 'layout' && (() => {
+                            const store = useCvStore.getState();
+                            const currentSchema = layoutSchema;
+                            let leftCol = null; let rightCol = null; let mainCol = null;
+
+                            const schemaCopy = JSON.parse(JSON.stringify(currentSchema));
+                            const findCols = (node) => {
+                                if (!node) return;
+                                if (node.id === 'left-col') leftCol = node;
+                                if (node.id === 'right-col') rightCol = node;
+                                if (node.id === 'main-col') mainCol = node;
+                                if (node.children) node.children.forEach(findCols);
+                            };
+                            findCols(schemaCopy);
+
+                            const getUsedIds = (node) => {
+                                let ids = [];
+                                if (node && node.id) ids.push(node.id);
+                                if (node && node.children) node.children.forEach(c => { ids = ids.concat(getUsedIds(c)); });
+                                return ids;
+                            };
+                            const usedIds = getUsedIds(schemaCopy);
+
+                            const ALL_SECTIONS = [
+                                { id: 'section-avatar-profile', label: 'Ảnh đại diện' },
+                                { id: 'section-business-card', label: 'Danh thiếp' },
+                                { id: 'section-contact-info', label: 'Thông tin cá nhân' },
+                                { id: 'section-summary', label: 'Mục tiêu nghề nghiệp' },
+                                { id: 'section-experience', label: 'Kinh nghiệm làm việc' },
+                                { id: 'section-education', label: 'Học vấn' },
+                                { id: 'section-skills', label: 'Kỹ năng' },
+                                { id: 'section-projects', label: 'Dự án' },
+                                { id: 'section-awards', label: 'Giải thưởng' },
+                                { id: 'section-certificates', label: 'Chứng chỉ' },
+                                { id: 'section-activities', label: 'Hoạt động' },
+                                { id: 'section-hobbies', label: 'Sở thích' },
+                                { id: 'section-references', label: 'Người tham chiếu' },
+                                { id: 'section-additional', label: 'Thông tin thêm' }
+                            ];
+
+                            const leftSections = (leftCol?.children || []).map(c => ALL_SECTIONS.find(a => a.id === c.id)).filter(Boolean);
+                            const rightSections = (rightCol?.children || []).map(c => ALL_SECTIONS.find(a => a.id === c.id)).filter(Boolean);
+                            const mainSections = (mainCol?.children || []).map(c => ALL_SECTIONS.find(a => a.id === c.id)).filter(Boolean);
+                            const unusedSections = ALL_SECTIONS.filter(s => !usedIds.includes(s.id));
+
+                            const onDragStart = (e, id, isNew) => {
+                                e.dataTransfer.setData("text/sidebar-id", id);
+                                e.dataTransfer.setData("text/sidebar-is-new", isNew ? "true" : "false");
+                                window.__sidebarDragId = id;
+
+                                const target = e.currentTarget;
+                                setTimeout(() => {
+                                    if (target) target.style.display = 'none';
+                                }, 0);
+                            };
+
+                            const onDragEnd = (e) => {
+                                if (e.currentTarget) e.currentTarget.style.display = 'block';
+                                const placeholder = document.getElementById('sidebar-drag-placeholder');
+                                if (placeholder) placeholder.remove();
+                                window.__sidebarDragId = null;
+                            };
+
+                            const onDragOver = (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+
+                                const draggedId = window.__sidebarDragId;
+                                if (!draggedId) return;
+
+                                let placeholder = document.getElementById('sidebar-drag-placeholder');
+                                if (!placeholder) {
+                                    placeholder = document.createElement('div');
+                                    placeholder.id = 'sidebar-drag-placeholder';
+                                    placeholder.style.height = '38px';
+                                    placeholder.style.backgroundColor = 'rgba(0, 177, 79, 0.15)';
+                                    placeholder.style.border = '1px dashed #00b14f';
+                                    placeholder.style.borderRadius = '6px';
+                                    placeholder.style.marginBottom = '8px';
+                                    placeholder.style.pointerEvents = 'none';
+                                }
+
+                                const container = e.currentTarget;
+                                const targetEl = e.target.closest('[data-sidebar-id]');
+
+                                if (targetEl && targetEl.getAttribute('data-sidebar-id') !== draggedId) {
+                                    const rect = targetEl.getBoundingClientRect();
+                                    const midY = rect.top + rect.height / 2;
+                                    if (e.clientY < midY) {
+                                        container.insertBefore(placeholder, targetEl);
+                                    } else {
+                                        container.insertBefore(placeholder, targetEl.nextSibling);
+                                    }
+                                } else if (!targetEl && e.target === container) {
+                                    if (!container.contains(placeholder)) container.appendChild(placeholder);
+                                }
+                            };
+
+                            const onDrop = (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+
+                                const id = e.dataTransfer.getData("text/sidebar-id");
+                                const isNew = e.dataTransfer.getData("text/sidebar-is-new") === "true";
+                                const placeholder = document.getElementById('sidebar-drag-placeholder');
+
+                                if (!id || !placeholder) {
+                                    if (placeholder) placeholder.remove();
+                                    window.__sidebarDragId = null;
+                                    return;
+                                }
+
+                                const newParentNode = placeholder.parentNode;
+                                const targetColId = newParentNode.getAttribute('data-col-id');
+
+                                const newOrderIds = [];
+                                Array.from(newParentNode.children).forEach(child => {
+                                    if (child.id === 'sidebar-drag-placeholder') {
+                                        newOrderIds.push(id);
+                                    } else if (child.hasAttribute('data-sidebar-id')) {
+                                        const childId = child.getAttribute('data-sidebar-id');
+                                        if (childId !== id) {
+                                            newOrderIds.push(childId);
+                                        }
+                                    }
+                                });
+
+                                placeholder.remove();
+                                window.__sidebarDragId = null;
+
+                                const newSchema = JSON.parse(JSON.stringify(currentSchema));
+                                let draggedNode = null;
+
+                                if (isNew) {
+                                    draggedNode = getNewSectionJson(id);
+                                    if (draggedNode && lang === 'en') draggedNode = translateLayoutTree(draggedNode, 'en');
+                                } else {
+                                    const extractItem = (parent) => {
+                                        if (!parent || !parent.children) return false;
+                                        const idx = parent.children.findIndex(c => c && c.id === id);
+                                        if (idx > -1) { draggedNode = parent.children[idx]; parent.children.splice(idx, 1); return true; }
+                                        for (const c of parent.children) { if (extractItem(c)) return true; }
+                                        return false;
+                                    };
+                                    extractItem(newSchema);
+                                }
+
+                                if (draggedNode && targetColId) {
+                                    const findColAndInsert = (parent) => {
+                                        if (parent?.id === targetColId) {
+                                            if (!parent.children) parent.children = [];
+                                            parent.children.push(draggedNode);
+                                            parent.children.sort((a, b) => {
+                                                const idxA = newOrderIds.indexOf(a.id);
+                                                const idxB = newOrderIds.indexOf(b.id);
+                                                if (idxA === -1) return 1;
+                                                if (idxB === -1) return -1;
+                                                return idxA - idxB;
+                                            });
+                                            return true;
+                                        }
+                                        if (parent?.children) { for (const c of parent.children) { if (findColAndInsert(c)) return true; } }
+                                        return false;
+                                    };
+                                    findColAndInsert(newSchema);
+                                    store.setInitialData(newSchema, store.cvData);
+                                }
+                            };
+
+                            const onTrashDragOver = (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const placeholder = document.getElementById('sidebar-drag-placeholder');
+                                if (placeholder) placeholder.remove();
+
+                                const draggedId = window.__sidebarDragId;
+
+                                if (draggedId === 'section-avatar-profile' || draggedId === 'section-contact-info' || draggedId === 'section-business-card') {
+                                    e.dataTransfer.dropEffect = 'none'; return;
+                                }
+                                e.dataTransfer.dropEffect = 'move';
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)';
+                            };
+
+                            const onTrashDragLeave = (e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                            };
+
+                            const onTrashDrop = (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                e.currentTarget.style.backgroundColor = 'transparent';
+
+                                const id = e.dataTransfer.getData("text/sidebar-id");
+                                const isNew = e.dataTransfer.getData("text/sidebar-is-new") === "true";
+
+                                if (!id || isNew) {
+                                    window.__sidebarDragId = null;
+                                    return;
+                                }
+
+                                if (id === 'section-avatar-profile' || id === 'section-contact-info') {
+                                    message.warning('Không thể ẩn Ảnh đại diện và Thông tin cá nhân khỏi CV!');
+                                    window.__sidebarDragId = null;
+                                    return;
+                                }
+
+                                const newSchema = JSON.parse(JSON.stringify(currentSchema));
+                                const extractItem = (parent) => {
+                                    if (!parent || !parent.children) return false;
+                                    const idx = parent.children.findIndex(c => c && c.id === id);
+                                    if (idx > -1) { parent.children.splice(idx, 1); return true; }
+                                    for (const c of parent.children) { if (extractItem(c)) return true; }
+                                    return false;
+                                };
+
+                                extractItem(newSchema);
+                                store.setInitialData(newSchema, store.cvData);
+                                window.__sidebarDragId = null;
+                            };
+
+                            const itemStyle = {
+                                backgroundColor: '#242424', padding: '10px', borderRadius: '6px', textAlign: 'center', cursor: 'grab',
+                                fontSize: '12px', fontWeight: '500', transition: '0.2s', border: '1px solid #333', marginBottom: '8px', color: '#a6a6a6'
+                            };
+
+                            return (
+                                <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                                    <style>{`
+                                        .cv-layout-scroll-area::-webkit-scrollbar { width: 6px; }
+                                        .cv-layout-scroll-area::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+                                        .cv-layout-scroll-area::-webkit-scrollbar-thumb:hover { background: #00b14f; }
+                                    `}</style>
+
+                                    {/* KHU VỰC CUỘN CHO BỐ CỤC CHÍNH */}
+                                    <div className="cv-layout-scroll-area" style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+
+                                        {/* 1. KHU VỰC CHIA 2 CỘT Ở TRÊN */}
+                                        {(leftCol || rightCol) && (
+                                            <div ref={sidebarLayoutRef} style={{ display: 'flex', backgroundColor: '#1a1a1a', borderRadius: '8px', border: '1px solid #333', overflow: 'hidden', minHeight: '140px', position: 'relative', flexShrink: 0 }}>
+                                                {/* CỘT TRÁI */}
+                                                {leftCol && (
+                                                    <div className="cv-mini-col" data-col-id="left-col" onDragOver={onDragOver} onDrop={onDrop} style={{ width: `${tempColWidth}%`, padding: '10px', backgroundColor: '#1f1f1f', borderRight: '1px solid #333', display: 'flex', flexDirection: 'column' }}>
+                                                        <div style={{ textAlign: 'center', color: '#00b14f', fontSize: '11px', fontWeight: 'bold', marginBottom: '10px', borderBottom: '1px dashed #333', paddingBottom: '6px' }}>{Math.round(tempColWidth)}%</div>
+                                                        {leftSections.map(s => (
+                                                            <div key={s.id} data-sidebar-id={s.id} draggable onDragStart={(e) => onDragStart(e, s.id, false)} onDragEnd={onDragEnd} style={itemStyle}>{s.label}</div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {/* 🚀 THANH KÉO VÀ TOOLTIP ĐỔI CHIỀU RỘNG CỘT */}
+                                                {(leftCol && rightCol) && (
+                                                    <Tooltip title="Thay đổi chiều rộng cột" placement="top">
+                                                        <div 
+                                                            onMouseDown={() => setIsResizingCols(true)} 
+                                                            style={{ 
+                                                                width: '8px', 
+                                                                marginLeft: '-4px', 
+                                                                marginRight: '-4px', 
+                                                                backgroundColor: isResizingCols ? '#00b14f' : 'transparent', 
+                                                                cursor: 'col-resize', 
+                                                                position: 'relative', 
+                                                                zIndex: 10, 
+                                                                transition: 'background 0.2s', 
+                                                                flexShrink: 0 
+                                                            }}
+                                                        >
+                                                            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '4px', height: '24px', backgroundColor: isResizingCols ? '#fff' : '#666', borderRadius: '2px' }} />
+                                                        </div>
+                                                    </Tooltip>
+                                                )}
+
+                                                {/* CỘT PHẢI */}
+                                                {rightCol && (
+                                                    <div className="cv-mini-col" data-col-id="right-col" onDragOver={onDragOver} onDrop={onDrop} style={{ width: leftCol ? `${100 - tempColWidth}%` : '100%', padding: '10px', backgroundColor: '#1a1a1a', display: 'flex', flexDirection: 'column' }}>
+                                                        {leftCol && <div style={{ textAlign: 'center', color: '#00b14f', fontSize: '11px', fontWeight: 'bold', marginBottom: '10px', borderBottom: '1px dashed #333', paddingBottom: '6px' }}>{Math.round(100 - tempColWidth)}%</div>}
+                                                        {rightSections.map(s => (
+                                                            <div key={s.id} data-sidebar-id={s.id} draggable onDragStart={(e) => onDragStart(e, s.id, false)} onDragEnd={onDragEnd} style={itemStyle}>{s.label}</div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* 2. KHU VỰC 1 CỘT (FULL WIDTH) Ở DƯỚI */}
+                                        {mainCol && (
+                                            <div className="cv-mini-col" data-col-id="main-col" onDragOver={onDragOver} onDrop={onDrop} style={{ backgroundColor: '#1a1a1a', borderRadius: '8px', border: '1px solid #333', padding: '10px', display: 'flex', flexDirection: 'column', minHeight: '120px', flexShrink: 0 }}>
+                                                {mainSections.map(s => (
+                                                    <div key={s.id} data-sidebar-id={s.id} draggable onDragStart={(e) => onDragStart(e, s.id, false)} onDragEnd={onDragEnd} style={itemStyle}>
+                                                        {s.label}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* 3. MỤC CHƯA SỬ DỤNG */}
+                                    <div onDragOver={onTrashDragOver} onDragLeave={onTrashDragLeave} onDrop={onTrashDrop} style={{ marginTop: '20px', borderTop: '1px dashed #333', paddingTop: '15px', minHeight: '130px', borderRadius: '8px', transition: 'background 0.2s', flexShrink: 0 }}>
+                                        <span className="custom-form-label" style={{ textAlign: 'center', display: 'block', marginBottom: '15px', pointerEvents: 'none' }}>MỤC CHƯA SỬ DỤNG</span>
+                                        {unusedSections.length > 0 ? (
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', pointerEvents: 'none' }}>
+                                                {unusedSections.map(s => (
+                                                    <div key={s.id} draggable onDragStart={(e) => { e.currentTarget.style.pointerEvents = 'auto'; onDragStart(e, s.id, true); }} onDragEnd={(e) => { e.currentTarget.style.pointerEvents = 'none'; onDragEnd(e); }} style={{ ...itemStyle, marginBottom: 0, backgroundColor: '#1f1f1f', color: '#fff', borderColor: '#444', pointerEvents: 'auto' }}>{s.label}</div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div style={{ textAlign: 'center', color: '#666', fontSize: '12px', fontStyle: 'italic', pointerEvents: 'none' }}>Kéo các mục xuống đây để ẩn khỏi CV</div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
 
+                {/* TAB GỢI Ý VIẾT CV (AI GEMINI) */}
+                {activeMenu === 'tips' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', paddingRight: '4px' }}>
+                        
+                        {/* TRẠNG THÁI 1: TÀI KHOẢN CHƯA NÂNG CẤP */}
+                        {!isPremium ? (
+                            <div style={{ textAlign: 'center', padding: '40px 20px', background: '#1a1a1a', borderRadius: '8px', border: '1px solid #333', marginTop: '20px' }}>
+                                <LockOutlined style={{ fontSize: '48px', color: '#faad14', marginBottom: '16px' }} />
+                                <Title level={5} style={{ color: '#fff', marginBottom: '12px' }}>Tính năng dành cho tài khoản VIP</Title>
+                                <p style={{ color: '#8c8c8c', marginBottom: '24px', fontSize: '13px', lineHeight: '1.6' }}>
+                                    Nâng cấp tài khoản để mở khóa trợ lý <strong>AI Gemini</strong>. Trợ lý thông minh sẽ giúp bạn tự động viết Mục tiêu nghề nghiệp và Kinh nghiệm làm việc cực kỳ chuyên nghiệp chỉ trong 3 giây.
+                                </p>
+                                <Button 
+                                    type="primary" 
+                                    size="large"
+                                    onClick={() => setIsPremium(true)} // Tạm thời bấm vào đây để kích hoạt mở khóa UI Test
+                                    style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: '#000', fontWeight: 'bold', borderRadius: '20px' }}
+                                >
+                                    Nâng cấp ngay
+                                </Button>
+                            </div>
+                        ) : (
+                            
+                        /* TRẠNG THÁI 2: ĐÃ NÂNG CẤP - HIỂN THỊ CÔNG CỤ AI */
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div style={{ background: '#1a1a1a', padding: '16px', borderRadius: '8px', border: '1px solid #333' }}>
+                                    <div style={{ marginBottom: '16px' }}>
+                                        <span className="custom-form-label" style={{ color: '#00b14f' }}>NGÀNH NGHỀ / VỊ TRÍ</span>
+                                        <Input 
+                                            placeholder="VD: Marketing, IT, Kế toán..." 
+                                            value={aiIndustry} 
+                                            onChange={e => setAiIndustry(e.target.value)} 
+                                            className="custom-input" 
+                                            style={{ marginTop: '8px', background: '#242424', borderColor: '#434343', color: '#fff' }} 
+                                        />
+                                    </div>
+                                    <div style={{ marginBottom: '16px' }}>
+                                        <span className="custom-form-label" style={{ color: '#00b14f' }}>MÔ TẢ NGẮN GỌN VỀ BẠN</span>
+                                        <Input.TextArea 
+                                            placeholder="VD: Tôi có 2 năm làm content, từng chạy ads facebook, quản lý page 10k follow..." 
+                                            value={aiDescription} 
+                                            onChange={e => setAiDescription(e.target.value)} 
+                                            rows={4} 
+                                            className="custom-input" 
+                                            style={{ marginTop: '8px', background: '#242424', borderColor: '#434343', color: '#fff', resize: 'none' }} 
+                                        />
+                                    </div>
+                                    <Button 
+                                        type="primary" 
+                                        icon={<RobotOutlined />} 
+                                        onClick={handleGenerateSuggestion} 
+                                        loading={isGenerating} 
+                                        style={{ width: '100%', backgroundColor: '#1890ff', borderColor: '#1890ff', fontWeight: 500 }}
+                                    >
+                                        {isGenerating ? 'AI Đang suy nghĩ...' : 'Tạo gợi ý với AI Gemini'}
+                                    </Button>
+                                </div>
+
+                                {/* KHU VỰC HIỂN THỊ KẾT QUẢ TRẢ VỀ */}
+                                {aiResult && (
+                                    <div style={{ background: '#1f1f1f', padding: '16px', borderRadius: '8px', border: '1px solid #00b14f', flex: 1, overflowY: 'auto' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px dashed #333', paddingBottom: '10px' }}>
+                                            <span style={{ color: '#00b14f', fontWeight: 'bold', fontSize: '13px' }}>
+                                                <RobotOutlined style={{ marginRight: '6px' }}/> KẾT QUẢ TỪ AI
+                                            </span>
+                                            <Button 
+                                                size="small" 
+                                                type="text" 
+                                                icon={<CopyOutlined />} 
+                                                style={{ color: '#8c8c8c' }} 
+                                                onClick={() => { navigator.clipboard.writeText(aiResult); message.success('Đã sao chép vào bộ nhớ tạm!'); }}
+                                            >
+                                                Sao chép
+                                            </Button>
+                                        </div>
+                                        <div style={{ color: '#d9d9d9', fontSize: '13.5px', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                                            {aiResult}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* WORKSPACE AREA */}
-                <div className="workspace-area" style={{ background: backgroundStyle !== 'none' ? backgroundStyle : '#0f0f0f' }}>
+                <div className="workspace-area" style={{ background: '#0f0f0f' }}>
                     <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }}>
-                        <div className="cv-preview-page" style={{ '--theme-color': themeColor }}>
+                        <div
+                            className="cv-preview-page"
+                            style={{
+                                '--theme-color': themeColor,
+                                '--font-family': fontFamily || '"Be Vietnam Pro", sans-serif',
+                                '--base-font-size': `${fontSize || 13.5}px`,
+                                '--line-height': lineHeight || 1.5,
+                                background: backgroundStyle && backgroundStyle !== 'none' ? backgroundStyle : '#ffffff'
+                            }}
+                        >
                             <MasterTemplate />
                         </div>
                     </ConfigProvider>
                 </div>
             </div>
+
+            {/* MODAL XEM TRƯỚC CV */}
+            <Modal
+                title={<span style={{ fontSize: '18px', fontWeight: 600 }}>Xem trước CV</span>}
+                open={isPreviewModalVisible}
+                onCancel={() => setIsPreviewModalVisible(false)}
+                width={880}
+                centered
+                footer={[
+                    <Button key="close" onClick={() => setIsPreviewModalVisible(false)}>
+                        Đóng
+                    </Button>,
+                    <Button key="download" type="primary" icon={<DownloadOutlined />} onClick={handleDownloadPDF} style={{ backgroundColor: '#00b14f', borderColor: '#00b14f' }}>
+                        Tải PDF
+                    </Button>
+                ]}
+                styles={{
+                    body: {
+                        padding: '30px 0',
+                        backgroundColor: '#525659',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        maxHeight: '75vh',
+                        overflowY: 'auto'
+                    }
+                }}
+            >
+                <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }}>
+                    <div
+                        className="cv-preview-page no-print is-exporting"
+                        style={{
+                            '--theme-color': themeColor,
+                            '--font-family': fontFamily || '"Be Vietnam Pro", sans-serif',
+                            '--base-font-size': `${fontSize || 13.5}px`,
+                            '--line-height': lineHeight || 1.5,
+                            background: backgroundStyle && backgroundStyle !== 'none' ? backgroundStyle : '#ffffff',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                            transform: 'scale(0.95)',
+                            transformOrigin: 'top center',
+                            pointerEvents: 'none'
+                        }}
+                    >
+                        <MasterTemplate />
+                    </div>
+                </ConfigProvider>
+            </Modal>
         </div>
     );
 };
