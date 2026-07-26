@@ -1,0 +1,74 @@
+ .custom-radio-group .ant-radio-wrapper {
+     display: flex;
+     align-items: flex-start;
+     width: 100%;
+     background-color: #1f1f1f;
+     border: 1px solid #303030;
+     border-radius: 8px;
+     padding: 16px;
+     margin-bottom: 12px;
+     color: #fff;
+     transition: all 0.3s;
+     margin-inline-end: 0px !important;
+ }
+
+ .custom-radio-group .ant-radio-wrapper-checked {
+     border-color: #1890ff !important;
+     background-color: rgba(24, 144, 255, 0.03);
+ }
+
+ .custom-radio-group .ant-radio-checked .ant-radio-inner {
+     border-color: #1890ff !important;
+     background-color: #1890ff !important;
+ }
+
+ .custom-radio-group .ant-radio-inner:after {
+     background-color: #fff !important;
+ }
+
+ .custom-radio-inner-text {
+     display: flex;
+     flex-direction: column;
+     margin-left: 8px;
+     width: 100%;
+ }
+
+ .lang-pill-badge {
+     background-color: #1890ff;
+     color: #fff;
+     border: 1px solid #1890ff;
+     border-radius: 20px;
+     padding: 4px 20px;
+     font-size: 13px;
+     font-weight: 500;
+     display: inline-block;
+     text-align: center;
+ }
+
+ .dark-select-input .ant-select-selector {
+     background-color: #141414 !important;
+     border: 1px solid #303030 !important;
+     color: #fff !important;
+     height: 40px !important;
+     display: flex;
+     align-items: center;
+ }
+
+ .dark-select-dropdown {
+     background-color: #1f1f1f !important;
+     border: 1px solid #303030;
+ }
+
+ .dark-select-dropdown .ant-select-item {
+     color: #fff !important;
+ }
+
+ .dark-select-dropdown .ant-select-item-option-selected {
+     background-color: #1890ff !important;
+     color: #fff !important;
+ }
+
+ .dark-select-dropdown .ant-select-item-option-active {
+     background-color: rgba(24, 144, 255, 0.1) !important;
+     color: #1890ff !important;
+ }

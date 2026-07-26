@@ -9,8 +9,7 @@ const ContainerNode = ({ node, children, isRoot = false }) => {
 
   const { fontFamily, fontSize, lineHeight, themeColor } = layoutSettings;
   const inlineStyles = node?.styles || {};
-
-  // Kích hoạt tính năng DropZone nếu Container này đại diện cho Cột trái hoặc Cột phải
+  
   const isColumn = node.id === 'left-col' || node.id === 'right-col';
 
   const handleDragOver = (e) => {
@@ -49,13 +48,11 @@ const ContainerNode = ({ node, children, isRoot = false }) => {
       fontSize: 'var(--base-font-size)',
       lineHeight: 'var(--line-height)',
     }),
-    // Vẽ viền hiệu ứng xanh lá đón chào khi kéo mục lướt qua cột
     ...(isDragOver && {
       outline: '2px dashed #00b14f',
       backgroundColor: 'rgba(0, 177, 79, 0.02)',
       transition: 'all 0.2s'
     })
-    // 🚫 ĐÃ XÓA BỎ: Hoàn toàn loại bỏ logic check hover và outline rác tại đây để chấm dứt viền đen bên trong[cite: 3]
   };
 
   return (
@@ -64,7 +61,6 @@ const ContainerNode = ({ node, children, isRoot = false }) => {
       onDragOver={handleDragOver}
       onDragLeave={() => setIsDragOver(false)}
       onDrop={handleDrop}
-      // 🚫 ĐÃ XÓA BỎ: Các hàm bắt sự kiện onMouseEnter / onMouseLeave dư thừa[cite: 3]
     >
       {children}
     </div>

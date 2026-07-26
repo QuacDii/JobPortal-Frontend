@@ -1,0 +1,57 @@
+.topcv-header {
+    background-color: #18191a !important;
+    height: 64px !important;
+    padding: 0 32px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    border-bottom: 1px solid #2d2f31;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+/* Nav Links */
+.topcv-nav-link {
+    color: #e4e6eb;
+    font-weight: 500;
+    font-size: 14px;
+    padding: 0 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 64px;
+    transition: all 0.2s ease;
+}
+
+.topcv-nav-link:hover,
+.topcv-nav-link.active {
+    color: #1890ff !important;
+}
+
+/* Action Buttons */
+.btn-topcv-register {
+    background-color: transparent !important;
+    border: 1px solid #1890ff !important;
+    color: #1890ff !important;
+    border-radius: 4px !important;
+    font-weight: 600 !important;
+}
+
+.btn-topcv-register:hover {
+    background-color: rgba(24, 144, 255, 0.1) !important;
+}
+
+.btn-topcv-login {
+    background-color: #1890ff !important;
+    border: 1px solid #1890ff !important;
+    color: #ffffff !important;
+    border-radius: 4px !important;
+    font-weight: 600 !important;
+}
+
+.btn-topcv-login:hover {
+    background-color: #096dd9 !important;
+    border-color: #096dd9 !important;
+}

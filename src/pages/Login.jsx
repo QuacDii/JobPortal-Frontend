@@ -34,13 +34,13 @@ const Login = () => {
         }
     };
 
-    // 👉 HÀM XỬ LÝ ĐĂNG NHẬP CHUẨN (Dùng Async/Await quản lý thủ công)
+    // HÀM XỬ LÝ ĐĂNG NHẬP CHUẨN
     const handleLogin = async () => {
         try {
             // 1. Ép Antd quét kiểm tra các ô dữ liệu xem điền đúng/đủ chưa
             const values = await form.validateFields();
             
-            console.log("🚀 [DEBUG] Form hợp lệ! Đang bắn API đăng nhập với data:", values);
+            console.log("Form hợp lệ! Đang bắn API đăng nhập với data:", values);
             setLoading(true);
 
             // 2. Gọi API xuống Backend
@@ -106,7 +106,7 @@ const Login = () => {
                     </Text>
                 </div>
 
-                {/* 👉 ĐÃ SỬA: Form chỉ làm nhiệm vụ giữ trạng thái, không tham gia vào hành vi submit của HTML */}
+                {/*Form chỉ làm nhiệm vụ giữ trạng thái, không tham gia vào hành vi submit của HTML */}
                 <Form form={form} layout="vertical">
                     
                     {/* Ô NHẬP EMAIL */}
@@ -151,7 +151,7 @@ const Login = () => {
                             loading={loading}
                             block
                             style={{ backgroundColor: primaryColor, borderColor: primaryColor, fontWeight: 'bold', height: 44, fontSize: 16, borderRadius: 6 }}
-                            onClick={handleLogin} // 👉 Gọi đích danh hàm điều khiển bằng tay
+                            onClick={handleLogin}
                         >
                             Đăng nhập
                         </Button>

@@ -71,8 +71,6 @@ const RichTextNode = ({ dataPath, placeholder, styles, dataScope }) => {
         onInput={handleInput}
         onBlur={handleBlur}
         className={`rich-text-editor ${checkIsEmpty(htmlContent) ? 'is-rich-empty' : ''}`}
-        // 🚀 SỬA LỖI 3: Loại bỏ hoàn toàn emptyStyle inline của React 
-        // để tránh xung đột, đẩy việc xử lý viền đỏ xuống CSS
         style={{ ...styles, outline: 'none' }}
         data-placeholder={placeholder || 'Nhập mô tả chi tiết tại đây...'}
         dangerouslySetInnerHTML={{ __html: htmlContent }}

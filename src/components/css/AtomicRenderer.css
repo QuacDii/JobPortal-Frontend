@@ -1,0 +1,160 @@
+/* =========================================
+   1. ĐỒNG BỘ FONT CHỮ ĐỘNG 
+   ========================================= */
+.cv-macro-section-block,
+.cv-macro-section-block *:not(.anticon) {
+    font-family: var(--font-family, inherit) !important;
+}
+
+/* =========================================
+   2. THANH CÔNG CỤ (TOOLBAR) & NÚT BẤM
+   ========================================= */
+.cv-macro-section-block > .cv-macro-toolbar { display: none !important; }
+.cv-macro-section-block:hover > .cv-macro-toolbar { display: flex !important; }
+.cv-macro-toolbar.force-show { display: flex !important; }
+
+.cv-macro-toolbar { 
+    background: rgba(36, 36, 36, 0.85) !important; 
+    backdrop-filter: blur(8px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 8px !important; 
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25) !important; 
+    padding: 4px !important;
+    color-scheme: dark !important; 
+}
+
+.cv-btn-item { 
+    background: transparent !important; 
+    border: none !important; 
+    color: #a0a0a0 !important; 
+    width: 28px; height: 28px; 
+    display: flex; align-items: center; justify-content: center; 
+    border-radius: 6px; cursor: pointer; 
+    transition: all 0.2s ease; 
+}
+.cv-btn-item:hover { 
+    background: rgba(255, 255, 255, 0.12) !important; 
+    color: #ffffff !important; 
+}
+.cv-btn-item .anticon { font-size: 14px !important; }
+
+.cv-btn-delete { 
+    background: transparent !important; 
+    border: none !important; 
+    color: #ff4d4f !important; 
+    padding: 0 12px; height: 28px; 
+    display: flex; align-items: center; justify-content: center; 
+    border-radius: 6px; cursor: pointer; 
+    font-size: 12px !important; font-weight: 600; 
+    transition: all 0.2s ease; 
+}
+.cv-btn-delete:hover { 
+    background: #ff4d4f !important; 
+    color: #ffffff !important; 
+}
+
+.cv-btn-add { 
+    background: #00b14f !important; 
+    border: 1px solid #00b14f !important; 
+    color: #ffffff !important; 
+    padding: 0 14px; height: 28px; 
+    display: flex; align-items: center; justify-content: center; 
+    border-radius: 14px !important; 
+    cursor: pointer; 
+    font-size: 12px !important; font-weight: 600; 
+    box-shadow: 0 2px 8px rgba(0, 177, 79, 0.25);
+    transition: all 0.2s ease; 
+}
+.cv-btn-add:hover { 
+    background: #009845 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 177, 79, 0.4);
+}
+
+/* =========================================
+   3. HIỆU ỨNG KÉO THẢ (DRAG & DROP)
+   ========================================= */
+.cv-drag-placeholder-style {
+    background-color: rgba(0, 177, 79, 0.1) !important;
+    border: 1px dashed #00b14f !important; border-radius: 4px !important;
+    opacity: 1 !important; box-shadow: none !important; pointer-events: none !important; 
+}
+.cv-drag-placeholder-style * { opacity: 0.3 !important; pointer-events: none !important; }
+.cv-drag-placeholder-style .cv-macro-toolbar { display: none !important; }
+
+.cv-column-dropzone { opacity: 0; pointer-events: auto !important; background: transparent; }
+
+/* =========================================
+   4. TÙY CHỈNH Ô NHẬP LIỆU BÊN TRONG CV
+   ========================================= */
+:root body #section-avatar-profile img, :root body [id="section-avatar-profile"] img {
+    border: 10px solid rgba(35, 23, 23, 0.99) !important; outline: none !important;
+}
+
+:root body .cv-macro-section-block [contenteditable="true"], 
+:root body .cv-macro-section-block input, 
+:root body .cv-macro-section-block textarea {
+    box-shadow: none !important; outline: none !important;
+}
+
+:root body .cv-macro-section-block:not(.has-empty-required) *[style*="red"],
+:root body .cv-macro-section-block:not(.has-empty-required) *[style*="rgb(255, 77, 79)"] {
+    border-color: transparent !important; outline-color: transparent !important; background-color: transparent !important;
+}
+
+/* Khi không hover/focus thì tàng hình viền */
+:root body .cv-macro-section-block [contenteditable="true"]:not(:hover):not(:focus),
+:root body .cv-macro-section-block input:not(:hover):not(:focus), 
+:root body .cv-macro-section-block textarea:not(:hover):not(:focus), 
+:root body .cv-macro-section-block .ProseMirror:not(:hover):not(:focus) {
+    border-color: transparent !important; 
+    outline-color: transparent !important; 
+    outline: none !important;
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+/* Khi hover/focus thì hiện viền đứt nét để người dùng biết có thể sửa */
+:root body .cv-macro-section-block [contenteditable="true"]:hover, 
+:root body .cv-macro-section-block [contenteditable="true"]:focus,
+:root body .cv-macro-section-block input:hover, 
+:root body .cv-macro-section-block input:focus,
+:root body .cv-macro-section-block textarea:hover, 
+:root body .cv-macro-section-block textarea:focus,
+:root body .cv-macro-section-block .ProseMirror:hover, 
+:root body .cv-macro-section-block .ProseMirror:focus {
+    outline: 1px dashed currentColor !important; 
+    outline-offset: 2px !important; 
+    border-radius: 4px !important;
+    background-color: transparent !important; 
+    background-image: none !important; 
+    border-color: transparent !important;
+    cursor: text !important;
+}
+
+/* Cảnh báo đỏ khi thiếu trường bắt buộc */
+:root body .cv-macro-section-block.has-empty-required [contenteditable="true"]:not(.ProseMirror), 
+:root body .cv-macro-section-block.has-empty-required input, 
+:root body .cv-macro-section-block.has-empty-required .ProseMirror {
+    border-color: rgba(255, 77, 79, 0.99) !important; outline-color: rgba(255, 77, 79, 0.99) !important;
+    outline: 1px dashed rgba(255, 77, 79, 0.99) !important; outline-offset: 3px !important; border-radius: 3px !important; 
+    background-color: transparent !important;
+    background-image: linear-gradient(rgba(255, 77, 79, 0.05), rgba(255, 77, 79, 0.05)) !important;
+}
+
+:root body .cv-macro-section-block .rich-text-force-dynamic, 
+:root body .cv-macro-section-block .rich-text-force-dynamic:hover, 
+:root body .cv-macro-section-block .rich-text-force-dynamic:focus {
+    border: none !important; outline: none !important; background-color: transparent !important; background-image: none !important;
+}
+
+div.cv-macro-section-block:hover, div.cv-macro-section-block { outline: none !important; }
+
+.cv-macro-section-block [class*="toolbar"]:not(.cv-macro-toolbar), 
+.cv-macro-section-block [class*="action"]:not(.cv-macro-toolbar), 
+.cv-macro-section-block button:not(.cv-btn-item):not(.cv-btn-delete):not(.cv-btn-add):not(.ant-checkbox-wrapper):not(.ant-switch) {
+    display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important;
+}
+
+.custom-cv-popover-wrapper .ant-popover-inner { background-color: #1f1f1f !important; border: 1px solid #333333 !important; border-radius: 6px !important; padding: 12px !important; }
+.rich-text-force-dynamic * { font-size: inherit !important; }

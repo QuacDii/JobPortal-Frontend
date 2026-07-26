@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import useCvStore from '../../../store/useCvStore';
 import get from 'lodash/get';
+import apiClient from '../../../api/apiClient'; // Giả định đường dẫn tới apiClient của bạn
 import { CameraOutlined, LoadingOutlined } from '@ant-design/icons';
 import { message } from 'antd';
 import apiClient from '../../../api/apiClient';
@@ -36,17 +37,31 @@ const ImageNode = ({ dataPath, styles, dataScope }) => {
 
     setUploading(true);
     try {
-      // Gọi trực tiếp đến API Upload ảnh trên cổng cục bộ của bạn
+      // Lấy Token từ localStorage để gửi kèm trong Request Header
+      const token = localStorage.getItem('token');
+
+      // Gọi API Upload ảnh kèm theo Authorization Token
       const res = await apiClient.post('/Upload/image', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}` 
+        },
       });
-      if (res.data && res.data.url) {
-        updateCvDataPath(finalPath, res.data.url);
+
+      // Kiểm tra dữ liệu trả về (tùy thuộc apiClient trả về res.data hay res)
+      const imageUrl = res?.data?.url || res?.url;
+
+      if (imageUrl) {
+        updateCvDataPath(finalPath, imageUrl);
         message.success('Cập nhật ảnh đại diện thành công!');
       }
     } catch (err) {
       console.error('Lỗi khi tải ảnh lên server:', err);
-      message.error('Không thể upload ảnh, vui lòng kiểm tra kết nối API Backend.');
+      if (err.response?.status === 401) {
+        message.error('Phiên làm việc hết hạn hoặc chưa đăng nhập. Vui lòng đăng nhập lại!');
+      } else {
+        message.error('Không thể upload ảnh, vui lòng kiểm tra kết nối API Backend.');
+      }
     } finally {
       setUploading(false);
     }
@@ -87,7 +102,7 @@ const ImageNode = ({ dataPath, styles, dataScope }) => {
         onChange={handleFileChange}
       />
 
-      {/* Nhúng đoạn CSS cục bộ cho hiệu ứng Hover giống TopCV */}
+      {/* Nhúng đoạn CSS cục bộ cho hiệu ứng Hover */}
       <style>{`
         .cv-avatar-wrapper .avatar-hover-mask {
           position: absolute;

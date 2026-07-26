@@ -1,0 +1,98 @@
+.dark-login-modal .ant-modal-content {
+    background-color: #1f1f1f !important;
+    color: #fff !important;
+    border-radius: 12px !important;
+    border: 1px solid #303030;
+    padding: 24px !important;
+}
+
+.dark-login-modal .ant-modal-header {
+    background: transparent !important;
+    border-bottom: none !important;
+    margin-bottom: 8px !important;
+}
+
+.dark-login-modal .ant-modal-title {
+    color: #fff !important;
+    text-align: center;
+    font-size: 22px;
+    font-weight: bold;
+    background: transparent !important;
+}
+
+.dark-login-modal .ant-modal-close {
+    color: #a6a6a6;
+}
+
+.dark-login-modal .ant-modal-close:hover {
+    color: #fff;
+}
+
+.dark-login-modal .ant-form-item-label>label {
+    color: #fff !important;
+}
+
+.custom-dark-select .ant-select-selector {
+    background-color: #141414 !important;
+    border: 1px solid #303030 !important;
+    color: #fff !important;
+    border-radius: 8px !important;
+    height: 40px !important;
+    align-items: center;
+}
+
+.custom-dark-select:hover .ant-select-selector {
+    border-color: #1890ff !important;
+}
+
+.custom-dark-select .ant-select-arrow {
+    color: #a6a6a6 !important;
+}
+
+.custom-dark-dropdown {
+    background-color: #1f1f1f !important;
+    border: 1px solid #303030 !important;
+    border-radius: 8px !important;
+}
+
+.custom-dark-dropdown .ant-select-item {
+    color: #a6a6a6 !important;
+}
+
+.custom-dark-dropdown .ant-select-item-option-active,
+.custom-dark-dropdown .ant-select-item:hover {
+    background-color: rgba(24, 144, 255, 0.1) !important;
+    color: #1890ff !important;
+}
+
+.position-card {
+    background: #1f1f1f !important;
+    border: 1px solid #303030 !important;
+    border-radius: 12px !important;
+    margin-bottom: 24px;
+    transition: all 0.3s;
+}
+
+.position-card:hover {
+    border-color: #fa8c16 !important;
+    box-shadow: 0 4px 15px rgba(250, 140, 22, 0.15);
+}
+
+.btn-apply-now {
+    background-color: #fa8c16 !important;
+    border-color: #fa8c16 !important;
+    color: #fff !important;
+    font-weight: bold !important;
+    height: 38px !important;
+    border-radius: 6px !important;
+    padding: 0 20px !important;
+    box-shadow: 0 4px 12px rgba(250, 140, 22, 0.3) !important;
+    transition: all 0.3s !important;
+}
+
+.btn-apply-now:hover {
+    background-color: #d46b08 !important;
+    border-color: #d46b08 !important;
+    box-shadow: 0 6px 16px rgba(250, 140, 22, 0.5) !important;
+    transform: translateY(-2px);
+}

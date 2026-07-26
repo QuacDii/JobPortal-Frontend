@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/apiClient';
+import './css/ManageCv.css';
 import { Row, Col, Card, Typography, Button, Space, Switch, Popconfirm, Spin, Empty, message, Avatar, Tooltip } from 'antd';
 import {
     EditOutlined,
@@ -57,7 +58,7 @@ const ManageCv = () => {
             })
             .catch(err => {
                 console.error("Lỗi lấy danh sách CV:", err);
-                setCvList([]); // Phòng vệ nếu lỗi thì mảng vẫn trống chứ không null
+                setCvList([]);
                 setLoading(false);
             });
     };
@@ -97,6 +98,7 @@ const ManageCv = () => {
         window.open(`/xem-cv/${currentId}`, '_blank');
     };
 
+    // Xử lý Xóa CV kèm thông báo lỗi chi tiết khi CV đang được dùng
     const handleDelete = (maCV) => {
         apiClient.delete(`/Cv/${maCV}`, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -105,7 +107,20 @@ const ManageCv = () => {
                 message.success('Đã xóa CV thành công!');
                 setCvList(cvList.filter(cv => (cv.maCV || cv.maCv) !== maCV));
             })
-            .catch(err => message.error('Xóa CV thất bại!'));
+            .catch(err => {
+                console.error("Lỗi xóa CV:", err);
+                
+                // Lấy message trả về từ phía server (nếu có)
+                const backendMessage = err.response?.data?.message || err.response?.data;
+
+                if (typeof backendMessage === 'string' && backendMessage.trim() !== '') {
+                    message.error(backendMessage);
+                } else if (err.response?.status === 400 || err.response?.status === 409) {
+                    message.error('Không thể xóa! CV này đang được sử dụng để nộp đơn ứng tuyển.');
+                } else {
+                    message.error('Xóa CV thất bại! Vui lòng thử lại sau.');
+                }
+            });
     };
 
     const handleSetPrimary = (maCV) => {
@@ -151,63 +166,6 @@ const ManageCv = () => {
 
     return (
         <div style={{ backgroundColor: '#1a1a1a', minHeight: '100vh', padding: '40px 10%' }}>
-            <style>{`
-                .cv-thumbnail-container {
-                    position: relative;
-                    width: 100%;
-                    height: 320px;
-                    background-color: #2e2e2e;
-                    border-radius: 8px 8px 0 0;
-                    overflow: hidden;
-                    border-bottom: 1px solid #333;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-                
-                .cv-hover-overlay {
-                    position: absolute;
-                    top: 0; left: 0; right: 0; bottom: 0;
-                    background-color: rgba(0, 0, 0, 0.7);
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: center;
-                    align-items: center;
-                    gap: 12px;
-                    opacity: 0;
-                    transition: opacity 0.3s ease;
-                }
-                .cv-card:hover .cv-hover-overlay {
-                    opacity: 1;
-                }
-
-                .primary-star {
-                    position: absolute;
-                    top: 12px; right: 12px;
-                    font-size: 24px;
-                    cursor: pointer;
-                    z-index: 2;
-                    transition: transform 0.2s;
-                }
-                .primary-star:hover {
-                    transform: scale(1.1);
-                }
-
-                .cv-card {
-                    background-color: #242424;
-                    border: 1px solid #333;
-                    border-radius: 8px;
-                    overflow: hidden;
-                }
-                .cv-card-body { padding: 16px; }
-
-                .overlay-btn {
-                    width: 140px;
-                    border-radius: 20px;
-                    font-weight: 500;
-                }
-            `}</style>
-
             <Row gutter={[32, 32]}>
                 <Col xs={24} lg={16}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -218,7 +176,7 @@ const ManageCv = () => {
                     </div>
 
                     {loading ? (
-                        <div style={{ textAling: 'center', padding: '100px 0' }}><Spin size="large" /></div>
+                        <div style={{ textAlign: 'center', padding: '100px 0' }}><Spin size="large" /></div>
                     ) : cvList.length === 0 ? (
                         <Card style={{ backgroundColor: '#242424', border: '1px solid #333', textAlign: 'center', padding: '40px 0' }}>
                             <Empty description={<span style={{ color: '#a6a6a6' }}>Bạn chưa tạo CV nào.</span>} />
@@ -355,7 +313,7 @@ const ManageCv = () => {
                             <Text style={{ color: '#8c8c8c', fontSize: '14px' }}>
                                 Có <strong style={{ color: '#1890ff' }}>{(cvList || []).filter(cv => cv.isPublic).length} CV</strong> đang bật cho phép NTD tìm kiếm
                             </Text>
-                                <Button type="default" style={{ marginTop: '16px', background: 'transparent', borderColor: '#1890ff', color: '#1890ff', borderRadius: '20px' }}>
+                            <Button type="default" style={{ marginTop: '16px', background: 'transparent', borderColor: '#1890ff', color: '#1890ff', borderRadius: '20px' }}>
                                 Quản lý danh sách
                             </Button>
                         </div>

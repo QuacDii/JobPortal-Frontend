@@ -27,7 +27,7 @@ const useCvStore = create((setStore, getStore) => ({
     fontSize: 14,
     lineHeight: 1.5,
     themeColor: '#00b14f',
-    backgroundStyle: 'none' // 👈 1. BỔ SUNG MẶC ĐỊNH ĐỂ KHÔNG BỊ LỖI HÌNH NỀN MATRIX
+    backgroundStyle: 'none' 
   },
 
   // 🚀 2. ĐẠI TU HÀM NÀY: Tiếp nhận trực tiếp dữ liệu chuẩn hóa đổ từ CvBuilder sang
