@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Row, Col, Card, Tag, Progress, Input, Button, message, 
-    Spin, Select, Typography, Space, Divider, Modal, Alert
+    Spin, Select, Typography, Space, Divider, Modal
 } from 'antd';
 import { 
     RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, 
-    SaveOutlined, ArrowLeftOutlined, MailOutlined, PhoneOutlined, EnvironmentOutlined 
+    SaveOutlined, ArrowLeftOutlined, MailOutlined, PhoneOutlined, 
+    EnvironmentOutlined, EyeOutlined 
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../../api/apiClient';
@@ -22,9 +23,10 @@ const CandidateAiDetail = () => {
     const [aiDetail, setAiDetail] = useState(null);
     const [noteText, setNoteText] = useState("");
 
-    // Các State phục vụ Modal hẹn phỏng vấn trực tiếp từ màn hình chi tiết AI
+    // Các State phục vụ Modal hẹn phỏng vấn
     const [isInterviewModalVisible, setIsInterviewModalVisible] = useState(false);
     const [interviewData, setInterviewData] = useState({ thoiGian: '', diaDiem: '', linkBaiTest: '', ghiChu: '' });
+
     useEffect(() => {
         if (maDon) {
             fetchAiDetails();
@@ -37,6 +39,9 @@ const CandidateAiDetail = () => {
             const response = await apiClient.get(`/recruitment/applications/${maDon}/ai-details`);
             const resPayload = response?.data || response;
             const actualData = resPayload.data ? resPayload.data : resPayload;
+            
+            // IN DỮ LIỆU OUT RA CONSOLE ĐỂ KIỂM TRA TÊN BIẾN
+            console.log(">>> Dữ liệu AI Detail từ Server:", actualData);
 
             if (actualData && (actualData.aiAnalysis || actualData.maDon)) {
                 setAiDetail(actualData);
@@ -52,14 +57,12 @@ const CandidateAiDetail = () => {
     };
 
     const handleStatusChange = async (newStatus) => {
-        // Giải pháp: Khởi tạo chuỗi rỗng độc lập, gỡ bỏ noteText để tránh nghẽn luồng State của Antd
         if (newStatus === 2) {
-            setInterviewData({ thoiGian: '', diaDiem: '', ghiChu: '' });
+            setInterviewData({ thoiGian: '', diaDiem: '', linkBaiTest: '', ghiChu: '' });
             setIsInterviewModalVisible(true);
             return;
         }
 
-        // Xử lý các trạng thái khác (Đã xem, Từ chối) trực tiếp qua API
         try {
             await apiClient.put(`/employer/applications/${maDon}/status`, {
                 status: newStatus,
@@ -68,13 +71,11 @@ const CandidateAiDetail = () => {
             message.success("Cập nhật trạng thái ứng viên thành công!");
             fetchAiDetails(); 
         } catch (error) {
-            // Đọc thông báo chặn đi lùi trả về từ Backend (nếu NTD cố tình chọn từ 3 về 1 hoặc 0)
             const msg = error.response?.data?.message || "Không thể cập nhật trạng thái do vi phạm logic phễu";
             message.error(msg);
         }
     };
 
-    // Hàm gửi lịch hẹn phỏng vấn kèm dữ liệu cấu trúc thời gian/địa điểm lên API chuẩn Backend
     const handleSendInterviewInvite = async () => {
         try {
             await apiClient.put(`/employer/applications/${maDon}/status`, {
@@ -129,7 +130,6 @@ const CandidateAiDetail = () => {
         );
     }
 
-    // Giải mã chuỗi JSON profile bóc tách từ CV
     let profile = {};
     if (aiDetail?.aiAnalysis?.profileExtractedJson) {
         try { profile = JSON.parse(aiDetail.aiAnalysis.profileExtractedJson); } catch (e) {}
@@ -137,15 +137,23 @@ const CandidateAiDetail = () => {
 
     const ai = aiDetail?.aiAnalysis || {};
 
+    const rawCvUrl = 
+            aiDetail?.cvUrl || 
+            aiDetail?.duongDanCv || 
+            aiDetail?.duongDan || 
+            aiDetail?.cvPath ||
+            aiDetail?.maCvNavigation?.duongDan ||
+            profile?.cvUrl || 
+            profile?.duongDan;
+
     return (
         <div style={{ padding: '24px', background: '#f8fafc', minHeight: '100vh' }}>
-            {/* Nút quay lại phễu lọc nhanh */}
             <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} style={{ marginBottom: 16 }}>
                 Quay lại danh sách phễu ứng viên
             </Button>
-
+            
             <Row gutter={24}>
-                {/* ─── CỘT TRÁI: THÔNG TIN HỒ SƠ CƠ BẢN (y hệt image_0b2242.jpg) ─── */}
+                {/* CỘT TRÁI: THÔNG TIN HỒ SƠ CƠ BẢN */}
                 <Col xs={24} md={6}>
                     <Card style={{ borderRadius: 12, textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
                         <div style={{ width: 80, height: 80, borderRadius: '50%', backgroundColor: '#f0f3ff', color: '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 'bold', margin: '0 auto 16px' }}>
@@ -153,8 +161,26 @@ const CandidateAiDetail = () => {
                         </div>
                         
                         <Title level={3} style={{ marginBottom: 4 }}>{profile.hoTen || "Ứng viên hệ thống"}</Title>
-                        <Text type="secondary" style={{ display: 'block', marginBottom: 20 }}>{profile.viTriHienTai || "Chức danh chưa rõ"}</Text>
+                        <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>{profile.viTriHienTai || "Chức danh chưa rõ"}</Text>
                         
+                        {/* NÚT XEM CV GỐC ĐÃ ĐƯỢC CHUYỂN VÀO ĐÂY */}
+                        <Button 
+                            type="primary" 
+                            ghost 
+                            icon={<EyeOutlined />} 
+                            block 
+                            style={{ marginBottom: 20, borderRadius: 6 }}
+                            onClick={() => {
+                                if (rawCvUrl) {
+                                    window.open(rawCvUrl, '_blank');
+                                } else {
+                                    message.warning("Không tìm thấy đường dẫn file CV gốc!");
+                                }
+                            }}
+                        >
+                            Xem CV gốc (PDF)
+                        </Button>
+
                         <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 12, color: '#475569' }}>
                             <div><MailOutlined style={{ marginRight: 8 }} /> {profile.email || "N/A"}</div>
                             <div><PhoneOutlined style={{ marginRight: 8 }} /> {profile.sdt || "N/A"}</div>
@@ -166,30 +192,26 @@ const CandidateAiDetail = () => {
                         </div>
 
                         <Divider style={{ margin: '20px 0' }} />
+
                         <div style={{ textAlign: 'left' }}>
-                        <Text strong type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 8 }}>TRẠNG THÁI HIỆN TẠI</Text>
-                        <Select 
-                            value={aiDetail?.trangThaiHienTai} 
-                            style={{ width: '100%' }}
-                            onChange={handleStatusChange}
-                        >
-                            {/* Chặn không cho quay lại trạng thái Mới nộp (0) nếu trạng thái hiện tại lớn hơn 0 */}
-                            <Option value={0} disabled={aiDetail?.trangThaiHienTai > 0}>Mới nộp</Option>
-                            
-                            {/* Trạng thái Đã xem (1) chỉ khả dụng khi đang ở Mới nộp (0) hoặc chính nó */}
-                            <Option value={1} disabled={aiDetail?.trangThaiHienTai > 1}>Đã xem</Option>
-                            
-                            <Option value={2}>Hẹn phỏng vấn (Kích hoạt gửi Email)</Option>
-                            <Option value={3}>Từ chối</Option>
-                        </Select>
-                    </div>
+                            <Text strong type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 8 }}>TRẠNG THÁI HIỆN TẠI</Text>
+                            <Select 
+                                value={aiDetail?.trangThaiHienTai} 
+                                style={{ width: '100%' }}
+                                onChange={handleStatusChange}
+                            >
+                                <Option value={0} disabled={aiDetail?.trangThaiHienTai > 0}>Mới nộp</Option>
+                                <Option value={1} disabled={aiDetail?.trangThaiHienTai > 1}>Đã xem</Option>
+                                <Option value={2}>Hẹn phỏng vấn (Gửi Email)</Option>
+                                <Option value={3}>Từ chối</Option>
+                            </Select>
+                        </div>
                     </Card>
                 </Col>
 
-                {/* ─── CỘT PHẢI: KẾT QUẢ PHÂN TÍCH TRÍ TUỆ NHÂN TẠO AI ─── */}
+                {/* CỘT PHẢI: KẾT QUẢ PHÂN TÍCH AI */}
                 <Col xs={24} md={18}>
                     <Card style={{ borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
-                        {/* Thanh tiêu đề và Tổng điểm Match */}
                         <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: 24 }}>
                             <Title level={4} style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
                                 <RobotOutlined style={{ color: '#10b981', marginRight: 8 }} /> Phân tích Matching gần nhất
@@ -199,7 +221,7 @@ const CandidateAiDetail = () => {
                             </Tag>
                         </div>
 
-                        {/* Khối 4 thanh đo Tiến trình song song nằm ngang */}
+                        {/* Thanh tiến trình */}
                         <Row gutter={[32, 16]} style={{ marginBottom: 28 }}>
                             <Col span={12}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -276,14 +298,15 @@ const CandidateAiDetail = () => {
                     </Card>
                 </Col>
             </Row>
-            {/* BỔ SUNG: MODAL THIẾT LẬP LỊCH HẸN PHỎNG VẤN TRỰC TIẾP TỪ TRANG CHI TIẾT AI */}
+
+            {/* MODAL THIẾT LẬP LỊCH HẸN PHỎNG VẤN */}
             <Modal
                 title="Thiết lập Lịch hẹn Phỏng vấn & Gửi Email"
                 open={isInterviewModalVisible}
                 onOk={handleSendInterviewInvite}
                 onCancel={() => setIsInterviewModalVisible(false)}
                 okText="Xác nhận & Gửi Mail"
-                cancelText="Hủy bộ"
+                cancelText="Hủy bỏ"
             >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: 15 }}>
                     <div>
