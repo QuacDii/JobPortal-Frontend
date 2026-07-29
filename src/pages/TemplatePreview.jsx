@@ -1,38 +1,73 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 import './css/TemplatePreview.css';
-import { UploadOutlined, ArrowLeftOutlined, EditOutlined, LoadingOutlined } from '@ant-design/icons';
-import { Row, Col, Radio, Button, Space, Typography, Breadcrumb, Spin, message, Select, Upload } from 'antd';
+import { UploadOutlined, ArrowLeftOutlined, EditOutlined, LoadingOutlined, CheckOutlined } from '@ant-design/icons';
+import { Row, Col, Radio, Button, Space, Typography, Breadcrumb, Spin, message, Select, Upload, Modal } from 'antd';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
+// Hàm đọc Token lấy isVip và userId
+const getUserInfoFromToken = (token) => {
+    if (!token) return null;
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        const decoded = JSON.parse(jsonPayload);
+        return {
+            userId: decoded.nameid || decoded.maUser || decoded.id || decoded.sub,
+            isVip: decoded.isVip === 'true' || decoded.isVip === true
+        };
+    } catch (error) {
+        return null;
+    }
+};
+
 const TemplatePreview = () => {
     const navigate = useNavigate();
     const { id } = useParams();
+    
+    // Đọc parameters từ URL
+    const [searchParams, setSearchParams] = useSearchParams();
 
     const [template, setTemplate] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    // Lưu trữ số lượng CV người dùng đã tạo
+    const [userCvCount, setUserCvCount] = useState(0);
 
     // Các state cấu hình theo hình mẫu
     const [sourceOption, setSourceOption] = useState('suggested');
     const [languageOption, setLanguageOption] = useState('vi');
     const [positionOption, setPositionOption] = useState(null);
     const [positionsList, setPositionsList] = useState([]);
+    
+    // State lưu màu sắc được chọn
+    const [selectedColor, setSelectedColor] = useState(searchParams.get('color') || null);
 
     useEffect(() => {
         const fetchTemplateDetail = async () => {
             try {
                 setLoading(true);
                 const response = await apiClient.get(`/MauCv/${id}`);
-
                 const result = response.data !== undefined ? response.data : response;
 
                 if (result) {
                     setTemplate(result);
                     if (result.ngonNgu) {
-                        setLanguageOption(result.ngonNgu);
+                        setLanguageOption(result.ngonNgu.toLowerCase());
+                    }
+                    
+                    // Khởi tạo màu mặc định nếu trên URL chưa có màu nhưng template có mảng màu
+                    const colorFromUrl = searchParams.get('color');
+                    if (colorFromUrl) {
+                        setSelectedColor(colorFromUrl);
+                    } else if (result.colors && result.colors.length > 0) {
+                        setSelectedColor(result.colors[0]);
                     }
                 }
             } catch (error) {
@@ -47,32 +82,66 @@ const TemplatePreview = () => {
         if (id) {
             fetchTemplateDetail();
         }
-    }, [id, navigate]);
+    }, [id, navigate, searchParams]);
 
     useEffect(() => {
-        const fetchPositions = async () => {
+        const fetchPositionsAndCvCount = async () => {
             try {
+                // 1. Fetch danh sách ngành nghề
                 const response = await apiClient.get('/NganhNghe/danh-sach');
-
                 const result = response.data !== undefined ? response.data : response;
-
                 setPositionsList(result || []);
-
                 if (result && result.length > 0) {
                     setPositionOption(result[0].maNganh);
                 }
+
+                // 2. Fetch số lượng CV hiện có của User
+                const token = localStorage.getItem('token');
+                const userInfo = getUserInfoFromToken(token);
+                if (userInfo?.userId) {
+                    const cvRes = await apiClient.get(`/Cv/user/${userInfo.userId}`);
+                    const cvs = Array.isArray(cvRes) ? cvRes : (cvRes?.data || []);
+                    setUserCvCount(cvs.length);
+                }
             } catch (error) {
-                console.error("❌ Lỗi khi tải danh sách vị trí:", error);
+                console.error("❌ Lỗi:", error);
             }
         };
 
-        fetchPositions();
-
-        fetchPositions();
+        fetchPositionsAndCvCount();
     }, []);
 
+    // HÀM CHUYỂN HƯỚNG VÀO BUILDER
     const handleStartBuilding = () => {
-        navigate(`/builder?templateId=${id}&source=${sourceOption}&lang=${languageOption}&position=${positionOption || ''}`);
+        const token = localStorage.getItem('token');
+        if (!token) {
+            message.warning("Vui lòng đăng nhập để tạo CV!");
+            navigate('/login');
+            return;
+        }
+
+        const userInfo = getUserInfoFromToken(token);
+        const isVip = userInfo?.isVip || false;
+
+        if (!isVip && userCvCount >= 5) {
+            Modal.confirm({
+                title: 'Đã đạt giới hạn tạo hồ sơ',
+                content: 'Tài khoản miễn phí chỉ được tạo tối đa 5 CV. Hãy nâng cấp VIP để tạo CV từ mẫu này và sử dụng không giới hạn!',
+                okText: 'Nâng cấp VIP ngay',
+                cancelText: 'Để sau',
+                okButtonProps: { style: { backgroundColor: '#faad14', borderColor: '#faad14', color: '#000' } },
+                onOk: () => navigate('/upgrade-vip')
+            });
+            return;
+        }
+
+        // Tạo URL Builder kèm theo Màu sắc đã chọn
+        let buildUrl = `/builder?templateId=${id}&source=${sourceOption}&lang=${languageOption}&position=${positionOption || ''}`;
+        if (selectedColor) {
+            buildUrl += `&color=${encodeURIComponent(selectedColor)}`;
+        }
+
+        navigate(buildUrl);
     };
 
     if (loading) {
@@ -110,7 +179,73 @@ const TemplatePreview = () => {
 
                 <Col xs={24} md={10}>
                     <div style={{ background: '#1f1f1f', borderRadius: '12px', padding: '24px', border: '1px solid #303030' }}>
-                        <Title level={4} style={{ color: '#1890ff', marginTop: 0, marginBottom: '20px', fontSize: '18px' }}>Bạn muốn tạo CV từ?</Title>
+
+                        {/* MỤC CHỌN MÀU SẮC CHỦ ĐẠO (Chỉ hiện nếu CV có mảng màu) */}
+                        {template?.colors && template.colors.length > 0 && (
+                            <div style={{ marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px dashed #444' }}>
+                                <Title level={5} style={{ color: '#fff', marginTop: 0, marginBottom: '12px' }}>
+                                    Màu sắc chủ đạo
+                                </Title>
+                                <Space size={14} wrap>
+                                    {template.colors.map((color, index) => {
+                                        const isSelected = selectedColor === color;
+                                        return (
+                                            <div
+                                                key={index}
+                                                onClick={() => {
+                                                    setSelectedColor(color);
+                                                    // Đổi URL nhè nhẹ để user refresh vẫn giữ được màu
+                                                    setSearchParams(prev => { prev.set('color', color); return prev; }, { replace: true });
+                                                }}
+                                                style={{
+                                                    width: '32px',
+                                                    height: '32px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: color,
+                                                    cursor: 'pointer',
+                                                    border: isSelected ? '3px solid #1f1f1f' : '3px solid transparent',
+                                                    outline: isSelected ? `2px solid ${color}` : '2px solid transparent',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    transition: 'all 0.2s ease-in-out'
+                                                }}
+                                            >
+                                                {isSelected && <CheckOutlined style={{ color: '#fff', fontSize: '14px', filter: 'drop-shadow(0px 0px 2px rgba(0,0,0,0.8))' }} />}
+                                            </div>
+                                        );
+                                    })}
+                                </Space>
+                            </div>
+                        )}
+
+                        {/* MỤC CHỌN NGÀNH NGHỀ BẮT BUỘC */}
+                        <div style={{ marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px dashed #444' }}>
+                            <Title level={5} style={{ color: '#fff', marginTop: 0, marginBottom: '12px' }}>
+                                Ngành nghề ứng tuyển <span style={{ color: '#ff4d4f' }}>*</span>
+                            </Title>
+                            <Text style={{ color: '#8c8c8c', fontSize: '13px', display: 'block', marginBottom: '8px' }}>
+                                Chọn ngành nghề để hệ thống tối ưu bộ cục và từ khóa cho CV của bạn.
+                            </Text>
+                            <Select
+                                size="large"
+                                value={positionOption}
+                                onChange={(value) => setPositionOption(value)}
+                                className="dark-select-input"
+                                popupClassName="dark-select-dropdown"
+                                style={{ width: '100%' }}
+                                loading={positionsList.length === 0}
+                                placeholder="-- Chọn ngành nghề --"
+                            >
+                                {positionsList.map((pos) => (
+                                    <Option key={pos.maNganh} value={pos.maNganh}>
+                                        {pos.tenNganh}
+                                    </Option>
+                                ))}
+                            </Select>
+                        </div>
+
+                        <Title level={5} style={{ color: '#fff', marginTop: 0, marginBottom: '16px' }}>Bạn muốn tạo CV từ?</Title>
 
                         <Radio.Group
                             className="custom-radio-group"
@@ -118,7 +253,6 @@ const TemplatePreview = () => {
                             onChange={(e) => setSourceOption(e.target.value)}
                             style={{ width: '100%' }}
                         >
-                            {/* TÙY CHỌN 1: MẪU GỢI Ý */}
                             <Radio value="suggested">
                                 <div className="custom-radio-inner-text">
                                     <Text strong style={{ color: '#fff', fontSize: '15px' }}>Nội dung CV mẫu JobsNow gợi ý</Text>
@@ -128,8 +262,7 @@ const TemplatePreview = () => {
                                             <div style={{ marginBottom: '8px' }}>
                                                 <Text style={{ color: '#a6a6a6', fontSize: '13px' }}>Ngôn ngữ thiết kế</Text>
                                             </div>
-                                            <Space style={{ marginBottom: '16px' }} wrap>
-                                                {/* 👉 NÚT TIẾNG VIỆT */}
+                                            <Space wrap>
                                                 <div
                                                     className="lang-pill-badge"
                                                     style={{
@@ -143,8 +276,6 @@ const TemplatePreview = () => {
                                                 >
                                                     Tiếng Việt
                                                 </div>
-
-                                                {/* 👉 NÚT TIẾNG ANH */}
                                                 <div
                                                     className="lang-pill-badge"
                                                     style={{
@@ -159,33 +290,14 @@ const TemplatePreview = () => {
                                                     Tiếng Anh (English)
                                                 </div>
                                             </Space>
-
-                                            <div style={{ marginBottom: '8px' }}><Text style={{ color: '#a6a6a6', fontSize: '13px' }}>Chọn vị trí gợi ý nội dung</Text></div>
-                                            <Select
-                                                value={positionOption}
-                                                onChange={(value) => setPositionOption(value)}
-                                                className="dark-select-input"
-                                                popupClassName="dark-select-dropdown"
-                                                style={{ width: '100%' }}
-                                                loading={positionsList.length === 0}
-                                            >
-                                                {positionsList.map((pos) => (
-                                                    <Option key={pos.maNganh} value={pos.maNganh}>
-                                                        {pos.tenNganh}
-                                                    </Option>
-                                                ))}
-                                            </Select>
                                         </div>
                                     )}
                                 </div>
                             </Radio>
 
-                            {/* TÙY CHỌN 2: TẢI FILE LÊN */}
                             <Radio value="upload-linkedin">
                                 <div className="custom-radio-inner-text">
                                     <Text strong style={{ color: '#fff', fontSize: '15px' }}>Nội dung CV từ máy tính của bạn</Text>
-
-                                    {/* 👉 Bổ sung nút Upload khi người dùng chọn mục này */}
                                     {sourceOption === 'upload-linkedin' && (
                                         <div style={{ marginTop: '12px' }} onClick={(e) => e.stopPropagation()}>
                                             <Upload accept=".pdf,.doc,.docx" maxCount={1} beforeUpload={() => false}>
@@ -198,7 +310,6 @@ const TemplatePreview = () => {
                                 </div>
                             </Radio>
 
-                            {/* TÙY CHỌN 3: TẠO TỪ ĐẦU */}
                             <Radio value="scratch">
                                 <div className="custom-radio-inner-text">
                                     <Text strong style={{ color: '#fff', fontSize: '15px' }}>Tạo CV từ đầu</Text>
@@ -209,10 +320,16 @@ const TemplatePreview = () => {
                             </Radio>
                         </Radio.Group>
 
-                        <Space direction="vertical" size="middle" style={{ width: '100%', marginTop: '20px' }}>
+                        <Space direction="vertical" size="middle" style={{ width: '100%', marginTop: '24px' }}>
                             <Button
                                 type="primary" size="large" block icon={<EditOutlined />}
-                                onClick={handleStartBuilding}
+                                onClick={() => {
+                                    if (!positionOption) {
+                                        message.warning("Vui lòng chọn Ngành nghề ứng tuyển trước khi tạo CV!");
+                                        return;
+                                    }
+                                    handleStartBuilding(); 
+                                }}
                                 style={{ backgroundColor: '#1890ff', borderColor: '#1890ff', height: '48px', fontWeight: 'bold', borderRadius: '8px', fontSize: '16px' }}
                             >
                                 Tạo CV

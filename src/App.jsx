@@ -11,6 +11,7 @@ import JobDetail from './pages/JobDetail';
 import ForgotPassword from './pages/ForgotPassword';
 import CvTemplateLibrary from './pages/CvTemplateLibrary';
 import CvBuilder from './pages/CvBuilder';
+import UpgradeVip from './pages/UpgradeVip';
 import ManageCv from './pages/ManageCv';
 import TemplatePreview from './pages/TemplatePreview';
 import Login from './pages/Login';
@@ -116,7 +117,7 @@ const App = () => {
     };
   }, [user]);
 
-  // ✨ HÀM TIỆN ÍCH BỌC BẢO VỆ ROUTE NHÀ TUYỂN DỤNG (CHẶN BẤT HỢP PHÁP NẾU CHƯA DUYỆT)
+  // HÀM TIỆN ÍCH BỌC BẢO VỆ ROUTE NHÀ TUYỂN DỤNG (CHẶN BẤT HỢP PHÁP NẾU CHƯA DUYỆT)
   const renderEmployerRoute = (element) => {
     if (!user || user.vaiTro !== "1") return <Navigate to="/login" replace />;
     
@@ -259,8 +260,7 @@ const App = () => {
         <Route path="/thu-vien-cv" element={<CandidateLayout user={user}><CvTemplateLibrary /></CandidateLayout>} />
 
         <Route path="/builder" element={<CandidateLayout user={user}><CvBuilder /></CandidateLayout>} />
-        <Route path="/tao-cv" element={<CandidateLayout user={user}><CvBuilder /></CandidateLayout>} />
-
+        <Route path="/upgrade-vip" element={<CandidateLayout user={user}><UpgradeVip /></CandidateLayout>} />
         <Route path="/xem-truoc-cv/:id" element={<CandidateLayout user={user}><TemplatePreview /></CandidateLayout>} />
 
         {/* ================= CÁC TRANG CALLBACK THANH TOÁN ================= */}

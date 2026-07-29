@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 import './css/ManageCv.css';
-import { Row, Col, Card, Typography, Button, Space, Switch, Popconfirm, Spin, Empty, message, Avatar, Tooltip } from 'antd';
+import { Row, Col, Card, Typography, Button, Space, Switch, Popconfirm, Spin, Empty, message, Avatar, Tooltip, Modal } from 'antd'; // 👉 ĐÃ THÊM Modal
 import {
     EditOutlined,
     DeleteOutlined,
@@ -16,7 +16,8 @@ import {
 
 const { Title, Text } = Typography;
 
-const getUserIdFromToken = (token) => {
+// 👉 ĐÃ SỬA: Hàm đọc Token lấy cả userId và isVip
+const getUserInfoFromToken = (token) => {
     if (!token) return null;
     try {
         const base64Url = token.split('.')[1];
@@ -25,7 +26,10 @@ const getUserIdFromToken = (token) => {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
         }).join(''));
         const decoded = JSON.parse(jsonPayload);
-        return decoded.nameid || decoded.maUser || decoded.id || decoded.sub;
+        return {
+            userId: decoded.nameid || decoded.maUser || decoded.id || decoded.sub,
+            isVip: decoded.isVip === 'true' || decoded.isVip === true
+        };
     } catch (error) {
         return null;
     }
@@ -41,7 +45,9 @@ const ManageCv = () => {
     const [userName, setUserName] = useState('Ứng viên');
 
     const token = localStorage.getItem('token');
-    const userId = getUserIdFromToken(token);
+    const userInfo = getUserInfoFromToken(token);
+    const userId = userInfo?.userId;
+    const isVipUser = userInfo?.isVip || false;
 
     const fetchMyCvs = () => {
         if (!token || !userId) {
@@ -90,7 +96,22 @@ const ManageCv = () => {
         }
     }, []);
 
-    const handleCreateNew = () => navigate('/tao-cv');
+    //CHẶN TẠO QUÁ 5 CV NẾU KHÔNG PHẢI VIP
+    const handleCreateNew = () => {
+        if (!isVipUser && cvList.length >= 5) {
+            Modal.confirm({
+                title: 'Đã đạt giới hạn tạo hồ sơ',
+                content: 'Tài khoản miễn phí chỉ được tạo tối đa 5 CV. Hãy nâng cấp VIP để tạo không giới hạn!',
+                okText: 'Nâng cấp VIP ngay',
+                cancelText: 'Để sau',
+                okButtonProps: { style: { backgroundColor: '#faad14', borderColor: '#faad14', color: '#000' } },
+                onOk: () => navigate('/upgrade-vip') 
+            });
+            return;
+        }
+        navigate('/tao-cv');
+    };
+
     const handleEdit = (maCV) => navigate(`/builder?cvId=${maCV}`);
 
     const handlePreview = (cv) => {
@@ -98,7 +119,6 @@ const ManageCv = () => {
         window.open(`/xem-cv/${currentId}`, '_blank');
     };
 
-    // Xử lý Xóa CV kèm thông báo lỗi chi tiết khi CV đang được dùng
     const handleDelete = (maCV) => {
         apiClient.delete(`/Cv/${maCV}`, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -109,8 +129,6 @@ const ManageCv = () => {
             })
             .catch(err => {
                 console.error("Lỗi xóa CV:", err);
-                
-                // Lấy message trả về từ phía server (nếu có)
                 const backendMessage = err.response?.data?.message || err.response?.data;
 
                 if (typeof backendMessage === 'string' && backendMessage.trim() !== '') {
@@ -276,9 +294,11 @@ const ManageCv = () => {
                             </div>
                         </div>
                         <div style={{ marginTop: '16px', textAlign: 'center' }}>
-                            <Button type="link" style={{ color: '#1890ff', padding: 0 }}>
-                                + Nâng cấp tài khoản Pro
-                            </Button>
+                            {!isVipUser && (
+                                <Button type="link" onClick={() => navigate('/upgrade-vip')} style={{ color: '#faad14', padding: 0, fontWeight: 'bold' }}>
+                                    + Nâng cấp tài khoản VIP
+                                </Button>
+                            )}
                         </div>
                     </Card>
 

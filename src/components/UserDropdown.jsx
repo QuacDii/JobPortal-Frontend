@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Popover, Avatar, Menu, Typography, Divider } from 'antd';
+import { Popover, Avatar, Menu, Typography, Divider, Button } from 'antd';
+import './css/UserDropdown.css';
 import apiClient from '../api/apiClient';
 import {
     DownOutlined,
@@ -12,9 +13,28 @@ import {
 } from '@ant-design/icons';
 
 const { Text } = Typography;
+const getUserInfoFromToken = (token) => {
+    if (!token) return null;
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
 
+        const decoded = JSON.parse(jsonPayload);
+        return {
+            userId: decoded.nameid || decoded.maUser || decoded.id || decoded.sub,
+            fullName: decoded.HoTen || decoded.name || '',
+            email: decoded.email || decoded.emailaddress || '',
+            isVip: decoded.isVip === 'true' || decoded.isVip === true
+        };
+    } catch (error) {
+        return null;
+    }
+};
 const UserDropdown = ({ user, onLogout }) => {
-    const navigate = useNavigate(); 
+    const navigate = useNavigate();
 
     // 1. STATE LƯU TRỮ LINK ẢNH REALTIME LẤY TỪ CV CHÍNH
     const [liveAvatar, setLiveAvatar] = useState(null);
@@ -32,12 +52,12 @@ const UserDropdown = ({ user, onLogout }) => {
                 .then(res => {
                     // Đề phòng Interceptor tự động bóc tách dữ liệu JSON
                     const actualData = res?.data !== undefined ? res.data : res;
-                    
+
                     if (actualData) {
                         // Trường hợp 1: API trả về một Object chứa URL dạng { url: "http://..." }
                         if (typeof actualData === 'object' && actualData.url) {
-                            setLiveAvatar(actualData.url); 
-                        } 
+                            setLiveAvatar(actualData.url);
+                        }
                         // Trường hợp 2: API trả về thẳng một chuỗi chuỗi String URL
                         else if (typeof actualData === 'string' && actualData.trim().startsWith('http')) {
                             setLiveAvatar(actualData);
@@ -68,7 +88,8 @@ const UserDropdown = ({ user, onLogout }) => {
             label: <span style={{ fontWeight: 500 }}>Quản lý tìm việc</span>,
             children: [
                 { key: 'viec-lam-da-luu', label: 'Việc làm đã lưu' },
-                { key: 'viec-lam-da-ung-tuyen', label: 'Việc làm đã ứng tuyển', 
+                {
+                    key: 'viec-lam-da-ung-tuyen', label: 'Việc làm đã ứng tuyển',
                     onClick: () => navigate('/viec-lam')
                 },
             ],
@@ -78,14 +99,14 @@ const UserDropdown = ({ user, onLogout }) => {
             icon: <FilePdfOutlined style={{ fontSize: 18 }} />,
             label: <span style={{ fontWeight: 500 }}>Quản lý CV & Cover letter</span>,
             children: [
-                { 
-                    key: 'cv-cua-toi', 
+                {
+                    key: 'cv-cua-toi',
                     label: 'CV của tôi',
                     onClick: () => navigate('/manage-cv')
                 },
-                { 
-                    key: 'cover-letter', 
-                    label: 'Cover Letter của tôi' 
+                {
+                    key: 'cover-letter',
+                    label: 'Cover Letter của tôi'
                 },
             ],
         },
@@ -96,79 +117,58 @@ const UserDropdown = ({ user, onLogout }) => {
         {
             key: 'dang-xuat',
             className: 'logout-item',
-            icon: <LogoutOutlined style={{ fontSize: 18 }} />, 
-            label: <span style={{ fontWeight: 500 }}>Đăng xuất</span>, 
+            icon: <LogoutOutlined style={{ fontSize: 18 }} />,
+            label: <span style={{ fontWeight: 500 }}>Đăng xuất</span>,
             onClick: handleLogout
         }
     ];
 
+    const token = localStorage.getItem('token');
+    const userInfo = getUserInfoFromToken(token);
+    const isVip = userInfo?.isVip || false;
+
     const popoverContent = (
         <div style={{ width: '340px', paddingBottom: '8px' }}>
-            <style>{`
-                .my-custom-menu.ant-menu-dark .ant-menu-item,
-                .my-custom-menu.ant-menu-dark .ant-menu-submenu-title,
-                .my-custom-menu.ant-menu-dark .ant-menu-item .anticon,
-                .my-custom-menu.ant-menu-dark .ant-menu-item span,
-                .my-custom-menu.ant-menu-dark .ant-menu-submenu-title span {
-                    color: #a6a6a6 !important;
-                }
-                
-                .my-custom-menu.ant-menu-dark .ant-menu-sub {
-                    background-color: transparent !important;
-                }
-                
-                .my-custom-menu.ant-menu-dark .ant-menu-item:not(.logout-item):hover,
-                .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover {
-                    background-color: transparent !important;
-                }
-                .my-custom-menu.ant-menu-dark .ant-menu-item:not(.logout-item):hover span,
-                .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover span,
-                .my-custom-menu.ant-menu-dark .ant-menu-item:not(.logout-item):hover .anticon,
-                .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover .anticon {
-                    color: #1890ff !important;
-                }
-                
-                .my-custom-menu.ant-menu-dark .logout-item,
-                .my-custom-menu.ant-menu-dark .logout-item span,
-                .my-custom-menu.ant-menu-dark .logout-item .anticon {
-                    color: #ff4d4f !important;
-                }
-                
-                .my-custom-menu.ant-menu-dark .logout-item:hover {
-                    background-color: rgba(255, 77, 79, 0.08) !important;
-                    border-radius: 6px !important;
-                }
-                .my-custom-menu.ant-menu-dark .logout-item:hover span,
-                .my-custom-menu.ant-menu-dark .logout-item:hover .anticon {
-                    background-color: transparent !important;
-                    color: #ff7875 !important;
-                }
-            `}</style>
-
             <div style={{ display: 'flex', alignItems: 'center', padding: '16px 20px', gap: '12px' }}>
                 <Avatar size={56} src={displayAvatar} style={{ border: '2px solid #00b14f' }} />
+                {isVip && (
+                    <div style={{ position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', background: '#faad14', color: '#fff', fontSize: '10px', fontWeight: 'bold', padding: '1px 6px', borderRadius: '10px', border: '1px solid #141414', whiteSpace: 'nowrap' }}>
+                        PRO / VIP
+                    </div>
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>{displayName}</Text>
                     <Text style={{ color: '#8c8c8c', fontSize: 12, marginTop: 2 }}>{displayEmail}</Text>
                 </div>
             </div>
+            {!isVip && (
+                <div style={{ padding: '0 20px 12px 20px' }}>
+                    <Button
+                        block
+                        onClick={() => navigate('/upgrade-vip')}
+                        style={{ background: 'linear-gradient(90deg, #faad14, #ffc53d)', color: '#000', fontWeight: 'bold', border: 'none', borderRadius: '6px' }}
+                    >
+                        Nâng cấp tài khoản VIP
+                    </Button>
+                </div>
+            )}
 
             <Divider style={{ margin: '0 0 8px 0', borderColor: '#333' }} />
 
-            <Menu 
+            <Menu
                 className="my-custom-menu"
-                mode="inline" 
-                items={menuItems} 
-                style={{ backgroundColor: 'transparent', borderRight: 'none' }} 
-                theme="dark" 
+                mode="inline"
+                items={menuItems}
+                style={{ backgroundColor: 'transparent', borderRight: 'none' }}
+                theme="dark"
             />
         </div>
     );
 
     return (
-        <Popover 
-            content={popoverContent} 
-            trigger="hover" 
+        <Popover
+            content={popoverContent}
+            trigger="hover"
             placement="bottomRight"
             arrow={false}
             overlayInnerStyle={{ backgroundColor: '#212121', padding: 0, border: '1px solid #333', borderRadius: '8px' }}

@@ -1,0 +1,40 @@
+  .my-custom-menu.ant-menu-dark .ant-menu-item,
+  .my-custom-menu.ant-menu-dark .ant-menu-submenu-title,
+  .my-custom-menu.ant-menu-dark .ant-menu-item .anticon,
+  .my-custom-menu.ant-menu-dark .ant-menu-item span,
+  .my-custom-menu.ant-menu-dark .ant-menu-submenu-title span {
+      color: #a6a6a6 !important;
+  }
+
+  .my-custom-menu.ant-menu-dark .ant-menu-sub {
+      background-color: transparent !important;
+  }
+
+  .my-custom-menu.ant-menu-dark .ant-menu-item:not(.logout-item):hover,
+  .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover {
+      background-color: transparent !important;
+  }
+
+  .my-custom-menu.ant-menu-dark .ant-menu-item:not(.logout-item):hover span,
+  .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover span,
+  .my-custom-menu.ant-menu-dark .ant-menu-item:not(.logout-item):hover .anticon,
+  .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover .anticon {
+      color: #1890ff !important;
+  }
+
+  .my-custom-menu.ant-menu-dark .logout-item,
+  .my-custom-menu.ant-menu-dark .logout-item span,
+  .my-custom-menu.ant-menu-dark .logout-item .anticon {
+      color: #ff4d4f !important;
+  }
+
+  .my-custom-menu.ant-menu-dark .logout-item:hover {
+      background-color: rgba(255, 77, 79, 0.08) !important;
+      border-radius: 6px !important;
+  }
+
+  .my-custom-menu.ant-menu-dark .logout-item:hover span,
+  .my-custom-menu.ant-menu-dark .logout-item:hover .anticon {
+      background-color: transparent !important;
+      color: #ff7875 !important;
+  }
