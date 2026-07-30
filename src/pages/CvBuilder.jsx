@@ -46,7 +46,8 @@ const getUserInfoFromToken = (token) => {
         return {
             userId: decoded.nameid || decoded.maUser || decoded.id || decoded.sub,
             fullName: decoded.HoTen || decoded.name || '',
-            email: decoded.email || decoded.emailaddress || ''
+            email: decoded.email || decoded.emailaddress || '',
+            isVip: decoded.isVip === 'true' || decoded.isVip === true
         };
     } catch (error) {
         return null;
@@ -158,7 +159,8 @@ const CvBuilder = () => {
     const token = localStorage.getItem('token');
     const userInfo = getUserInfoFromToken(token);
     const userId = userInfo?.userId || null;
-
+    const isVipUser = userInfo?.isVip || false;
+    const [isPremium, setIsPremium] = useState(isVipUser);
     const [cvTitle, setCvTitle] = useState('CV chưa đặt tên');
     const [pageLoading, setPageLoading] = useState(false);
     const [activeMenu, setActiveMenu] = useState('design');
@@ -170,7 +172,6 @@ const CvBuilder = () => {
     const sidebarLayoutRef = useRef(null);
 
     // STATE CHO TÍNH NĂNG AI GEMINI
-    const [isPremium, setIsPremium] = useState(false); 
     const [aiIndustry, setAiIndustry] = useState('');
     const [aiDescription, setAiDescription] = useState('');
     const [aiResult, setAiResult] = useState('');
@@ -222,7 +223,7 @@ const CvBuilder = () => {
                 const defaultColor = actualTemplate?.colors?.[0] || '#00b14f';
                 updateLayoutSetting('themeColor', defaultColor);
                 setSearchParams(prev => { prev.set('templateId', newTemplateId); return prev; }, { replace: true });
-                
+
                 hideLoading();
                 message.success('Đã đổi mẫu CV thành công!');
             }
@@ -345,7 +346,7 @@ const CvBuilder = () => {
         };
     }, [isResizingCols]);
 
-    // 🚀 HÀM NẶN KHỐI MỚI THÔNG MINH (ĐÃ BỔ SUNG ĐẦY ĐỦ CHO TẤT CẢ CÁC MỤC)
+    // HÀM NẶN KHỐI MỚI THÔNG MINH
     const getNewSectionJson = (id) => {
         const store = useCvStore.getState();
         const schema = store.layoutSchema || store.schema;
@@ -353,7 +354,7 @@ const CvBuilder = () => {
 
         const findHeading = (node) => {
             if (node && (node.id === 'section-education' || node.id === 'section-experience') && node.children && node.children.length > 0) {
-                headingTemplate = JSON.parse(JSON.stringify(node.children[0])); 
+                headingTemplate = JSON.parse(JSON.stringify(node.children[0]));
             }
             if (!headingTemplate && node && node.children) {
                 node.children.forEach(findHeading);
@@ -376,11 +377,11 @@ const CvBuilder = () => {
 
         if (id === 'section-summary') {
             title = "Mục tiêu nghề nghiệp";
-            contentChildren = [{ 
-                "type": "RichText", 
-                "dataPath": "summary", 
-                "placeholder": "Mục tiêu nghề nghiệp của bạn, bao gồm mục tiêu ngắn hạn và dài hạn", 
-                "styles": { "textAlign": "justify", "fontSize": "13.5px", "border": "none", "outline": "none", "width": "100%" } 
+            contentChildren = [{
+                "type": "RichText",
+                "dataPath": "summary",
+                "placeholder": "Mục tiêu nghề nghiệp của bạn, bao gồm mục tiêu ngắn hạn và dài hạn",
+                "styles": { "textAlign": "justify", "fontSize": "13.5px", "border": "none", "outline": "none", "width": "100%" }
             }];
         } else if (id === 'section-education') {
             title = "Học vấn";
@@ -442,7 +443,7 @@ const CvBuilder = () => {
         };
     };
 
-    // 🚀 HÀM GỌI API AI GEMINI
+    // HÀM GỌI API AI GEMINI
     const handleGenerateSuggestion = async () => {
         if (!aiIndustry || !aiDescription) {
             message.warning("Vui lòng nhập Ngành nghề và Mô tả kinh nghiệm!");
@@ -453,35 +454,85 @@ const CvBuilder = () => {
         setAiResult('');
 
         try {
-            const API_KEY = "YOUR_GEMINI_API_KEY"; // Thay API Key của bạn vào đây
-            
-            const prompt = `Bạn là một chuyên gia tuyển dụng nhân sự cấp cao. Hãy viết nội dung CV cho ngành "${aiIndustry}" dựa trên mô tả sau của ứng viên: "${aiDescription}". 
-            Hãy viết làm 2 phần rõ ràng:
-            1. Mục tiêu nghề nghiệp (1 đoạn văn ngắn gọn, chuyên nghiệp).
-            2. Kinh nghiệm làm việc nổi bật (3-4 gạch đầu dòng mô tả công việc súc tích, có dùng số liệu nếu có).
-            Không giải thích gì thêm, chỉ in ra kết quả.`;
-
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }]
-                })
+            const response = await apiClient.post('/AiHelper/generate-cv-tips', {
+                industry: aiIndustry,
+                description: aiDescription
             });
 
-            const data = await response.json();
-            
-            if (data.candidates && data.candidates[0].content.parts[0].text) {
-                setAiResult(data.candidates[0].content.parts[0].text);
+            // Hứng data an toàn
+            const responseData = response.data || response;
+
+            if (responseData && responseData.data) {
+                setAiResult(responseData.data);
+            } else if (typeof responseData === 'string' && responseData.trim() !== '') {
+                setAiResult(responseData);
             } else {
                 message.error("Không nhận được phản hồi hợp lệ từ AI.");
             }
         } catch (error) {
-            console.error("Gemini API Error:", error);
-            message.error("Lỗi khi kết nối với AI Gemini.");
+            console.error("Lỗi AI Backend:", error);
+            message.error("Lỗi khi tạo gợi ý. Vui lòng thử lại!");
         } finally {
             setIsGenerating(false);
         }
+    };
+    const handleAutoFill = () => {
+        if (!aiResult) return;
+
+        let parsedSummary = '';
+        let parsedExperience = '';
+
+        // 1. Tách chuỗi dựa trên tiêu đề "2. Kinh nghiệm..." mà ta đã prompt cho AI
+        const expRegex = /2\.?\s*\*?\*?Kinh nghiệm/i;
+        const parts = aiResult.split(expRegex);
+
+        if (parts.length > 1) {
+            // Xóa tiêu đề "1. Mục tiêu..." ở phần đầu
+            parsedSummary = parts[0].replace(/1\.?\s*\*?\*?Mục tiêu.*?(\n|$)/i, '').trim();
+            parsedExperience = parts[1].trim();
+        } else {
+            // Dự phòng nếu AI không trả đúng format số 1, 2
+            parsedSummary = aiResult.trim();
+        }
+
+        // 2. Chuyển đổi đoạn text Kinh nghiệm thành mã HTML dạng danh sách (Bullet points)
+        let expHtml = '';
+        if (parsedExperience) {
+            const lines = parsedExperience.split('\n').filter(l => l.trim() !== '');
+            // Lọc bỏ các dấu gạch ngang, dấu sao ở đầu dòng và bọc thẻ <li>
+            const bullets = lines.map(l => `<li>${l.replace(/^[\*\-\•]\s*/, '').trim()}</li>`).join('');
+            expHtml = `<ul>${bullets}</ul>`;
+        }
+
+        // 3. Lấy dữ liệu CV hiện tại từ Store (Zustand)
+        const store = useCvStore.getState();
+        const newCvData = JSON.parse(JSON.stringify(store.cvData)); // Copy sâu để không lỗi tham chiếu
+
+        // Ghi đè Mục tiêu nghề nghiệp
+        if (parsedSummary) {
+            newCvData.summary = parsedSummary;
+        }
+
+        // Điền Kinh nghiệm làm việc (Ghi đè vào kinh nghiệm đầu tiên hoặc tạo mới nếu chưa có)
+        if (expHtml) {
+            if (!newCvData.experience || newCvData.experience.length === 0) {
+                newCvData.experience = [{
+                    id: Date.now(),
+                    startDate: '',
+                    endDate: 'Nay',
+                    companyName: 'Tên Công Ty',
+                    title: aiIndustry, // Lấy ngành nghề làm Title luôn
+                    description: expHtml
+                }];
+            } else {
+                // Nếu đã có block kinh nghiệm, ta nối thêm hoặc ghi đè phần mô tả
+                newCvData.experience[0].description = expHtml;
+            }
+        }
+
+        // 4. Lưu lại dữ liệu mới để UI tự động cập nhật
+        store.setInitialData(store.layoutSchema, newCvData);
+        message.success('Đã điền tự động nội dung AI vào bản CV!');
     };
 
     const { fontFamily, fontSize, lineHeight, themeColor, backgroundStyle } = useCvStore(state => state.layoutSettings || {});
@@ -576,6 +627,7 @@ const CvBuilder = () => {
                         education: [{ id: 1, startDate: '', endDate: '', school: '', major: '', description: '' }],
                         projects: [], activities: [], awards: [], certificates: [], hobbies: ''
                     };
+
                     setCvTitle(`CV_${(userInfo?.fullName || 'UngVien').replace(/\s+/g, '')}_Moi`);
 
                     let templateLayout = null;
@@ -587,12 +639,12 @@ const CvBuilder = () => {
                             const defaultColor = colorParam || actualTemplate?.colors?.[0] || (templateId === '3' ? '#574040' : '#00b14f');
                             updateLayoutSetting('themeColor', defaultColor);
 
+                            // Lấy cấu trúc khung (Layout)
                             let rawData = actualTemplate?.layoutJson || actualTemplate?.LayoutJson;
                             if (rawData) {
                                 if (typeof rawData === 'string') rawData = rawData.replace(/^\uFEFF/, '').trim();
-                                let parsedData = typeof rawData === 'object' ? rawData : JSON.parse(rawData);
-                                if (typeof parsedData === 'string') parsedData = JSON.parse(parsedData);
-                                templateLayout = parsedData;
+                                templateLayout = typeof rawData === 'object' ? rawData : JSON.parse(rawData);
+                                if (typeof templateLayout === 'string') templateLayout = JSON.parse(templateLayout);
 
                                 const jsonString = JSON.stringify(templateLayout);
                                 const isEn = jsonString.includes('Work Experience') || jsonString.includes('Target Position') || jsonString.includes('Education');
@@ -603,12 +655,85 @@ const CvBuilder = () => {
                                 setLang(targetLang);
                                 setSearchParams(prev => { prev.set('lang', targetLang); return prev; }, { replace: true });
 
+                                // Dịch ngôn ngữ các tiêu đề của Layout
                                 templateLayout = translateLayoutTree(templateLayout, targetLang);
                             }
+
+                            // 2. NẾU NGƯỜI DÙNG CHỌN "NỘI DUNG GỢI Ý" -> LẤY DỮ LIỆU MẪU TỪ DATABASE ĐẮP VÀO
+                            if (source === 'suggested') {
+                                let dummyDataStr = actualTemplate?.duLieuMau || actualTemplate?.DuLieuMau;
+                                if (dummyDataStr) {
+                                    try {
+                                        let parsedDummy = null;
+                                        if (typeof dummyDataStr === 'string') {
+                                            dummyDataStr = dummyDataStr.replace(/^\uFEFF/, '').trim();
+                                            parsedDummy = JSON.parse(dummyDataStr);
+                                        } else {
+                                            parsedDummy = dummyDataStr;
+                                        }
+
+                                        // LÔ-GÍC ĐA NGÔN NGỮ: Kiểm tra JSON có cấu trúc "vi" và "en" không
+                                        if (parsedDummy.vi && parsedDummy.en) {
+                                            // targetLang đã được khai báo ở trên (chứa giá trị 'vi' hoặc 'en' từ URL)
+                                            initialContent = parsedDummy[targetLang] || parsedDummy.vi;
+                                        } else {
+                                            initialContent = parsedDummy;
+                                        }
+
+                                        // Ghi đè Tên và Email thật của người dùng
+                                        initialContent.personalInfo = {
+                                            ...initialContent.personalInfo,
+                                            fullName: userInfo?.fullName || initialContent.personalInfo?.fullName || '',
+                                            email: userInfo?.email || initialContent.personalInfo?.email || ''
+                                        };
+                                        const emptyKeys = ['projects', 'activities', 'awards', 'certificates', 'hobbies'].filter(
+                                            key => !initialContent[key] || (Array.isArray(initialContent[key]) && initialContent[key].length === 0)
+                                        ).map(key => `section-${key}`);
+
+                                        // 2. Hàm đệ quy thông minh: Xóa các block có ID nằm trong danh sách rỗng khỏi Cấu trúc Layout
+                                        const cleanLayout = (node) => {
+                                            if (Array.isArray(node)) {
+                                                return node.map(cleanLayout).filter(item => item !== null);
+                                            } else if (typeof node === 'object' && node !== null) {
+
+                                                // Tìm định danh của Block 
+                                                const blockId = node.id || node.type || node.blockId || node.key;
+
+                                                // Nếu block này thuộc nhóm dữ liệu rỗng -> Hủy (return null)
+                                                if (emptyKeys.includes(blockId)) return null;
+
+                                                const newNode = {};
+                                                for (let k in node) {
+                                                    newNode[k] = cleanLayout(node[k]);
+                                                }
+
+                                                // Dọn dẹp các khe trống (null) dính lại trong mảng sau khi xóa block
+                                                for (let k in newNode) {
+                                                    if (Array.isArray(newNode[k])) {
+                                                        newNode[k] = newNode[k].filter(item => item !== null);
+                                                    }
+                                                }
+                                                return newNode;
+                                            }
+                                            return node;
+                                        };
+
+                                        // 3. Áp dụng bộ lọc dọn dẹp vào templateLayout trước khi vẽ ra màn hình
+                                        if (templateLayout) {
+                                            templateLayout = cleanLayout(templateLayout);
+                                        }
+                                    } catch (e) {
+                                        console.error("Lỗi parse DuLieuMau từ Database:", e);
+                                    }
+                                }
+                            }
+
                         } catch (err) {
                             console.error("Lỗi gọi API hoặc định dạng JSON:", err);
                         }
                     }
+
+                    // Nạp dữ liệu vào Zustand Store để vẽ ra giao diện
                     setInitialData(templateLayout, initialContent);
                 }
             } catch (err) {
@@ -1159,21 +1284,21 @@ const CvBuilder = () => {
                                                     </div>
                                                 )}
 
-                                                {/* 🚀 THANH KÉO VÀ TOOLTIP ĐỔI CHIỀU RỘNG CỘT */}
+                                                {/* THANH KÉO VÀ TOOLTIP ĐỔI CHIỀU RỘNG CỘT */}
                                                 {(leftCol && rightCol) && (
                                                     <Tooltip title="Thay đổi chiều rộng cột" placement="top">
-                                                        <div 
-                                                            onMouseDown={() => setIsResizingCols(true)} 
-                                                            style={{ 
-                                                                width: '8px', 
-                                                                marginLeft: '-4px', 
-                                                                marginRight: '-4px', 
-                                                                backgroundColor: isResizingCols ? '#00b14f' : 'transparent', 
-                                                                cursor: 'col-resize', 
-                                                                position: 'relative', 
-                                                                zIndex: 10, 
-                                                                transition: 'background 0.2s', 
-                                                                flexShrink: 0 
+                                                        <div
+                                                            onMouseDown={() => setIsResizingCols(true)}
+                                                            style={{
+                                                                width: '8px',
+                                                                marginLeft: '-4px',
+                                                                marginRight: '-4px',
+                                                                backgroundColor: isResizingCols ? '#00b14f' : 'transparent',
+                                                                cursor: 'col-resize',
+                                                                position: 'relative',
+                                                                zIndex: 10,
+                                                                transition: 'background 0.2s',
+                                                                flexShrink: 0
                                                             }}
                                                         >
                                                             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '4px', height: '24px', backgroundColor: isResizingCols ? '#fff' : '#666', borderRadius: '2px' }} />
@@ -1221,94 +1346,111 @@ const CvBuilder = () => {
                                 </div>
                             );
                         })()}
-                    </div>
-                </div>
 
-                {/* TAB GỢI Ý VIẾT CV (AI GEMINI) */}
-                {activeMenu === 'tips' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', paddingRight: '4px' }}>
-                        
-                        {/* TRẠNG THÁI 1: TÀI KHOẢN CHƯA NÂNG CẤP */}
-                        {!isPremium ? (
-                            <div style={{ textAlign: 'center', padding: '40px 20px', background: '#1a1a1a', borderRadius: '8px', border: '1px solid #333', marginTop: '20px' }}>
-                                <LockOutlined style={{ fontSize: '48px', color: '#faad14', marginBottom: '16px' }} />
-                                <Title level={5} style={{ color: '#fff', marginBottom: '12px' }}>Tính năng dành cho tài khoản VIP</Title>
-                                <p style={{ color: '#8c8c8c', marginBottom: '24px', fontSize: '13px', lineHeight: '1.6' }}>
-                                    Nâng cấp tài khoản để mở khóa trợ lý <strong>AI Gemini</strong>. Trợ lý thông minh sẽ giúp bạn tự động viết Mục tiêu nghề nghiệp và Kinh nghiệm làm việc cực kỳ chuyên nghiệp chỉ trong 3 giây.
-                                </p>
-                                <Button 
-                                    type="primary" 
-                                    size="large"
-                                    onClick={() => setIsPremium(true)} // Tạm thời bấm vào đây để kích hoạt mở khóa UI Test
-                                    style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: '#000', fontWeight: 'bold', borderRadius: '20px' }}
-                                >
-                                    Nâng cấp ngay
-                                </Button>
-                            </div>
-                        ) : (
-                            
-                        /* TRẠNG THÁI 2: ĐÃ NÂNG CẤP - HIỂN THỊ CÔNG CỤ AI */
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                <div style={{ background: '#1a1a1a', padding: '16px', borderRadius: '8px', border: '1px solid #333' }}>
-                                    <div style={{ marginBottom: '16px' }}>
-                                        <span className="custom-form-label" style={{ color: '#00b14f' }}>NGÀNH NGHỀ / VỊ TRÍ</span>
-                                        <Input 
-                                            placeholder="VD: Marketing, IT, Kế toán..." 
-                                            value={aiIndustry} 
-                                            onChange={e => setAiIndustry(e.target.value)} 
-                                            className="custom-input" 
-                                            style={{ marginTop: '8px', background: '#242424', borderColor: '#434343', color: '#fff' }} 
-                                        />
-                                    </div>
-                                    <div style={{ marginBottom: '16px' }}>
-                                        <span className="custom-form-label" style={{ color: '#00b14f' }}>MÔ TẢ NGẮN GỌN VỀ BẠN</span>
-                                        <Input.TextArea 
-                                            placeholder="VD: Tôi có 2 năm làm content, từng chạy ads facebook, quản lý page 10k follow..." 
-                                            value={aiDescription} 
-                                            onChange={e => setAiDescription(e.target.value)} 
-                                            rows={4} 
-                                            className="custom-input" 
-                                            style={{ marginTop: '8px', background: '#242424', borderColor: '#434343', color: '#fff', resize: 'none' }} 
-                                        />
-                                    </div>
-                                    <Button 
-                                        type="primary" 
-                                        icon={<RobotOutlined />} 
-                                        onClick={handleGenerateSuggestion} 
-                                        loading={isGenerating} 
-                                        style={{ width: '100%', backgroundColor: '#1890ff', borderColor: '#1890ff', fontWeight: 500 }}
-                                    >
-                                        {isGenerating ? 'AI Đang suy nghĩ...' : 'Tạo gợi ý với AI Gemini'}
-                                    </Button>
-                                </div>
+                        {activeMenu === 'tips' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', boxSizing: 'border-box' }}>
 
-                                {/* KHU VỰC HIỂN THỊ KẾT QUẢ TRẢ VỀ */}
-                                {aiResult && (
-                                    <div style={{ background: '#1f1f1f', padding: '16px', borderRadius: '8px', border: '1px solid #00b14f', flex: 1, overflowY: 'auto' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px dashed #333', paddingBottom: '10px' }}>
-                                            <span style={{ color: '#00b14f', fontWeight: 'bold', fontSize: '13px' }}>
-                                                <RobotOutlined style={{ marginRight: '6px' }}/> KẾT QUẢ TỪ AI
-                                            </span>
-                                            <Button 
-                                                size="small" 
-                                                type="text" 
-                                                icon={<CopyOutlined />} 
-                                                style={{ color: '#8c8c8c' }} 
-                                                onClick={() => { navigator.clipboard.writeText(aiResult); message.success('Đã sao chép vào bộ nhớ tạm!'); }}
+                                {/* TRẠNG THÁI 1: TÀI KHOẢN CHƯA NÂNG CẤP */}
+                                {!isPremium ? (
+                                    <div style={{ textAlign: 'center', padding: '30px 16px', background: '#1a1a1a', borderRadius: '8px', border: '1px solid #333', width: '100%', boxSizing: 'border-box' }}>
+                                        <LockOutlined style={{ fontSize: '36px', color: '#faad14', marginBottom: '16px' }} />
+                                        <Title level={5} style={{ color: '#fff', marginBottom: '8px', fontSize: '15px', whiteSpace: 'normal' }}>Tính năng tài khoản VIP</Title>
+                                        <p style={{ color: '#8c8c8c', marginBottom: '20px', fontSize: '13px', lineHeight: '1.5', whiteSpace: 'normal' }}>
+                                            Nâng cấp tài khoản để mở khóa trợ lý <strong>AI Gemini</strong>. Hệ thống sẽ tự động viết Mục tiêu nghề nghiệp và Kinh nghiệm làm việc chuyên nghiệp chỉ trong 3 giây.
+                                        </p>
+                                        <Button
+                                            type="primary"
+                                            onClick={() => navigate('/upgrade-vip')}
+                                            style={{ backgroundColor: '#faad14', borderColor: '#faad14', color: '#000', fontWeight: 'bold', width: '100%', borderRadius: '6px' }}
+                                        >
+                                            Nâng cấp ngay
+                                        </Button>
+                                    </div>
+                                ) : (
+
+                                    /* TRẠNG THÁI 2: ĐÃ NÂNG CẤP - HIỂN THỊ CÔNG CỤ AI */
+                                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', boxSizing: 'border-box' }}>
+                                        <div style={{ marginBottom: '20px' }}>
+                                            <span className="custom-form-label" style={{ display: 'block', marginBottom: '8px' }}>NGÀNH NGHỀ / VỊ TRÍ</span>
+                                            <Input
+                                                placeholder="VD: Marketing, IT, Kế toán..."
+                                                value={aiIndustry}
+                                                onChange={e => setAiIndustry(e.target.value)}
+                                                className="custom-input"
+                                                style={{ background: '#242424', borderColor: '#434343', color: '#fff' }}
+                                            />
+                                        </div>
+
+                                        <div style={{ marginBottom: '20px' }}>
+                                            <span className="custom-form-label" style={{ display: 'block', marginBottom: '8px' }}>MÔ TẢ NGẮN GỌN VỀ BẠN</span>
+                                            <Input.TextArea
+                                                placeholder="VD: Có 2 năm làm content, từng chạy ads facebook, quản lý page 10k follow..."
+                                                value={aiDescription}
+                                                onChange={e => setAiDescription(e.target.value)}
+                                                rows={4}
+                                                className="custom-input"
+                                                style={{ background: '#242424', borderColor: '#434343', color: '#fff', resize: 'none' }}
+                                            />
+                                        </div>
+
+                                        <div style={{ marginBottom: '20px' }}>
+                                            <Button
+                                                type="primary"
+                                                icon={<RobotOutlined />}
+                                                onClick={handleGenerateSuggestion}
+                                                loading={isGenerating}
+                                                style={{ width: '100%', backgroundColor: '#1890ff', borderColor: '#1890ff', fontWeight: 500 }}
                                             >
-                                                Sao chép
+                                                {isGenerating ? 'AI đang xử lý...' : 'Tạo gợi ý với AI Gemini'}
                                             </Button>
                                         </div>
-                                        <div style={{ color: '#d9d9d9', fontSize: '13.5px', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                                            {aiResult}
-                                        </div>
+
+                                        {/* KHU VỰC HIỂN THỊ KẾT QUẢ TRẢ VỀ */}
+                                        {aiResult && (
+                                            <div style={{ background: '#1f1f1f', padding: '12px', borderRadius: '6px', border: '1px solid #00b14f', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '12px', borderBottom: '1px dashed #333', paddingBottom: '12px' }}>
+
+                                                    {/* Dòng 1: Tiêu đề */}
+                                                    <span style={{ color: '#00b14f', fontWeight: 'bold', fontSize: '13px', display: 'flex', alignItems: 'center' }}>
+                                                        <RobotOutlined style={{ marginRight: '6px', fontSize: '16px' }} /> KẾT QUẢ TỪ AI GEMINI
+                                                    </span>
+
+                                                    {/* Dòng 2: Cụm nút bấm trải đều */}
+                                                    <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                                                        <Button
+                                                            size="small"
+                                                            type="primary"
+                                                            icon={<CheckOutlined />}
+                                                            style={{ backgroundColor: '#00b14f', borderColor: '#00b14f', fontSize: '12px', flex: 1 }}
+                                                            onClick={handleAutoFill}
+                                                        >
+                                                            Điền tự động vào CV
+                                                        </Button>
+                                                        <Button
+                                                            size="small"
+                                                            type="default"
+                                                            icon={<CopyOutlined />}
+                                                            style={{ backgroundColor: '#242424', borderColor: '#434343', color: '#fff', fontSize: '12px' }}
+                                                            onClick={() => { navigator.clipboard.writeText(aiResult); message.success('Đã sao chép vào bộ nhớ tạm!'); }}
+                                                        >
+                                                            Copy
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    style={{ color: '#d9d9d9', fontSize: '13px', whiteSpace: 'pre-wrap', lineHeight: 1.6, flex: 1 }}
+                                                    dangerouslySetInnerHTML={{
+                                                        __html: aiResult.replace(/\*\*(.*?)\*\*/g, '<strong style="color: #fff; font-size: 14px;">$1</strong>')
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
                         )}
                     </div>
-                )}
-
+                </div>
                 {/* WORKSPACE AREA */}
                 <div className="workspace-area" style={{ background: '#0f0f0f' }}>
                     <ConfigProvider theme={{ algorithm: theme.defaultAlgorithm }}>
@@ -1322,6 +1464,22 @@ const CvBuilder = () => {
                                 background: backgroundStyle && backgroundStyle !== 'none' ? backgroundStyle : '#ffffff'
                             }}
                         >
+                            {!isVipUser && (
+                                <div className="no-print" style={{
+                                    position: 'absolute',
+                                    bottom: '15px',
+                                    right: '25px',
+                                    opacity: 0.4,
+                                    fontSize: '12px',
+                                    fontFamily: 'Arial, sans-serif',
+                                    color: '#000',
+                                    zIndex: 9999,
+                                    pointerEvents: 'none',
+                                    userSelect: 'none'
+                                }}>
+                                    Tạo bởi <strong>JobsNow.vn</strong>
+                                </div>
+                            )}
                             <MasterTemplate />
                         </div>
                     </ConfigProvider>
