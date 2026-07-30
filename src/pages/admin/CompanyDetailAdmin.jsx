@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
     Card, Descriptions, Tag, Button, Image, Typography, Modal, 
-    Input, message, Spin, Row, Col, Divider, Space, Alert, Badge, Popconfirm 
+    Input, message, Spin, Row, Col, Divider, Space, Popconfirm, Tabs, Tooltip, Alert, Badge 
 } from 'antd';
 import { 
     ArrowLeftOutlined, CheckOutlined, CloseOutlined, FormOutlined, 
-    ApartmentOutlined, FileTextOutlined, RobotOutlined, FilePdfOutlined,
-    WarningOutlined, BulbOutlined, MailOutlined, CheckCircleOutlined, CloseCircleOutlined, InfoCircleOutlined
+    ApartmentOutlined, FileTextOutlined, FilePdfOutlined,
+    BulbOutlined, MailOutlined, PictureOutlined, CopyOutlined, ExportOutlined,
+    SyncOutlined, ArrowRightOutlined, InfoCircleOutlined
 } from '@ant-design/icons';
 import apiClient from '../../api/apiClient';
 
@@ -21,12 +22,8 @@ const CompanyDetailAdmin = () => {
     const [company, setCompany] = useState(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [activeTab, setActiveTab] = useState('front_new');
 
-    // Trạng thái OCR
-    const [ocrLoading, setOcrLoading] = useState(false);
-    const [ocrResult, setOcrResult] = useState(null);
-
-    // Modal Yêu cầu bổ sung
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [requestNote, setRequestNote] = useState('');
 
@@ -41,39 +38,19 @@ const CompanyDetailAdmin = () => {
             const res = await apiClient.get(`/AdminApproval/company-detail/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setCompany(res?.data || res);
+            const data = res?.data || res;
+            setCompany(data);
+            
+            // Nếu là yêu cầu cập nhật, mặc định chọn tab GPKD Mới
+            if (data?.loaiYeuCau === "UPDATE") {
+                setActiveTab('front_new');
+            } else {
+                setActiveTab('front');
+            }
         } catch (error) {
             message.error("Lỗi khi tải chi tiết hồ sơ công ty!");
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleRunOcr = async () => {
-        const imageUrl = company?.giayPhepKinhDoanhMatTruoc || company?.giayPhepKinhDoanhMatSau;
-        if (!imageUrl) {
-            message.warning("Công ty này chưa tải tệp Giấy phép kinh doanh!");
-            return;
-        }
-
-        setOcrLoading(true);
-        try {
-            const token = localStorage.getItem('token');
-            const res = await apiClient.post('/AdminApproval/ocr-extract', 
-                { imageUrl }, 
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-            const payload = res?.data || res;
-            if (payload.success) {
-                setOcrResult(payload);
-                message.success("Bóc tách dữ liệu OCR thành công!");
-            } else {
-                message.error(payload.message || "Không thể đọc dữ liệu từ tệp này!");
-            }
-        } catch (error) {
-            message.error("Lỗi hệ thống khi gọi OCR!");
-        } finally {
-            setOcrLoading(false);
         }
     };
 
@@ -88,8 +65,8 @@ const CompanyDetailAdmin = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             
-            if (actionType === "APPROVE") message.success("Đã phê duyệt doanh nghiệp & gửi email thông báo!");
-            if (actionType === "REJECT") message.success("Đã từ chối doanh nghiệp!");
+            if (actionType === "APPROVE") message.success("Đã phê duyệt yêu cầu & gửi email thông báo!");
+            if (actionType === "REJECT") message.success("Đã xử lý từ chối!");
             if (actionType === "REQUEST_ADDITION") message.info("Đã gửi yêu cầu bổ sung tới nhà tuyển dụng!");
             
             navigate('/admin/approve-companies');
@@ -101,367 +78,310 @@ const CompanyDetailAdmin = () => {
         }
     };
 
-    // Các mẫu phản hồi nhanh cho Admin
+    const handleCopy = (text, label) => {
+        if (!text) return;
+        navigator.clipboard.writeText(text);
+        message.success(`Đã sao chép ${label}!`);
+    };
+
     const quickReasonTemplates = [
         "Mã số thuế khai báo không trùng khớp với Mã số doanh nghiệp trên Giấy phép kinh doanh đính kèm.",
         "Ảnh chụp/scan Giấy phép kinh doanh bị mờ, lóa sáng hoặc mất góc. Vui lòng tải bản scan rõ nét hơn.",
         "Tên công ty khai báo chưa chính xác so với Giấy đăng ký kinh doanh chính thức.",
-        "Giấy phép kinh doanh hết hạn hoặc không hợp lệ. Vui lòng cung cấp bản ghi mới nhất."
+        "Giấy phép kinh doanh mới hết hạn hoặc không hợp lệ. Vui lòng cung cấp bản ghi mới nhất."
     ];
 
     const isPdfUrl = (url) => url && url.toLowerCase().endsWith('.pdf');
 
-    // --- HÀM SO SÁNH PHÂN LOẠI CHI TIẾT (KHÁC DẤU VÀ TƯƠNG ĐỒNG) ---
-    const removeAccents = (str) => {
-        if (!str) return '';
-        return str
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/đ/g, "d")
-            .replace(/Đ/g, "D");
-    };
-
-    const getLevenshteinDistance = (a, b) => {
-        if (!a || !b) return (a || b).length;
-        const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
-
-        for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
-        for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
-
-        for (let i = 1; i <= a.length; i++) {
-            for (let j = 1; j <= b.length; j++) {
-                const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-                matrix[i][j] = Math.min(
-                    matrix[i - 1][j] + 1,
-                    matrix[i][j - 1] + 1,
-                    matrix[i - 1][j - 1] + cost
-                );
-            }
-        }
-        return matrix[a.length][b.length];
-    };
-
-    const compareFields = (declared, ocr) => {
-        if (!ocr) return { status: 'MISSING', isMatch: false, label: 'Chưa đọc được', note: null };
-        if (!declared) return { status: 'UNCHECKED', isMatch: false, label: 'Chưa khai báo', note: null };
-
-        const s1 = declared.toString().normalize("NFC").replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
-        const s2 = ocr.toString().normalize("NFC").replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
-
-        // 1. Khớp tuyệt đối cả dấu
-        if (s1.toUpperCase() === s2.toUpperCase()) {
-            return { status: 'EXACT', isMatch: true, label: 'Trùng khớp', note: null };
+    const renderDocumentViewer = (url, title) => {
+        if (!url) {
+            return (
+                <div style={{ height: 'calc(100vh - 210px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', borderRadius: 8, border: '1px dashed #cbd5e1' }}>
+                    <FileTextOutlined style={{ fontSize: 40, color: '#94a3b8', marginBottom: 12 }} />
+                    <Text type="secondary">Không có tệp {title}</Text>
+                </div>
+            );
         }
 
-        // 2. Khớp chữ cái nhưng khác dấu tiếng Việt
-        const clean1 = removeAccents(s1).toLowerCase();
-        const clean2 = removeAccents(s2).toLowerCase();
-
-        if (clean1 === clean2 || clean2.includes(clean1) || clean1.includes(clean2)) {
-            return { 
-                status: 'ACCENT_DIFF', 
-                isMatch: true, 
-                label: 'Khớp (khác dấu *)', 
-                note: `(*) Chênh lệch nhỏ về dấu tiếng Việt giữa bản khai báo và OCR` 
-            };
+        if (isPdfUrl(url)) {
+            return (
+                <div style={{ height: 'calc(100vh - 210px)', display: 'flex', flexDirection: 'column', borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                    <div style={{ padding: '6px 12px', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                        <Text style={{ fontSize: 12 }} type="secondary"><FilePdfOutlined style={{ color: '#ff4d4f' }} /> Tệp PDF Giấy phép kinh doanh</Text>
+                        <Button type="link" size="small" icon={<ExportOutlined />} href={url} target="_blank">Mở tab mới</Button>
+                    </div>
+                    <iframe 
+                        src={url} 
+                        title={title} 
+                        style={{ width: '100%', height: '100%', border: 'none', flex: 1 }}
+                    />
+                </div>
+            );
         }
 
-        // 3. Khớp tương đồng mờ (Fuzzy Levenshtein >= 85%)
-        const maxLen = Math.max(clean1.length, clean2.length);
-        const distance = getLevenshteinDistance(clean1, clean2);
-        const similarity = maxLen === 0 ? 1 : 1.0 - (distance / maxLen);
-
-        if (similarity >= 0.85) {
-            return { 
-                status: 'FUZZY_MATCH', 
-                isMatch: true, 
-                label: `Tương đồng (${Math.round(similarity * 100)}% *)`, 
-                note: `(*) Chênh lệch nhỏ một vài ký tự do lỗi font hoặc nhận diện OCR` 
-            };
-        }
-
-        // 4. Khác biệt rõ rệt
-        return { status: 'MISMATCH', isMatch: false, label: 'Khác biệt', note: null };
-    };
-
-    const compareMst = () => {
-        if (!ocrResult?.maSoThue || !company?.maSoThue) return { status: 'MISSING', isMatch: false, label: 'Chưa đọc được', note: null };
-        const ocrMst = ocrResult.maSoThue.replace(/\D/g, '');
-        const declMst = company.maSoThue.replace(/\D/g, '');
-        const matched = ocrMst === declMst || ocrMst.includes(declMst) || declMst.includes(ocrMst);
-        return matched 
-            ? { status: 'EXACT', isMatch: true, label: 'Trùng khớp', note: null }
-            : { status: 'MISMATCH', isMatch: false, label: 'Khác biệt', note: null };
-    };
-
-    const mstComparison = compareMst();
-    const nameComparison = compareFields(company?.tenCongTy, ocrResult?.tenCongTy);
-    const repComparison = compareFields(company?.nguoiDaiDien, ocrResult?.nguoiDaiDien);
-
-    const renderMatchTag = (comp) => {
-        switch (comp.status) {
-            case 'EXACT':
-                return <Tag color="success" icon={<CheckCircleOutlined />}>{comp.label}</Tag>;
-            case 'ACCENT_DIFF':
-                return <Tag color="warning" icon={<CheckCircleOutlined />}>{comp.label}</Tag>;
-            case 'FUZZY_MATCH':
-                return <Tag color="processing" icon={<CheckCircleOutlined />}>{comp.label}</Tag>;
-            case 'MISMATCH':
-                return <Tag color="error" icon={<CloseCircleOutlined />}>{comp.label}</Tag>;
-            default:
-                return <Tag color="default">{comp.label}</Tag>;
-        }
+        return (
+            <div style={{ height: 'calc(100vh - 210px)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a08', borderRadius: 8, padding: 12, overflow: 'hidden' }}>
+                <Image 
+                    src={url} 
+                    alt={title}
+                    style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} 
+                />
+            </div>
+        );
     };
 
     if (loading) return <div style={{ textAlign: 'center', marginTop: 100 }}><Spin size="large" /></div>;
     if (!company) return <div style={{ padding: 24 }}>Không tìm thấy thông tin doanh nghiệp!</div>;
 
-    const hasAnyMismatch = ocrResult && (!mstComparison.isMatch || !nameComparison.isMatch || !repComparison.isMatch);
+    const isUpdate = company.loaiYeuCau === "UPDATE" && company.thongTinChoDuyet;
+    const pendingData = company.thongTinChoDuyet || {};
+
+    // Cấu hình Tabs xem tài liệu
+    const tabItems = isUpdate ? [
+        {
+            key: 'front_new',
+            label: (<span><Tag color="green">MỚI</Tag> GPKD Mặt trước</span>),
+            children: renderDocumentViewer(pendingData.giayPhepKinhDoanhMatTruoc, "GPKD Mới (Mặt trước)")
+        },
+        {
+            key: 'back_new',
+            label: (<span><Tag color="green">MỚI</Tag> GPKD Mặt sau</span>),
+            children: renderDocumentViewer(pendingData.giayPhepKinhDoanhMatSau, "GPKD Mới (Mặt sau)")
+        },
+        {
+            key: 'front_old',
+            label: (<span><Tag color="default">CỦ</Tag> GPKD Hiện tại</span>),
+            children: renderDocumentViewer(company.giayPhepKinhDoanhMatTruoc, "GPKD Cũ (Hiện tại)")
+        }
+    ] : [
+        {
+            key: 'front',
+            label: (<span><FileTextOutlined /> GPKD Mặt trước</span>),
+            children: renderDocumentViewer(company.giayPhepKinhDoanhMatTruoc, "GPKD Mặt trước")
+        },
+        {
+            key: 'back',
+            label: (<span><FileTextOutlined /> GPKD Mặt sau</span>),
+            children: renderDocumentViewer(company.giayPhepKinhDoanhMatSau, "GPKD Mặt sau")
+        },
+        {
+            key: 'logo',
+            label: (<span><PictureOutlined /> Logo Công ty</span>),
+            children: (
+                <div style={{ height: 'calc(100vh - 210px)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa', borderRadius: 8 }}>
+                    {company.logo ? (
+                        <Image src={company.logo} style={{ maxHeight: '80%', objectFit: 'contain' }} />
+                    ) : (
+                        <Text type="secondary">Chưa tải Logo</Text>
+                    )}
+                </div>
+            )
+        }
+    ];
 
     return (
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
-            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/admin/approve-companies')} style={{ marginBottom: 16 }}>
-                Quay lại danh sách
-            </Button>
+        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', padding: '12px 20px', backgroundColor: '#f1f5f9', boxSizing: 'border-box', overflow: 'hidden' }}>
+            
+            {/* 1. THANH HEADER TRÊN CÙNG */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexShrink: 0 }}>
+                <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/admin/approve-companies')} size="middle">
+                    Quay lại danh sách
+                </Button>
+                <Title level={4} style={{ margin: 0, color: '#0f172a', fontSize: 18 }}>
+                    <ApartmentOutlined style={{ color: '#1677ff', marginRight: 8 }} />
+                    THẨM ĐỊNH HỒ SƠ: <span style={{ color: '#1e40af' }}>{company.tenCongTy}</span>
+                </Title>
+                <Space>
+                    {isUpdate ? (
+                        <Tag color="blue" icon={<SyncOutlined spin />} style={{ fontSize: 13, padding: '4px 10px' }}>
+                            Yêu cầu cập nhật thông tin
+                        </Tag>
+                    ) : (
+                        <Tag color="orange" style={{ fontSize: 13, padding: '4px 10px' }}>
+                            Đăng ký xác minh lần đầu
+                        </Tag>
+                    )}
+                </Space>
+            </div>
 
-            <Card
-                style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
-                title={
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <ApartmentOutlined style={{ fontSize: 24, color: '#1677ff' }} />
-                        <Title level={4} style={{ margin: 0 }}>THẨM ĐỊNH HỒ SƠ DOANH NGHIỆP</Title>
-                    </div>
-                }
-                extra={
-                    <Space>
-                        <Button 
-                            type="dashed" 
-                            icon={<RobotOutlined style={{ color: '#722ed1' }} />} 
-                            loading={ocrLoading} 
-                            onClick={handleRunOcr}
-                            style={{ borderColor: '#722ed1', color: '#722ed1', fontWeight: 600 }}
-                        >
-                            Trích xuất OCR AI
-                        </Button>
-                        <Popconfirm
-                            title="Xác nhận từ chối và xóa yêu cầu này?"
-                            description="Tài khoản doanh nghiệp sẽ nhận được email thông báo từ chối."
-                            onConfirm={() => handleAction("REJECT")}
-                            okText="Từ chối"
-                            cancelText="Hủy"
-                            okButtonProps={{ danger: true, loading: submitting }}
-                        >
-                            <Button danger icon={<CloseOutlined />}>
-                                Từ chối
-                            </Button>
-                        </Popconfirm>
-                        <Button 
-                            icon={<FormOutlined />} 
-                            style={{ backgroundColor: '#fa8c16', color: '#fff', borderColor: '#fa8c16' }} 
-                            onClick={() => setIsModalOpen(true)}
-                        >
-                            Yêu cầu bổ sung
-                        </Button>
-                        <Popconfirm
-                            title="Phê duyệt chính thức cho Doanh nghiệp này?"
-                            description="Doanh nghiệp sẽ được cấp quyền đăng tin tuyển dụng và tìm CV ngay lập tức."
-                            onConfirm={() => handleAction("APPROVE")}
-                            okText="Duyệt ngay"
-                            cancelText="Hủy"
-                        >
-                            <Button 
-                                type="primary" 
-                                icon={<CheckOutlined />} 
-                                style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }} 
-                                loading={submitting} 
-                            >
-                                Duyệt hồ sơ
-                            </Button>
-                        </Popconfirm>
-                    </Space>
-                }
-            >
-                {/* KHUNG ĐỐI SOÁT OCR AI */}
-                {ocrResult && (
-                    <Alert
-                        style={{ marginBottom: 24, borderRadius: 10, border: '1px solid #d3ade6', backgroundColor: '#f9f0ff' }}
-                        message={
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Space>
-                                    <RobotOutlined style={{ fontSize: 20, color: '#722ed1' }} />
-                                    <Text strong style={{ fontSize: 16, color: '#531dab' }}>KẾT QUẢ BÓC TÁCH TỰ ĐỘNG (OCR AI Assistant)</Text>
-                                </Space>
-                                <Tag color="purple" style={{ fontWeight: 600 }}>
-                                    Độ tin cậy AI: {Math.round((ocrResult.confidenceScore || 0.98) * 100)}%
-                                </Tag>
-                            </div>
-                        }
-                        description={
-                            <div style={{ marginTop: 12 }}>
-                                <Row gutter={16}>
-                                    {/* Cột 1: Thông tin do NTD khai báo */}
-                                    <Col span={12}>
-                                        <Card size="small" title="Thông tin NTD Khai báo" style={{ borderRadius: 8, height: '100%' }}>
-                                            <div style={{ marginBottom: 12 }}>
-                                                <Text type="secondary" style={{ fontSize: 12 }}>Mã số thuế:</Text>
-                                                <div><Tag color="blue" style={{ fontSize: 13, marginTop: 2 }}>{company.maSoThue || 'Chưa khai báo'}</Tag></div>
-                                            </div>
+            {/* 2. BỐ CỤC SPLIT-SCREEN CÂN BẰNG */}
+            <Row gutter={16} style={{ flex: 1, minHeight: 0 }}>
+                
+                {/* CỘT TRÁI: SOI GIẤY PHÉP KINH DOANH */}
+                <Col xs={24} lg={12} style={{ height: '100%' }}>
+                    <Card 
+                        title={<Text strong style={{ color: '#0f172a', fontSize: 14 }}><FileTextOutlined /> TÀI LIỆU PHÁP LÝ (SOI TRỰC TIẾP)</Text>}
+                        style={{ height: '100%', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+                        bodyStyle={{ padding: '8px 12px 12px' }}
+                    >
+                        <Tabs 
+                            activeKey={activeTab} 
+                            onChange={setActiveTab} 
+                            items={tabItems} 
+                            size="small" 
+                            tabBarStyle={{ marginBottom: 8 }}
+                        />
+                    </Card>
+                </Col>
 
-                                            <div style={{ marginBottom: 12 }}>
-                                                <Text type="secondary" style={{ fontSize: 12 }}>Tên công ty:</Text>
-                                                <div style={{ fontWeight: 600, color: '#1e293b', marginTop: 2 }}>{company.tenCongTy || 'Chưa khai báo'}</div>
-                                            </div>
+                {/* CỘT PHẢI: ĐỐI SOÁT & SO SÁNH CỦ VS MỚI (DIFF) */}
+                <Col xs={24} lg={12} style={{ height: '100%' }}>
+                    <Card 
+                        style={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+                        bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}
+                    >
+                        {/* A. BẢNG ACTION BANNER (CỐ ĐỊNH) */}
+                        <div style={{ padding: '10px 16px', background: '#ffffff', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                            <Text strong style={{ fontSize: 14, color: '#334155' }}>Quyết định:</Text>
+                            <Space wrap>
+                                <Popconfirm
+                                    title={isUpdate ? "Xác nhận hủy yêu cầu cập nhật này?" : "Xác nhận từ chối và xóa hồ sơ?"}
+                                    description={isUpdate ? "Doanh nghiệp vẫn tiếp tục hoạt động bằng thông tin cũ." : "Tài khoản doanh nghiệp sẽ bị xoá khỏi hàng chờ."}
+                                    onConfirm={() => handleAction("REJECT")}
+                                    okText="Từ chối"
+                                    cancelText="Hủy"
+                                    okButtonProps={{ danger: true, loading: submitting }}
+                                >
+                                    <Button danger icon={<CloseOutlined />}>
+                                        Từ chối
+                                    </Button>
+                                </Popconfirm>
 
-                                            <div>
-                                                <Text type="secondary" style={{ fontSize: 12 }}>Người đại diện:</Text>
-                                                <div style={{ fontWeight: 600, color: '#1e293b', marginTop: 2 }}>{company.nguoiDaiDien || 'Chưa khai báo'}</div>
-                                            </div>
-                                        </Card>
-                                    </Col>
+                                <Button 
+                                    icon={<FormOutlined />} 
+                                    style={{ backgroundColor: '#fa8c16', color: '#fff', borderColor: '#fa8c16' }} 
+                                    onClick={() => setIsModalOpen(true)}
+                                >
+                                    Yêu cầu bổ sung
+                                </Button>
 
-                                    {/* Cột 2: Thông tin AI đọc từ GPKD */}
-                                    <Col span={12}>
-                                        <Card size="small" title="Thông tin AI Đọc từ GPKD" style={{ borderRadius: 8, height: '100%', borderColor: hasAnyMismatch ? '#ffccc7' : '#b7eb8f' }}>
-                                            {/* MST */}
-                                            <div style={{ marginBottom: 12 }}>
-                                                <Text type="secondary" style={{ fontSize: 12 }}>Mã số thuế OCR:</Text>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                                                    <Text strong>{ocrResult.maSoThue || "Không đọc được"}</Text>
-                                                    {renderMatchTag(mstComparison)}
-                                                </div>
-                                            </div>
+                                <Popconfirm
+                                    title={isUpdate ? "Đồng ý áp dụng thông tin mới cho Doanh nghiệp?" : "Phê duyệt chính thức cho Doanh nghiệp này?"}
+                                    description="Dữ liệu mới sẽ được đè vào hệ thống và gửi email thông báo."
+                                    onConfirm={() => handleAction("APPROVE")}
+                                    okText="Duyệt ngay"
+                                    cancelText="Hủy"
+                                >
+                                    <Button 
+                                        type="primary" 
+                                        icon={<CheckOutlined />} 
+                                        style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }} 
+                                        loading={submitting} 
+                                    >
+                                        Duyệt hồ sơ
+                                    </Button>
+                                </Popconfirm>
+                            </Space>
+                        </div>
 
-                                            {/* Tên Công Ty */}
-                                            <div style={{ marginBottom: 12 }}>
-                                                <Text type="secondary" style={{ fontSize: 12 }}>Tên công ty OCR:</Text>
-                                                <div style={{ marginTop: 2 }}>
-                                                    <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: 4 }}>{ocrResult.tenCongTy || "Không đọc được"}</div>
-                                                    <div>{renderMatchTag(nameComparison)}</div>
-                                                    {nameComparison.note && (
-                                                        <div style={{ fontSize: 11, color: '#d46b08', marginTop: 3, fontStyle: 'italic' }}>
-                                                            <InfoCircleOutlined /> {nameComparison.note}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Đại Diện Pháp Luật */}
-                                            <div>
-                                                <Text type="secondary" style={{ fontSize: 12 }}>Đại diện pháp luật OCR:</Text>
-                                                <div style={{ marginTop: 2 }}>
-                                                    <div style={{ fontWeight: 600, color: '#1e293b', marginBottom: 4 }}>{ocrResult.nguoiDaiDien || "Không đọc được"}</div>
-                                                    <div>{renderMatchTag(repComparison)}</div>
-                                                    {repComparison.note && (
-                                                        <div style={{ fontSize: 11, color: '#d46b08', marginTop: 3, fontStyle: 'italic' }}>
-                                                            <InfoCircleOutlined /> {repComparison.note}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </Card>
-                                    </Col>
-                                </Row>
-
-                                {hasAnyMismatch && (
-                                    <div style={{ marginTop: 14, padding: '8px 12px', background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 6, color: '#cf1322', fontSize: 13, fontWeight: 500 }}>
-                                        <WarningOutlined /> Cảnh báo: Phát hiện thông tin khai báo có sự sai lệch so với Giấy phép kinh doanh. Vui lòng đối chiếu kỹ trước khi duyệt hoặc bấm 'Yêu cầu bổ sung'!
-                                    </div>
-                                )}
-                            </div>
-                        }
-                        type="info"
-                    />
-                )}
-
-                {/* THÔNG TIN KHAI BÁO CỦA CÔNG TY */}
-                <Descriptions bordered column={2} size="middle">
-                    <Descriptions.Item label="Tên công ty chính thức" span={2}>
-                        <Text strong style={{ fontSize: 16, color: '#1e293b' }}>{company.tenCongTy}</Text>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Mã số thuế"><Tag color="geekblue" style={{ fontSize: 14 }}>{company.maSoThue}</Tag></Descriptions.Item>
-                    <Descriptions.Item label="Quy mô">{company.quyMo || "Chưa khai báo"}</Descriptions.Item>
-                    <Descriptions.Item label="Người đại diện">{company.nguoiDaiDien}</Descriptions.Item>
-                    <Descriptions.Item label="Email liên hệ">{company.email}</Descriptions.Item>
-                    <Descriptions.Item label="Địa chỉ trụ sở" span={2}>{company.diaChi}</Descriptions.Item>
-                </Descriptions>
-
-                <Divider />
-
-                {/* KHU VỰC HIỂN THỊ CẢ GIỚI THIỆU VÀ MẪU EMAIL */}
-                <Row gutter={[16, 16]}>
-                    <Col xs={24} md={12}>
-                        <Text strong style={{ fontSize: 15 }}><FileTextOutlined /> Giới thiệu về doanh nghiệp:</Text>
-                        <Paragraph style={{ background: '#f8fafc', padding: 14, borderRadius: 8, marginTop: 8, border: '1px solid #e2e8f0', minHeight: 120 }}>
-                            {company.moTa || "Không có nội dung mô tả."}
-                        </Paragraph>
-                    </Col>
-                    
-                    <Col xs={24} md={12}>
-                        <Text strong style={{ fontSize: 15 }}><MailOutlined style={{ color: '#1677ff' }} /> Mẫu Email Mời Phỏng Vấn (NTD cài đặt):</Text>
-                        <Paragraph style={{ background: '#f8fafc', padding: 14, borderRadius: 8, marginTop: 8, border: '1px solid #e2e8f0', whiteSpace: 'pre-line', minHeight: 120 }}>
-                            {company.mauEmailInterview || "Nhà tuyển dụng chưa thiết lập mẫu email phỏng vấn."}
-                        </Paragraph>
-                    </Col>
-                </Row>
-
-                <Divider />
-
-                {/* TÀI LIỆU VĂN BẢN VÀ GPKD */}
-                <Title level={5}><FileTextOutlined /> HỒ SƠ TÀI LIỆU VÀ GIẤY PHÉP KINH DOANH ĐÍNH KÈM</Title>
-                <Row gutter={16} style={{ marginTop: 16 }}>
-                    <Col span={8} style={{ textAlign: 'center' }}>
-                        <Card title="Logo Doanh nghiệp" size="small" style={{ borderRadius: 8 }}>
-                            {company.logo ? (
-                                <Image src={company.logo} style={{ maxHeight: 180, objectFit: 'contain' }} />
-                            ) : (
-                                <Text type="secondary">Chưa tải Logo</Text>
+                        {/* B. KHU VỰC ĐỐI SOÁT NỘI DUNG (CUỘN ĐỘC LẬP) */}
+                        <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+                            
+                            {/* BANNER THÔNG BÁO CHẾ ĐỘ CẬP NHẬT */}
+                            {isUpdate && (
+                                <Alert
+                                    message="Yêu cầu Cập nhật Thông tin Pháp lý"
+                                    description="Doanh nghiệp này đang hoạt động bình thường và gửi yêu cầu điều chỉnh Tên/MST/GPKD. Các trường màu xanh lá là thông tin MỚI do NTD yêu cầu."
+                                    type="info"
+                                    showIcon
+                                    style={{ marginBottom: 16, borderRadius: 8 }}
+                                />
                             )}
-                        </Card>
-                    </Col>
 
-                    <Col span={8} style={{ textAlign: 'center' }}>
-                        <Card title="GPKD (Mặt trước / Bản chính)" size="small" style={{ borderRadius: 8 }}>
-                            {company.giayPhepKinhDoanhMatTruoc ? (
-                                isPdfUrl(company.giayPhepKinhDoanhMatTruoc) ? (
-                                    <div style={{ padding: '30px 0' }}>
-                                        <FilePdfOutlined style={{ fontSize: 48, color: '#ff4d4f' }} />
-                                        <div style={{ marginTop: 12 }}>
-                                            <Button type="primary" href={company.giayPhepKinhDoanhMatTruoc} target="_blank">
-                                                Mở xem file PDF GPKD
-                                            </Button>
+                            <Text strong style={{ color: '#2563eb', fontSize: 14, display: 'block', marginBottom: 12 }}>
+                                <FileTextOutlined /> {isUpdate ? "BẢNG SO SÁNH THÔNG TIN (CỦ VS MỚI)" : "THÔNG TIN DOANH NGHIỆP KHAI BÁO"}
+                            </Text>
+
+                            <Descriptions bordered column={1} size="small" labelStyle={{ width: '32%', fontWeight: 600, backgroundColor: '#f8fafc' }}>
+                                
+                                {/* 1. MÃ SỐ THUẾ */}
+                                <Descriptions.Item label="Mã số thuế">
+                                    {isUpdate && pendingData.maSoThue !== company.maSoThue ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                            <Text type="secondary" delete style={{ fontSize: 13 }}>Đang dùng: {company.maSoThue}</Text>
+                                            <Space>
+                                                <Tag color="green" style={{ fontSize: 14, fontWeight: 'bold' }}>
+                                                    Mới: {pendingData.maSoThue}
+                                                </Tag>
+                                                <Tooltip title="Sao chép MST mới">
+                                                    <Button size="small" type="text" icon={<CopyOutlined />} onClick={() => handleCopy(pendingData.maSoThue, "MST mới")} />
+                                                </Tooltip>
+                                            </Space>
                                         </div>
-                                    </div>
-                                ) : (
-                                    <Image src={company.giayPhepKinhDoanhMatTruoc} style={{ maxHeight: 180, objectFit: 'contain' }} />
-                                )
-                            ) : (
-                                <Tag color="red">Chưa tải mặt trước</Tag>
-                            )}
-                        </Card>
-                    </Col>
-
-                    <Col span={8} style={{ textAlign: 'center' }}>
-                        <Card title="GPKD (Mặt sau - Tùy chọn)" size="small" style={{ borderRadius: 8 }}>
-                            {company.giayPhepKinhDoanhMatSau ? (
-                                isPdfUrl(company.giayPhepKinhDoanhMatSau) ? (
-                                    <div style={{ padding: '30px 0' }}>
-                                        <FilePdfOutlined style={{ fontSize: 48, color: '#ff4d4f' }} />
-                                        <div style={{ marginTop: 12 }}>
-                                            <Button type="primary" href={company.giayPhepKinhDoanhMatSau} target="_blank">
-                                                Mở xem file PDF Mặt sau
-                                            </Button>
+                                    ) : (
+                                        <Space>
+                                            <Tag color="geekblue" style={{ fontSize: 15, fontWeight: 'bold', padding: '2px 8px' }}>
+                                                {company.maSoThue}
+                                            </Tag>
+                                            <Tooltip title="Sao chép MST">
+                                                <Button size="small" type="text" icon={<CopyOutlined />} onClick={() => handleCopy(company.maSoThue, "MST")} />
+                                            </Tooltip>
+                                        </Space>
+                                    )}
+                                </Descriptions.Item>
+                                
+                                {/* 2. TÊN CÔNG TY */}
+                                <Descriptions.Item label="Tên công ty">
+                                    {isUpdate && pendingData.tenCongTy !== company.tenCongTy ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                            <Text type="secondary" delete style={{ fontSize: 13 }}>Đang dùng: {company.tenCongTy}</Text>
+                                            <Space>
+                                                <Text strong style={{ fontSize: 14, color: '#16a34a' }}>Mới: {pendingData.tenCongTy}</Text>
+                                                <Tooltip title="Sao chép Tên công ty mới">
+                                                    <Button size="small" type="text" icon={<CopyOutlined />} onClick={() => handleCopy(pendingData.tenCongTy, "Tên công ty mới")} />
+                                                </Tooltip>
+                                            </Space>
                                         </div>
-                                    </div>
-                                ) : (
-                                    <Image src={company.giayPhepKinhDoanhMatSau} style={{ maxHeight: 180, objectFit: 'contain' }} />
-                                )
-                            ) : (
-                                <Tag color="default">Không tải mặt sau</Tag>
-                            )}
-                        </Card>
-                    </Col>
-                </Row>
-            </Card>
+                                    ) : (
+                                        <Space>
+                                            <Text strong style={{ fontSize: 14, color: '#0f172a' }}>{company.tenCongTy}</Text>
+                                            <Tooltip title="Sao chép Tên công ty">
+                                                <Button size="small" type="text" icon={<CopyOutlined />} onClick={() => handleCopy(company.tenCongTy, "Tên công ty")} />
+                                            </Tooltip>
+                                        </Space>
+                                    )}
+                                </Descriptions.Item>
+
+                                <Descriptions.Item label="Người đại diện">
+                                    <Text strong>{company.nguoiDaiDien || "Chưa khai báo"}</Text>
+                                </Descriptions.Item>
+
+                                <Descriptions.Item label="Email liên hệ">
+                                    {company.email}
+                                </Descriptions.Item>
+
+                                <Descriptions.Item label="Địa chỉ trụ sở">
+                                    {company.diaChi}
+                                </Descriptions.Item>
+
+                                <Descriptions.Item label="Quy mô">
+                                    {company.quyMo || "Chưa khai báo"}
+                                </Descriptions.Item>
+                            </Descriptions>
+
+                            <Divider style={{ margin: '16px 0' }} />
+
+                            <div style={{ marginBottom: 16 }}>
+                                <Text strong style={{ fontSize: 13, color: '#334155', display: 'block', marginBottom: 6 }}>
+                                     Giới thiệu doanh nghiệp:
+                                </Text>
+                                <Paragraph style={{ background: '#f8fafc', padding: 10, borderRadius: 6, border: '1px solid #e2e8f0', margin: 0, fontSize: 13 }}>
+                                    {company.moTa || "Không có nội dung mô tả."}
+                                </Paragraph>
+                            </div>
+
+                            <div>
+                                <Text strong style={{ fontSize: 13, color: '#334155', display: 'block', marginBottom: 6 }}>
+                                    <MailOutlined style={{ color: '#2563eb' }} /> Mẫu Email Phỏng Vấn (NTD cài đặt):
+                                </Text>
+                                <Paragraph style={{ background: '#f8fafc', padding: 10, borderRadius: 6, border: '1px solid #e2e8f0', whiteSpace: 'pre-line', margin: 0, fontSize: 13 }}>
+                                    {company.mauEmailInterview || "Nhà tuyển dụng chưa thiết lập mẫu email phỏng vấn."}
+                                </Paragraph>
+                            </div>
+                        </div>
+                    </Card>
+                </Col>
+            </Row>
 
             {/* MODAL YÊU CẦU BỔ SUNG */}
             <Modal
@@ -480,24 +400,25 @@ const CompanyDetailAdmin = () => {
                     }
                     handleAction("REQUEST_ADDITION", requestNote);
                 }}
-                okText="Gửi thông báo & Email tới NTD"
+                okText="Gửi thông báo & Email"
                 cancelText="Hủy"
                 confirmLoading={submitting}
-                width={650}
+                width={580}
             >
-                <Paragraph style={{ marginBottom: 12 }}>
-                    Nội dung này sẽ hiển thị trực tiếp trên giao diện Nhà tuyển dụng và được gửi tự động qua Email:
+                <Paragraph style={{ marginBottom: 12, fontSize: 13 }}>
+                    Nội dung phản hồi sẽ được gửi tự động qua Email cho Nhà tuyển dụng:
                 </Paragraph>
-                <div style={{ marginBottom: 16 }}>
-                    <Text strong style={{ fontSize: 13, color: '#475569', display: 'block', marginBottom: 8 }}>
-                        <BulbOutlined style={{ color: '#fa8c16' }} /> Gợi ý mẫu phản hồi nhanh:
+
+                <div style={{ marginBottom: 12 }}>
+                    <Text strong style={{ fontSize: 12, color: '#475569', display: 'block', marginBottom: 6 }}>
+                        <BulbOutlined style={{ color: '#fa8c16' }} /> Mẫu phản hồi nhanh:
                     </Text>
-                    <Space wrap size={[6, 6]}>
+                    <Space wrap size={[4, 4]}>
                         {quickReasonTemplates.map((template, idx) => (
                             <Tag 
                                 key={idx} 
                                 color="orange" 
-                                style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}
+                                style={{ cursor: 'pointer', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}
                                 onClick={() => setRequestNote(template)}
                             >
                                 + Mẫu {idx + 1}
@@ -505,6 +426,7 @@ const CompanyDetailAdmin = () => {
                         ))}
                     </Space>
                 </div>
+
                 <TextArea 
                     rows={4} 
                     value={requestNote} 

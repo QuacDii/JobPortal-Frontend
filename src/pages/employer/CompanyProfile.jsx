@@ -7,7 +7,8 @@ import {
     UploadOutlined, BuildOutlined, CheckCircleOutlined, 
     SyncOutlined, WarningOutlined, FileImageOutlined, 
     FilePdfOutlined, MailOutlined, SafetyCertificateOutlined,
-    EnvironmentOutlined, NumberOutlined, TeamOutlined, EditOutlined
+    EnvironmentOutlined, NumberOutlined, TeamOutlined, EditOutlined,
+    InfoCircleOutlined
 } from '@ant-design/icons';
 import apiClient from '../../api/apiClient';
 
@@ -22,13 +23,13 @@ const CompanyProfile = ({ onStatusChange }) => {
     const [logoFileList, setLogoFileList] = useState([]);
     const [frontFileList, setFrontFileList] = useState([]);
     const [backFileList, setBackFileList] = useState([]);
-
     const [currentLogo, setCurrentLogo] = useState(null);
     const [currentFront, setCurrentFront] = useState(null);
     const [currentBack, setCurrentBack] = useState(null);
     
     const [companyStatus, setCompanyStatus] = useState(null);
     const [yeuCauBoSung, setYeuCauBoSung] = useState(null);
+    const [hasPendingUpdate, setHasPendingUpdate] = useState(false);
 
     useEffect(() => {
         fetchCompanyData();
@@ -52,6 +53,8 @@ const CompanyProfile = ({ onStatusChange }) => {
                 setCurrentFront(data.giayPhepKinhDoanhMatTruoc);
                 setCurrentBack(data.giayPhepKinhDoanhMatSau);
                 setYeuCauBoSung(data.yeuCauBoSung);
+                setHasPendingUpdate(!!data.duLieuChoDuyetJson);
+
                 if (onStatusChange) onStatusChange(data.trangThai ? "APPROVED" : "PENDING");
             } else {
                 if (onStatusChange) onStatusChange("NO_COMPANY");
@@ -63,30 +66,40 @@ const CompanyProfile = ({ onStatusChange }) => {
         }
     };
 
-    // Hàm Validate File Client trước khi đưa vào Form State
     const validateFileBeforeUpload = (file, isImageOnly = false) => {
         const isLt10M = file.size / 1024 / 1024 < 10;
         if (!isLt10M) {
             message.error('Dung lượng tệp không được vượt quá 10MB!');
             return Upload.LIST_IGNORE;
         }
-
         const allowedFormats = isImageOnly 
             ? ['image/jpeg', 'image/png', 'image/webp']
             : ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
-
         const isValidFormat = allowedFormats.includes(file.type);
         if (!isValidFormat) {
             message.error(isImageOnly ? 'Chỉ chấp nhận file ảnh (JPG, PNG, WEBP)!' : 'Chỉ chấp nhận file Ảnh hoặc PDF!');
             return Upload.LIST_IGNORE;
         }
-
-        return false; // Ngăn Antd tự động HTTP Request
+        return false;
     };
 
     const isPdfUrl = (url) => url && url.toLowerCase().endsWith('.pdf');
 
     const onFinish = async (values) => {
+        // 1. Validation Bắt buộc có LOGO
+        const hasLogo = currentLogo || logoFileList.length > 0;
+        if (!hasLogo) {
+            message.error("Vui lòng tải lên Logo của doanh nghiệp!");
+            return;
+        }
+
+        // 2. Validation Bắt buộc có GPKD Mặt trước
+        const hasFrontGpkd = currentFront || frontFileList.length > 0;
+        if (!hasFrontGpkd) {
+            message.error("Vui lòng tải lên Giấy phép kinh doanh (Mặt trước / Bản chính)!");
+            return;
+        }
+
         setLoading(true);
         try {
             const formData = new FormData();
@@ -96,7 +109,6 @@ const CompanyProfile = ({ onStatusChange }) => {
             formData.append('DiaChi', values.diaChi);
             formData.append('MoTa', values.moTa || '');
             formData.append('MauEmailInterview', values.mauEmailInterview || '');
-
             if (logoFileList.length > 0) formData.append('LogoFile', logoFileList[0].originFileObj);
             if (frontFileList.length > 0) formData.append('GiayPhepKinhDoanhMatTruocFile', frontFileList[0].originFileObj);
             if (backFileList.length > 0) formData.append('GiayPhepKinhDoanhMatSauFile', backFileList[0].originFileObj);
@@ -107,16 +119,15 @@ const CompanyProfile = ({ onStatusChange }) => {
 
             const resPayload = response?.data || response;
             if (resPayload.success) {
-                message.success("Lưu hồ sơ thành công, đã gửi chờ Admin kiểm duyệt!");
-                setCompanyStatus(0);
-                setYeuCauBoSung(null);
+                message.success(resPayload.message || "Lưu thông tin hồ sơ thành công!");
+                
                 setLogoFileList([]);
                 setFrontFileList([]);
                 setBackFileList([]);
                 fetchCompanyData();
-                if (onStatusChange) onStatusChange("PENDING");
             }
         } catch (error) {
+            // Hiển thị thông báo lỗi (bao gồm lỗi trùng Mã số thuế từ Backend)
             message.error(error.response?.data?.message || 'Lưu thông tin thất bại!');
         } finally {
             setLoading(false);
@@ -158,9 +169,14 @@ const CompanyProfile = ({ onStatusChange }) => {
                     </Space>
 
                     <div>
-                        {companyStatus === 1 && (
+                        {companyStatus === 1 && !hasPendingUpdate && (
                             <Tag color="success" style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600 }}>
                                 <CheckCircleOutlined /> ĐÃ XÁC THỰC PHÁP LÝ
+                            </Tag>
+                        )}
+                        {companyStatus === 1 && hasPendingUpdate && (
+                            <Tag color="processing" style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600 }}>
+                                <SyncOutlined spin /> ĐANG CHỜ DUYỆT CẬP NHẬT
                             </Tag>
                         )}
                         {companyStatus === 0 && !yeuCauBoSung && (
@@ -201,7 +217,7 @@ const CompanyProfile = ({ onStatusChange }) => {
 
             {companyStatus === 0 && !yeuCauBoSung && (
                 <Alert 
-                    message={<Text strong style={{ color: '#9a3412' }}>Hồ sơ đang trong quá trình duyệt</Text>}
+                    message={<Text strong style={{ color: '#9a3412' }}>Hồ sơ đang trong quá trình thẩm định lần đầu</Text>}
                     description="Thông tin công ty và bản scan Giấy phép kinh doanh của bạn đã được gửi đến Ban quản trị. Quá trình xác minh thường mất từ 1 - 24 giờ làm việc." 
                     type="warning" 
                     showIcon 
@@ -210,10 +226,21 @@ const CompanyProfile = ({ onStatusChange }) => {
                 />
             )}
 
+            {companyStatus === 1 && hasPendingUpdate && (
+                <Alert 
+                    message={<Text strong style={{ color: '#1e40af' }}>Yêu cầu thay đổi thông tin đang chờ Admin thẩm định</Text>}
+                    description="Các cập nhật về Logo, Mô tả hay Mẫu email đã có hiệu lực ngay. Yêu cầu thay đổi thông tin pháp lý (Tên/MST/GPKD) đang chờ duyệt. Trong thời gian này, tài khoản của bạn vẫn hoạt động và đăng tin tuyển dụng bình thường." 
+                    type="info" 
+                    showIcon 
+                    icon={<InfoCircleOutlined style={{ color: '#2563eb' }} />}
+                    style={{ marginBottom: 24, borderRadius: 10, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}
+                />
+            )}
+
             {/* FORM CHÍNH */}
             <Form layout="vertical" form={form} onFinish={onFinish}>
                 <Row gutter={[24, 24]} align="stretch">
-    
+
                     {/* CỘT TRÁI: THÔNG TIN CHUNG & EMAIL */}
                     <Col xs={24} lg={15} style={{ display: 'flex', flexDirection: 'column' }}>
                         
@@ -237,21 +264,29 @@ const CompanyProfile = ({ onStatusChange }) => {
                             
                             <Row gutter={16}>
                                 <Col span={12}>
+                                    {/* MÃ SỐ THUẾ - BẮT BUỘC CHỈ NHẬP SỐ */}
                                     <Form.Item 
                                         label="Mã số thuế" 
                                         name="maSoThue" 
-                                        rules={[{ required: true, message: 'Vui lòng nhập mã số thuế!' }]}
+                                        rules={[
+                                            { required: true, message: 'Vui lòng nhập mã số thuế!' },
+                                            { pattern: /^[0-9]+$/, message: 'Mã số thuế chỉ được nhập chữ số!' }
+                                        ]}
                                     >
                                         <Input size="large" placeholder="VD: 0101234567" prefix={<NumberOutlined style={{ color: '#cbd5e1' }} />} />
                                     </Form.Item>
                                 </Col>
                                 <Col span={12}>
+                                    {/* QUY MÔ NHÂN SỰ - BẮT BUỘC CHỈ NHẬP SỐ */}
                                     <Form.Item 
-                                        label="Quy mô nhân sự" 
+                                        label="Quy mô nhân sự (Số lượng)" 
                                         name="quyMo" 
-                                        rules={[{ required: true, message: 'Vui lòng chọn hoặc nhập quy mô!' }]}
+                                        rules={[
+                                            { required: true, message: 'Vui lòng nhập quy mô nhân sự!' },
+                                            { pattern: /^[0-9]+$/, message: 'Quy mô nhân sự chỉ được nhập chữ số!' }
+                                        ]}
                                     >
-                                        <Input size="large" placeholder="VD: 100 - 500 nhân sự" prefix={<TeamOutlined style={{ color: '#cbd5e1' }} />} />
+                                        <Input size="large" placeholder="VD: 100" prefix={<TeamOutlined style={{ color: '#cbd5e1' }} />} />
                                     </Form.Item>
                                 </Col>
                             </Row>
@@ -264,12 +299,22 @@ const CompanyProfile = ({ onStatusChange }) => {
                                 <Input size="large" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" prefix={<EnvironmentOutlined style={{ color: '#cbd5e1' }} />} />
                             </Form.Item>
 
-                            <Form.Item label="Giới thiệu về công ty" name="moTa">
-                                <TextArea rows={3} placeholder="Mô tả tầm nhìn, sứ mệnh, văn hóa doanh nghiệp..." showCount maxLength={1000} />
+                            {/* BẮT BUỘC NHẬP GIỚI THIỆU CÔNG TY */}
+                            <Form.Item 
+                                label="Giới thiệu về công ty" 
+                                name="moTa"
+                                rules={[{ required: true, message: 'Vui lòng nhập giới thiệu về công ty!' }]}
+                            >
+                                <TextArea 
+                                    autoSize={{ minRows: 6, maxRows: 12 }} 
+                                    placeholder="Mô tả tầm nhìn, sứ mệnh, văn hóa doanh nghiệp..." 
+                                    showCount 
+                                    maxLength={1000} 
+                                />
                             </Form.Item>
                         </Card>
 
-                        {/* CARD 2: CẤU HÌNH MẪU EMAIL (ÉP BẰNG CHÂN VỚI CỘT PHẢI) */}
+                        {/* CARD 2: CẤU HÌNH MẪU EMAIL */}
                         <Card 
                             title={
                                 <Space>
@@ -311,7 +356,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                                 </Space>
                             </div>
 
-                            {/* FORM ITEM KHÔNG BỊ BÓP CHIỀU NGANG */}
                             <Form.Item 
                                 name="mauEmailInterview" 
                                 style={{ 
@@ -335,7 +379,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                                 />
                             </Form.Item>
 
-                            {/* BỔ SUNG WIDTH 100% CHO TẤT CẢ CONTAINER ANTD BÊN TRONG */}
                             <style>{`
                                 .full-height-form-item,
                                 .full-height-form-item .ant-form-item-row,
@@ -358,9 +401,14 @@ const CompanyProfile = ({ onStatusChange }) => {
                     {/* CỘT PHẢI: LOGO & TÀI LIỆU PHÁP LÝ */}
                     <Col xs={24} lg={9}>
                         
-                        {/* CARD 3: LOGO DOANH NGHIỆP */}
+                        {/* CARD 3: LOGO DOANH NGHIỆP (BẮT BUỘC) */}
                         <Card 
-                            title="Logo Thương Hiệu" 
+                            title={
+                                <Space>
+                                    <span>Logo Thương Hiệu</span>
+                                    <Text type="danger">*</Text>
+                                </Space>
+                            } 
                             style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: 24, textAlign: 'center' }}
                         >
                             <div style={{ padding: '12px 0' }}>
@@ -372,7 +420,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                                         />
                                     </div>
                                 ) : null}
-
                                 <Upload 
                                     beforeUpload={(file) => validateFileBeforeUpload(file, true)} 
                                     onChange={({ fileList }) => setLogoFileList(fileList.slice(-1))} 
@@ -402,12 +449,11 @@ const CompanyProfile = ({ onStatusChange }) => {
                                 Vui lòng tải lên bản chụp/scan Giấy phép kinh doanh chính thức (Ảnh chụp rõ nét hoặc file PDF).
                             </Paragraph>
 
-                            {/* UPLOAD GPKD MẶT TRƯỚC */}
+                            {/* UPLOAD GPKD MẶT TRƯỚC (BẮT BUỘC) */}
                             <div style={{ marginBottom: 20, border: '1px dashed #0284c7', padding: '16px', borderRadius: '10px', textAlign: 'center', backgroundColor: '#f0f9ff' }}>
                                 <Text strong style={{ display: 'block', marginBottom: 8, color: '#0369a1' }}>
-                                    <FileImageOutlined /> Mặt Trước / Bản Chính (PDF/Ảnh)
+                                    <FileImageOutlined /> Mặt Trước / Bản Chính <Text type="danger">*</Text>
                                 </Text>
-
                                 {currentFront && frontFileList.length === 0 && (
                                     <div style={{ marginBottom: 12 }}>
                                         {isPdfUrl(currentFront) ? (
@@ -419,7 +465,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                                         )}
                                     </div>
                                 )}
-
                                 <Upload 
                                     beforeUpload={(file) => validateFileBeforeUpload(file, false)} 
                                     onChange={({ fileList }) => setFrontFileList(fileList.slice(-1))} 
@@ -431,12 +476,11 @@ const CompanyProfile = ({ onStatusChange }) => {
                                 </Upload>
                             </div>
 
-                            {/* UPLOAD GPKD MẶT SAU */}
+                            {/* UPLOAD GPKD MẶT SAU (TÙY CHỌN) */}
                             <div style={{ border: '1px dashed #0284c7', padding: '16px', borderRadius: '10px', textAlign: 'center', backgroundColor: '#f0f9ff' }}>
                                 <Text strong style={{ display: 'block', marginBottom: 8, color: '#0369a1' }}>
                                     <FileImageOutlined /> Mặt Sau (Tùy chọn)
                                 </Text>
-
                                 {currentBack && backFileList.length === 0 && (
                                     <div style={{ marginBottom: 12 }}>
                                         {isPdfUrl(currentBack) ? (
@@ -448,7 +492,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                                         )}
                                     </div>
                                 )}
-
                                 <Upload 
                                     beforeUpload={(file) => validateFileBeforeUpload(file, false)} 
                                     onChange={({ fileList }) => setBackFileList(fileList.slice(-1))} 
@@ -460,7 +503,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                                 </Upload>
                             </div>
                         </Card>
-
                     </Col>
                 </Row>
 
@@ -498,9 +540,8 @@ const CompanyProfile = ({ onStatusChange }) => {
                     >
                         Lưu & Nộp lại hồ sơ
                     </Button>
-
                     <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic', color: '#64748b' }}>
-                        * Hệ thống sẽ lưu thông tin và gửi yêu cầu xác minh lại tới Ban quản trị.
+                        * Thông tin phụ (Logo, Mô tả, Quy mô) sẽ được cập nhật ngay. Thay đổi Tên/MST/GPKD sẽ gửi thẩm định lại.
                     </Text>
                 </div>
             </Form>

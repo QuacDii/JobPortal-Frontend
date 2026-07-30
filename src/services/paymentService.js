@@ -1,16 +1,21 @@
 import apiClient from '../api/apiClient';
 
 const paymentService = {
-    // Gọi API lấy đường dẫn (URL) quét mã QR của MoMo
-    createPaymentUrl: (maUser, soTien, maGoi=null) => {
-        // Vì Backend chúng ta nhận tham số trực tiếp (không qua DTO) nên sẽ gửi dưới dạng query parameters
+    createPaymentUrl: (maUser, soTien, maGoi = null) => {
         return apiClient.post('/Payment/create', null, {
-            params: {
-                maUser: maUser,
-                soTien: soTien,
-                maGoi: maGoi
-            }
+            params: { maUser, soTien, maGoi }
         });
+    },
+
+    checkStatus: (orderId, maUser, maGoi = null) => {
+        return apiClient.get('/Payment/check-status', {
+            params: { orderId, maUser, maGoi }
+        });
+    },
+
+    // Bổ sung API confirmFallback
+    confirmFallback: (data) => {
+        return apiClient.post('/Payment/confirm-fallback', data);
     }
 };
 

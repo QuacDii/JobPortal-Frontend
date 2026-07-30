@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import useCvStore from '../../../store/useCvStore';
 import get from 'lodash/get';
-import apiClient from '../../../api/apiClient'; // Giả định đường dẫn tới apiClient của bạn
 import { CameraOutlined, LoadingOutlined } from '@ant-design/icons';
 import { message } from 'antd';
 import apiClient from '../../../api/apiClient';

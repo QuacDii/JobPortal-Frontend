@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Table, Typography, Modal, InputNumber, Row, Col, Statistic, Space, Tag, Badge } from 'antd';
-import { WalletOutlined, ShoppingCartOutlined, ExclamationCircleOutlined, HistoryOutlined, ArrowLeftOutlined, FireOutlined } from '@ant-design/icons';
+import { Card, Button, Table, Typography, Modal, InputNumber, Row, Col, Statistic, Space, Tag, Badge, Spin } from 'antd';
+import { 
+    WalletOutlined, 
+    ShoppingCartOutlined, 
+    ExclamationCircleOutlined, 
+    HistoryOutlined, 
+    ArrowLeftOutlined, 
+    FireOutlined,
+    PayCircleOutlined,
+    CheckCircleOutlined,
+    LoadingOutlined 
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import servicePackage from '../../services/servicePackage';
 import paymentService from '../../services/paymentService';
@@ -22,13 +32,20 @@ const ServicePackage = () => {
     const [loading, setLoading] = useState(false);
     const [maUser, setMaUser] = useState(null);
 
-    // State cho Modal Nạp tiền MoMo Inline
+    // State cho Modal Nạp tiền thiếu
     const [isTopupModalVisible, setIsTopupModalVisible] = useState(false);
     const [topupAmount, setTopupAmount] = useState(10000);
     const [missingAmount, setMissingAmount] = useState(0);
+    const [selectedPkgId, setSelectedPkgId] = useState(null);
+
+    // State cho Modal Thanh toán MoMo & Polling
+    const [payUrl, setPayUrl] = useState('');
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [checkingOrderId, setCheckingOrderId] = useState(null);
+    const [isChecking, setIsChecking] = useState(false);
+    const [isConfirmingManual, setIsConfirmingManual] = useState(false);
 
     useEffect(() => {
-        // Đồng bộ cách lấy token giống hệt như bên Wallet.jsx
         const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
         if (token) {
             try {
@@ -42,6 +59,37 @@ const ServicePackage = () => {
         fetchData();
     }, []);
 
+    // 1. POLLING TỰ ĐỘNG LẮNG NGHE KẾT QUẢ THANH TOÁN & MUA GÓI TỪ MOMO
+    useEffect(() => {
+        let interval = null;
+
+        if (isChecking && checkingOrderId && maUser) {
+            interval = setInterval(async () => {
+                try {
+                    const res = await paymentService.checkStatus(checkingOrderId, maUser, selectedPkgId);
+                    const isPaid = res?.data?.isPaid || res?.isPaid;
+
+                    if (isPaid) {
+                        toast.success(`Nạp tiền & Kích hoạt gói dịch vụ thành công!`);
+                        setIsChecking(false);
+                        setIsPaymentModalOpen(false);
+                        setIsTopupModalVisible(false);
+                        setCheckingOrderId(null);
+                        
+                        // Cập nhật lại toàn bộ giao diện Ví & Gói VIP
+                        fetchData();
+                    }
+                } catch (err) {
+                    console.error("Lỗi kiểm tra trạng thái giao dịch:", err);
+                }
+            }, 3000); // 3 giây hỏi 1 lần
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [isChecking, checkingOrderId, maUser, selectedPkgId]);
+
     const fetchData = async () => {
         try {
             const [pkgRes, histRes, balRes] = await Promise.all([
@@ -50,7 +98,6 @@ const ServicePackage = () => {
                 servicePackage.getBalance()
             ]);
             
-            // Xử lý linh hoạt: Nếu có .data thì lấy, không thì lấy trực tiếp
             const actualPkg = pkgRes?.data ? pkgRes.data : pkgRes;
             const actualHist = histRes?.data ? histRes.data : histRes;
             const actualBal = balRes?.data ? balRes.data : balRes;
@@ -58,7 +105,6 @@ const ServicePackage = () => {
             setPackages(Array.isArray(actualPkg) ? actualPkg : []); 
             setHistory(Array.isArray(actualHist) ? actualHist : []);
             
-            // ÉP KIỂU VỀ NUMBER ĐỂ CHỐNG LỖI NaN
             setBalance(Number(actualBal?.soDuVi) || 0);
             setNgayHetHan(actualBal?.ngayHetHanGoi);
             setLuotXemCv(Number(actualBal?.luotXemCvConLai) || 0);
@@ -70,10 +116,22 @@ const ServicePackage = () => {
         }
     };
 
-    const [selectedPkgId, setSelectedPkgId] = useState(null);
+    const extractOrderId = (url) => {
+        try {
+            const urlObj = new URL(url);
+            const tParam = urlObj.searchParams.get('t');
+            if (tParam) {
+                const decoded = atob(tParam);
+                const parts = decoded.split('|');
+                if (parts.length >= 2) return parts[1];
+            }
+        } catch (e) {
+            console.error("Lỗi bóc tách orderId:", e);
+        }
+        return Date.now().toString();
+    };
 
     const handlePurchaseClick = (pkg) => {
-        // Ép kiểu chắc chắn là số
         const giaGoc = Number(pkg.giaTien) || 0;
         const giaKM = Number(pkg.giaKhuyenMai) || 0;
         const giaThucTe = (giaKM > 0) ? giaKM : giaGoc;
@@ -106,7 +164,6 @@ const ServicePackage = () => {
                 }
             });
         } else {
-            // Tính số tiền thiếu an toàn
             const thieu = giaThucTe - soDuHienTai;
             setMissingAmount(thieu);
             setTopupAmount(thieu < 10000 ? 10000 : thieu); 
@@ -115,6 +172,7 @@ const ServicePackage = () => {
         }
     };
 
+    // BƯỚC 1: TẠO GIAO DỊCH VÀ MỞ MODAL HƯỚNG DẪN MOMO
     const handleTopupSubmit = async () => {
         if (!maUser) {
             toast.error("Không tìm thấy thông tin tài khoản, vui lòng đăng nhập lại!");
@@ -122,26 +180,58 @@ const ServicePackage = () => {
         }
         const soTienNap = Number(topupAmount) || 0;
         if (soTienNap < 10000) return toast.warning("Tối thiểu 10.000đ");
+
         try {
             setLoading(true);
             const response = await paymentService.createPaymentUrl(maUser, soTienNap, selectedPkgId);
-            if (response && response.url) {
-                localStorage.setItem('payment_redirect', '/employer/service-package');
+            const url = response?.url || response?.data?.url || response?.data;
 
-                toast.info("Chuyển hướng an toàn sang MoMo...");
-                window.location.href = response.url;
+            if (url && typeof url === 'string' && url.startsWith('http')) {
+                const orderId = extractOrderId(url);
+                setPayUrl(url);
+                setCheckingOrderId(orderId);
+                
+                // Đóng modal nhập tiền, mở modal chuyển sang MoMo
+                setIsTopupModalVisible(false);
+                setIsPaymentModalOpen(true);
+                setIsChecking(true);
             } else {
                 toast.error("Không nhận được URL thanh toán từ server!");
             }
         } catch (error) {
             console.error("Lỗi nạp tiền MoMo:", error);
-            toast.error("Lỗi kết nối MoMo.");
+            toast.error(error.response?.data?.message || "Lỗi kết nối MoMo.");
         } finally {
             setLoading(false);
         }
     };
 
-    // ... Cột lịch sử giao dịch (columns) giữ nguyên như cũ ...
+    // BƯỚC 2: NÚT XÁC NHẬN THỦ CÔNG KHI MOMO SANDBOX BỊ TREO
+    const handleManualConfirm = async () => {
+        setIsConfirmingManual(true);
+        try {
+            await paymentService.confirmFallback({
+                maUser: maUser,
+                amount: Number(topupAmount),
+                orderId: checkingOrderId,
+                resultCode: '0',
+                maGoi: selectedPkgId
+            });
+            toast.success(`Nạp tiền & Kích hoạt gói dịch vụ thành công!`);
+            setIsPaymentModalOpen(false);
+            setIsChecking(false);
+            setCheckingOrderId(null);
+            
+            // Cập nhật lại UI tự động
+            fetchData();
+        } catch (err) {
+            console.error("Lỗi xác nhận thủ công:", err);
+            toast.error("Xác nhận thất bại, vui lòng thử lại!");
+        } finally {
+            setIsConfirmingManual(false);
+        }
+    };
+
     const columns = [
         { title: 'Ngày GD', dataIndex: 'ngayGd', render: (t) => new Date(t).toLocaleString('vi-VN') },
         { title: 'Loại', dataIndex: 'loaiGiaoDich', render: (t) => <Tag color={t===1?'green':'red'}>{t===1?'+ Nạp':'- Mua gói'}</Tag> },
@@ -205,7 +295,6 @@ const ServicePackage = () => {
                 {packages.map(pkg => {
                     const isDiscount = pkg.giaKhuyenMai && pkg.giaKhuyenMai > 0 && pkg.giaKhuyenMai < pkg.giaTien;
                     
-                    // Render UI cho từng gói
                     const CardContent = (
                         <Card 
                             hoverable 
@@ -213,7 +302,7 @@ const ServicePackage = () => {
                                 textAlign: 'center', 
                                 borderRadius: '10px', 
                                 borderTop: isDiscount ? '5px solid #ff4d4f' : '5px solid #1890ff', 
-                                height: '100%', // Ép thẻ Card cao bằng nhau
+                                height: '100%',
                                 display: 'flex',
                                 flexDirection: 'column'
                             }}
@@ -225,14 +314,12 @@ const ServicePackage = () => {
                         >
                             <Title level={4}>{pkg.tenGoi}</Title>
                             
-                            {/* VÙNG GIÁ TIỀN: Cố định min-height để không bị lệch khi có/không có giá gạch ngang */}
                             <div style={{ margin: '15px 0', minHeight: '75px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                 {isDiscount ? (
                                     <Text delete style={{ color: '#999', fontSize: '16px', display: 'block' }}>
                                         {pkg.giaTien.toLocaleString()} đ
                                     </Text>
                                 ) : (
-                                    // Div rỗng giữ chỗ cho các gói không có giảm giá
                                     <div style={{ height: '24px' }}></div>
                                 )}
                                 <Title level={2} style={{ color: isDiscount ? '#ff4d4f' : '#D82D8B', margin: 0 }}>
@@ -240,7 +327,6 @@ const ServicePackage = () => {
                                 </Title>
                             </div>
 
-                            {/* VÙNG DANH SÁCH QUYỀN LỢI */}
                             <Space direction="vertical" style={{ width: '100%', textAlign: 'left', marginTop: 15, flex: 1 }}>
                                 <Text>
                                     ⏳ Chu kỳ: <b>
@@ -252,7 +338,6 @@ const ServicePackage = () => {
                                 <Text>⭐ Cơ chế: <b>Cộng dồn quyền lợi</b></Text>
                             </Space>
 
-                            {/* NÚT BẤM: Dùng marginTop: 'auto' để luôn bị đẩy xuống sát đáy */}
                             <Button 
                                 type={isDiscount ? "primary" : "default"} 
                                 danger={isDiscount} 
@@ -267,7 +352,6 @@ const ServicePackage = () => {
 
                     return (
                         <Col xs={24} sm={12} md={8} key={pkg.maGoi}>
-                            {/* Nếu có giảm giá thì gắn ruy-băng (Badge) */}
                             {isDiscount ? (
                                 <Badge.Ribbon text={<><FireOutlined /> SIÊU TIẾT KIỆM</>} color="red">
                                     {CardContent}
@@ -283,7 +367,7 @@ const ServicePackage = () => {
             </Title>
             <Table dataSource={history} columns={columns} rowKey="maGd" pagination={{ pageSize: 5 }} style={{ marginTop: 20 }} />
 
-            {/* MODAL NẠP TIỀN NẰM NGAY TRONG TRANG */}
+            {/* MODAL 1: BÁO SỐ DƯ THIẾU & NHẬP SỐ TIỀN CẦN NẠP */}
             <Modal
                 title={<span><ExclamationCircleOutlined style={{ color: '#faad14', marginRight: 8 }} /> Cần nạp thêm tiền</span>}
                 open={isTopupModalVisible}
@@ -301,6 +385,55 @@ const ServicePackage = () => {
                     </p>
                     <p>Nhập số tiền bạn muốn nạp (Tối thiểu 10.000đ):</p>
                     <InputNumber min={10000} step={10000} value={topupAmount} onChange={setTopupAmount} style={{ width: '70%', fontSize: '18px' }} addonAfter="VNĐ" />
+                </div>
+            </Modal>
+
+            {/* MODAL 2: MỞ TRANG THANH TOÁN MOMO & XÁC NHẬN KÍCH HOẠT */}
+            <Modal
+                title={<span style={{ color: '#A50064', fontSize: '18px' }}><PayCircleOutlined /> Kích hoạt thanh toán MoMo</span>}
+                open={isPaymentModalOpen}
+                onCancel={() => { setIsPaymentModalOpen(false); setIsChecking(false); }}
+                footer={null}
+                centered
+            >
+                <div style={{ textAlign: 'center', padding: '15px 0' }}>
+                    <p style={{ fontSize: '15px', color: '#333' }}>
+                        Đơn nạp tiền <b>#{checkingOrderId}</b> đã tạo thành công. Vui lòng nhấn nút bên dưới để mở trang thanh toán MoMo:
+                    </p>
+                    
+                    <a 
+                        href={payUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{
+                            display: 'inline-block', width: '100%', padding: '14px 0',
+                            backgroundColor: '#A50064', color: '#fff', fontWeight: 'bold',
+                            fontSize: '16px', borderRadius: '6px', textAlign: 'center',
+                            textDecoration: 'none', margin: '10px 0 20px 0'
+                        }}
+                    >
+                        MỞ TRANG THANH TOÁN MOMO
+                    </a>
+
+                    <div style={{ padding: '12px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '6px', marginBottom: '15px' }}>
+                        <Spin indicator={<LoadingOutlined style={{ fontSize: 18, color: '#d48806', marginRight: '8px' }} spin />} />
+                        <span style={{ color: '#d48806', fontWeight: '500', fontSize: '13px' }}>
+                            Đang tự động lắng nghe kết quả từ MoMo...
+                        </span>
+                    </div>
+
+                    <Button 
+                        type="primary"
+                        icon={<CheckCircleOutlined />}
+                        loading={isConfirmingManual}
+                        onClick={handleManualConfirm}
+                        style={{ 
+                            width: '100%', height: '45px', backgroundColor: '#52c41a', 
+                            borderColor: '#52c41a', fontWeight: 'bold', fontSize: '15px' 
+                        }}
+                    >
+                        Tôi đã nhập OTP trên MoMo (Xác nhận ngay)
+                    </Button>
                 </div>
             </Modal>
         </div>
