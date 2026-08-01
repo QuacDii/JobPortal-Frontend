@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Input, Button, Card, Select, DatePicker, Typography, Row, Col, Divider, message, InputNumber, Cascader, Alert } from 'antd';
 import { PlusOutlined, DeleteOutlined, SendOutlined, RocketOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs'; // 🌟 1. Bổ sung dayjs để xử lý ngày tháng
 import apiClient from '../../api/apiClient';
 
 const { Title, Text } = Typography;
@@ -9,89 +10,57 @@ const { TextArea } = Input;
 const PostJob = () => {
     const [form] = Form.useForm(); 
     const [loading, setLoading] = useState(false);
-
     const [standardSkills, setStandardSkills] = useState([]);
     const [industries, setIndustries] = useState([]);
     const [locations, setLocations] = useState([]);
 
-    // 1. TẢI DỮ LIỆU ĐỘC LẬP - TRÁNH LỖI DÂY CHUYỀN
+    const CAP_BAC_OPTIONS = [
+        { value: 'Thực tập sinh', label: 'Thực tập sinh' },
+        { value: 'Nhân viên', label: 'Nhân viên' },
+        { value: 'Trưởng nhóm', label: 'Trưởng nhóm' },
+        { value: 'Trưởng/Phó phòng', label: 'Trưởng/Phó phòng' },
+        { value: 'Quản lý / Giám sát', label: 'Quản lý / Giám sát' },
+        { value: 'Trưởng chi nhánh', label: 'Trưởng chi nhánh' },
+        { value: 'Phó giám đốc', label: 'Phó giám đốc' },
+        { value: 'Giám đốc', label: 'Giám đốc' },
+    ];
+
     useEffect(() => {
         const fetchMasterData = async () => {
-            // Khối 1: Tải Kỹ năng (Bọc catch độc lập để nếu lỗi 500 thì các mục khác vẫn chạy)
             try {
-                const resSkills = await apiClient.get('/recruitment/skills').catch(err => {
-                    console.error("Lỗi tải Kỹ năng:", err);
-                    return []; // Trả về mảng rỗng phòng hờ
-                });
-                
-                // Chuẩn hóa dữ liệu Kỹ năng sang { label, value } chuẩn Ant Design
-                const mappedSkills = Array.isArray(resSkills)
-                    ? resSkills.map(item => ({
-                        label: item.tenKyNang || item.label,
-                        value: item.maKyNang || item.value
-                    }))
-                    : [];
-                setStandardSkills(mappedSkills);
-            } catch (error) {
-                console.error("Lỗi xử lý Kỹ năng:", error);
-            }
+                const resSkills = await apiClient.get('/recruitment/skills').catch(() => []);
+                setStandardSkills(Array.isArray(resSkills) ? resSkills.map(item => ({ label: item.tenKyNang || item.label, value: item.maKyNang || item.value })) : []);
+            } catch (error) { console.error("Lỗi Kỹ năng:", error); }
 
-            // Khối 2: Tải Ngành nghề
             try {
-                const resInd = await apiClient.get('/recruitment/industries').catch(err => {
-                    console.error("Lỗi tải Ngành nghề:", err);
-                    return [];
-                });
-                
-                // Chuẩn hóa dữ liệu Ngành nghề sang { label, value }
-                const mappedIndustries = Array.isArray(resInd)
-                    ? resInd.map(item => ({
-                        label: item.tenNganh || item.label,
-                        value: item.maNganh || item.value
-                    }))
-                    : [];
-                setIndustries(mappedIndustries);
-            } catch (error) {
-                console.error("Lỗi xử lý Ngành nghề:", error);
-            }
+                const resInd = await apiClient.get('/recruitment/industries').catch(() => []);
+                setIndustries(Array.isArray(resInd) ? resInd.map(item => ({ label: item.tenNganh || item.label, value: item.maNganh || item.value })) : []);
+            } catch (error) { console.error("Lỗi Ngành nghề:", error); }
 
-            // Khối 3: Tải Khu vực (Hỗ trợ cấu trúc phân cấp cho Cascader)
             try {
-                const resLoc = await apiClient.get('/recruitment/locations').catch(err => {
-                    console.error("Lỗi tải Khu vực:", err);
-                    return [];
-                });
-                
-                // Chuẩn hóa dữ liệu Tỉnh/Thành -> Quận/Huyện cho Cascader
-                const mappedLocations = Array.isArray(resLoc)
-                    ? resLoc.map(tp => ({
-                        label: tp.tenTP || tp.tenTp || tp.label,
-                        value: tp.maTP || tp.maTp || tp.value,
-                        children: (tp.phuongXas || tp.phuongXasNavigation || tp.children || []).map(px => ({
-                            label: px.tenPhuong || px.label,
-                            value: px.maPhuong || px.value
-                        }))
+                const resLoc = await apiClient.get('/recruitment/locations').catch(() => []);
+                setLocations(Array.isArray(resLoc) ? resLoc.map(tp => ({
+                    label: tp.tenTP || tp.tenTp || tp.label,
+                    value: tp.maTP || tp.maTp || tp.value,
+                    children: (tp.phuongXas || tp.phuongXasNavigation || tp.children || []).map(px => ({
+                        label: px.tenPhuong || px.label,
+                        value: px.maPhuong || px.value
                     }))
-                    : [];
-                setLocations(mappedLocations);
-            } catch (error) {
-                console.error("Lỗi xử lý Khu vực:", error);
-            }
+                })) : []);
+            } catch (error) { console.error("Lỗi Khu vực:", error); }
         };
-        
         fetchMasterData();
     }, []);
 
-    // 2. XỬ LÝ SUBMIT GỬI DỮ LIỆU XUỐNG API MASTER-DETAIL
     const onFinish = async (values) => {
         setLoading(true);
         try {
-            // Định dạng lại payload để khớp chính xác với DTO ở Backend
             const payload = {
                 tieuDeChienDich: values.tieuDeChienDich,
                 ngayHetHan: values.ngayHetHan.format('YYYY-MM-DD'),
                 danhSachViTri: values.danhSachViTri.map(pos => ({
                     tenViTri: pos.tenViTri,
+                    capBac: pos.capBac,
                     soLuongTuyen: pos.soLuongTuyen || 1,
                     luong: pos.luong,
                     moTaCongViec: pos.moTaCongViec,
@@ -103,12 +72,10 @@ const PostJob = () => {
                     nganhNgheKhac: pos.nganhNgheKhac || null
                 }))
             };
-
             const response = await apiClient.post('/recruitment/post-job', payload);
-            
             if (response.success || response.data?.success) {
                 message.success(response.message || 'Đăng tin thành công!');
-                form.resetFields(); // Xóa trắng form sau khi thành công
+                form.resetFields();
             }
         } catch (error) {
             const errorMsg = error.response?.data?.message || 'Có lỗi xảy ra khi đăng tin!';
@@ -124,15 +91,13 @@ const PostJob = () => {
                 <RocketOutlined style={{ fontSize: '28px', color: '#1890ff', marginRight: 15 }} />
                 <Title level={3} style={{ margin: 0 }}>Tạo Chiến dịch Tuyển dụng mới</Title>
             </div>
-
             <Alert
                 message="Lưu ý về tính năng Phân tích hồ sơ bằng AI (HR Tech):"
-                description="Vui lòng mô tả thông tin vị trí việc làm, yêu cầu ứng viên và quyền lợi đầy đủ để hệ thống AI có thể đối chiếu chéo và chấm điểm matching chính xác nhất. Đối với tài khoản doanh nghiệp chưa kích hoạt hoặc hết hạn gói Premium, tính năng AI phân tích tự động này sẽ không khả dụng."
+                description="Vui lòng mô tả thông tin vị trí việc làm, yêu cầu ứng viên và quyền lợi đầy đủ để hệ thống AI có thể đối chiếu chéo và chấm điểm matching chính xác nhất."
                 type="info"
                 showIcon
                 style={{ marginBottom: 24, borderRadius: 6 }}
             />
-
             <Form 
                 layout="vertical" 
                 form={form} 
@@ -152,18 +117,35 @@ const PostJob = () => {
                             </Form.Item>
                         </Col>
                         <Col span={8}>
+                            {/* 🌟 2. VALIDATION NGÀY HẾT HẠN > NGÀY HIỆN TẠI */}
                             <Form.Item 
                                 label="Ngày hết hạn nhận CV" 
                                 name="ngayHetHan" 
-                                rules={[{ required: true, message: 'Vui lòng chọn ngày hết hạn!' }]}
+                                rules={[
+                                    { required: true, message: 'Vui lòng chọn ngày hết hạn!' },
+                                    {
+                                        validator: (_, value) => {
+                                            if (!value || value.isAfter(dayjs(), 'day')) {
+                                                return Promise.resolve();
+                                            }
+                                            return Promise.reject(new Error('Ngày hết hạn phải lớn hơn ngày hiện tại!'));
+                                        }
+                                    }
+                                ]}
                             >
-                                <DatePicker size="large" style={{ width: '100%' }} format="DD/MM/YYYY" />
+                                <DatePicker 
+                                    size="large" 
+                                    style={{ width: '100%' }} 
+                                    format="DD/MM/YYYY" 
+                                    // Vô hiệu hóa chọn các ngày trong quá khứ và ngày hôm nay trên lịch
+                                    disabledDate={(current) => current && current <= dayjs().endOf('day')}
+                                />
                             </Form.Item>
                         </Col>
                     </Row>
                 </Card>
 
-                {/* --- PHẦN DETAIL: DANH SÁCH VỊ TRÍ CÔNG VIỆC (DYNAMIC FORM) --- */}
+                {/* --- PHẦN DETAIL: DANH SÁCH VỊ TRÍ CÔNG VIỆC --- */}
                 <Form.List name="danhSachViTri">
                     {(fields, { add, remove }) => (
                         <>
@@ -182,16 +164,57 @@ const PostJob = () => {
                                 >
                                     <Row gutter={24}>
                                         <Col span={12}>
-                                            <Form.Item {...restField} label="Tên vị trí (Chức danh)" name={[name, 'tenViTri']} rules={[{ required: true, message: 'Bắt buộc nhập!' }]}>
+                                            <Form.Item 
+                                                {...restField} 
+                                                label="Tên vị trí (Chức danh)" 
+                                                name={[name, 'tenViTri']} 
+                                                rules={[{ required: true, message: 'Bắt buộc nhập!' }]}
+                                            >
                                                 <Input placeholder="VD: Frontend Developer (ReactJS)" />
                                             </Form.Item>
                                         </Col>
-                                        <Col span={6}>
-                                            <Form.Item {...restField} label="Mức lương" name={[name, 'luong']} rules={[{ required: true, message: 'Bắt buộc nhập!' }]}>
+                                        <Col span={12}>
+                                            <Form.Item
+                                                {...restField}
+                                                label="Cấp bậc"
+                                                name={[name, 'capBac']}
+                                                rules={[{ required: true, message: 'Vui lòng chọn cấp bậc vị trí!' }]}
+                                            >
+                                                <Select
+                                                    placeholder="-- Chọn cấp bậc vị trí --"
+                                                    options={CAP_BAC_OPTIONS}
+                                                    allowClear
+                                                />
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
+
+                                    <Row gutter={24}>
+                                        <Col span={12}>
+                                            {/* 🌟 3. VALIDATION MỨC LƯƠNG KHÔNG ĐƯỢC LÀ SỐ ÂM */}
+                                            <Form.Item 
+                                                {...restField} 
+                                                label="Mức lương" 
+                                                name={[name, 'luong']} 
+                                                rules={[
+                                                    { required: true, message: 'Bắt buộc nhập!' },
+                                                    {
+                                                        validator: (_, value) => {
+                                                            if (!value) return Promise.resolve();
+                                                            const strVal = String(value).trim();
+                                                            // Bắt trường hợp nhập số âm (-15, -10 triệu...)
+                                                            if (strVal.startsWith('-') || parseFloat(strVal) < 0) {
+                                                                return Promise.reject(new Error('Mức lương không được là số âm!'));
+                                                            }
+                                                            return Promise.resolve();
+                                                        }
+                                                    }
+                                                ]}
+                                            >
                                                 <Input placeholder="VD: 15 - 20 Triệu" />
                                             </Form.Item>
                                         </Col>
-                                        <Col span={6}>
+                                        <Col span={12}>
                                             <Form.Item {...restField} label="Số lượng tuyển" name={[name, 'soLuongTuyen']}>
                                                 <InputNumber min={1} style={{ width: '100%' }} placeholder="VD: 2" />
                                             </Form.Item>
@@ -209,7 +232,6 @@ const PostJob = () => {
                                                 />
                                             </Form.Item>
                                             
-                                            {/* Tự động hiển thị ô nhập khi chọn ngành nghề "Khác" */}
                                             <Form.Item 
                                                 noStyle 
                                                 shouldUpdate={(prevValues, currentValues) => 
@@ -218,12 +240,8 @@ const PostJob = () => {
                                             >
                                                 {({ getFieldValue }) => {
                                                     const selectedId = getFieldValue(['danhSachViTri', name, 'maNganh']);
-
                                                     if (!selectedId) return null;
-                                                    
-                                                    // Kiểm tra xem ngành được chọn có nhãn là "Khác" hay không
                                                     const isKhac = industries.find(item => item.value === selectedId && item.label === 'Khác');
-
                                                     return isKhac ? (
                                                         <Form.Item
                                                             {...restField}
@@ -242,17 +260,16 @@ const PostJob = () => {
                                             <Form.Item {...restField} label="Khu vực làm việc" name={[name, 'maPhuong']} rules={[{ required: true, message: 'Bắt buộc chọn!' }]}>
                                                 <Cascader 
                                                     options={locations} 
-                                                    showSearch 
                                                     placeholder="Chọn Tỉnh/Thành phố -> Quận/Huyện" 
-                                                    filter={(inputValue, path) =>
-                                                        path.some(option => option.label.toLowerCase().indexOf(inputValue.toLowerCase()) > -1)
-                                                    }
+                                                    showSearch={{
+                                                        filter: (inputValue, path) =>
+                                                            path.some(option => option.label.toLowerCase().indexOf(inputValue.toLowerCase()) > -1)
+                                                    }}
                                                 />
                                             </Form.Item>
                                         </Col>
                                     </Row>
 
-                                    {/* Khối nhập Kỹ năng */}
                                     <Form.Item 
                                         {...restField} 
                                         label="Kỹ năng yêu cầu (Nhập hoặc dán danh sách ngăn cách bởi dấu phẩy)" 
@@ -287,8 +304,6 @@ const PostJob = () => {
                                     </Form.Item>
                                 </Card>
                             ))}
-
-                            {/* Nút thêm vị trí mới */}
                             <Form.Item>
                                 <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />} style={{ height: 50, borderColor: '#1890ff', color: '#1890ff', fontSize: 16 }}>
                                     Thêm vị trí công việc

@@ -9,7 +9,8 @@ import {
     FireOutlined,
     PayCircleOutlined,
     CheckCircleOutlined,
-    LoadingOutlined 
+    LoadingOutlined,
+    CloseCircleOutlined 
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import servicePackage from '../../services/servicePackage';
@@ -207,31 +208,44 @@ const ServicePackage = () => {
     };
 
     // BƯỚC 2: NÚT XÁC NHẬN THỦ CÔNG KHI MOMO SANDBOX BỊ TREO
-    const handleManualConfirm = async () => {
+    const handleManualConfirm = async (resultCode = '0') => {
         setIsConfirmingManual(true);
+        
+        // 🌟 1. Lưu lại đường dẫn trang hiện tại vào localStorage
+        localStorage.setItem('payment_redirect', window.location.pathname);
+
         try {
-            await paymentService.confirmFallback({
-                maUser: maUser,
-                amount: Number(topupAmount),
-                orderId: checkingOrderId,
-                resultCode: '0',
-                maGoi: selectedPkgId
-            });
-            toast.success(`Nạp tiền & Kích hoạt gói dịch vụ thành công!`);
-            setIsPaymentModalOpen(false);
-            setIsChecking(false);
-            setCheckingOrderId(null);
-            
-            // Cập nhật lại UI tự động
-            fetchData();
+            if (resultCode === '0') {
+                // Gọi API xác nhận nạp tiền & kích hoạt gói VIP
+                await paymentService.confirmFallback({
+                    maUser: maUser,
+                    amount: Number(topupAmount),
+                    orderId: checkingOrderId,
+                    resultCode: '0',
+                    maGoi: selectedPkgId
+                });
+
+                setIsPaymentModalOpen(false);
+                setIsChecking(false);
+                setCheckingOrderId(null);
+
+                // 🌟 2. Chuyển hướng sang màn hình PaymentSuccess
+                navigate(`/payment-success?orderId=${checkingOrderId}`);
+            } else {
+                setIsPaymentModalOpen(false);
+                setIsChecking(false);
+                setCheckingOrderId(null);
+
+                // 🌟 3. Chuyển hướng sang màn hình PaymentFailed
+                navigate(`/payment-failed?orderId=${checkingOrderId}`);
+            }
         } catch (err) {
-            console.error("Lỗi xác nhận thủ công:", err);
-            toast.error("Xác nhận thất bại, vui lòng thử lại!");
+            console.error("Lỗi xác nhận giả lập:", err);
+            toast.error("Thao tác thất bại, vui lòng thử lại!");
         } finally {
             setIsConfirmingManual(false);
         }
     };
-
     const columns = [
         { title: 'Ngày GD', dataIndex: 'ngayGd', render: (t) => new Date(t).toLocaleString('vi-VN') },
         { title: 'Loại', dataIndex: 'loaiGiaoDich', render: (t) => <Tag color={t===1?'green':'red'}>{t===1?'+ Nạp':'- Mua gói'}</Tag> },
@@ -390,15 +404,15 @@ const ServicePackage = () => {
 
             {/* MODAL 2: MỞ TRANG THANH TOÁN MOMO & XÁC NHẬN KÍCH HOẠT */}
             <Modal
-                title={<span style={{ color: '#A50064', fontSize: '18px' }}><PayCircleOutlined /> Kích hoạt thanh toán MoMo</span>}
-                open={isPaymentModalOpen}
+                title={<span style={{ color: '#A50064', fontSize: '18px' }}><PayCircleOutlined /> Kích hoạt thanh toán MoMo (Sandbox)</span>}
+                open={isPaymentModalOpen} // Hoặc isPaymentModalOpen đối với ServicePackage
                 onCancel={() => { setIsPaymentModalOpen(false); setIsChecking(false); }}
                 footer={null}
                 centered
             >
                 <div style={{ textAlign: 'center', padding: '15px 0' }}>
                     <p style={{ fontSize: '15px', color: '#333' }}>
-                        Đơn nạp tiền <b>#{checkingOrderId}</b> đã tạo thành công. Vui lòng nhấn nút bên dưới để mở trang thanh toán MoMo:
+                        Đơn nạp tiền <b>#{checkingOrderId}</b> đã sẵn sàng. Vui lòng nhấn mở cổng MoMo hoặc chọn kết quả giả lập bên dưới:
                     </p>
                     
                     <a 
@@ -406,34 +420,50 @@ const ServicePackage = () => {
                         target="_blank" 
                         rel="noopener noreferrer"
                         style={{
-                            display: 'inline-block', width: '100%', padding: '14px 0',
+                            display: 'inline-block', width: '100%', padding: '12px 0',
                             backgroundColor: '#A50064', color: '#fff', fontWeight: 'bold',
-                            fontSize: '16px', borderRadius: '6px', textAlign: 'center',
-                            textDecoration: 'none', margin: '10px 0 20px 0'
+                            fontSize: '15px', borderRadius: '6px', textAlign: 'center',
+                            textDecoration: 'none', margin: '5px 0 15px 0'
                         }}
                     >
                         MỞ TRANG THANH TOÁN MOMO
                     </a>
 
-                    <div style={{ padding: '12px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '6px', marginBottom: '15px' }}>
-                        <Spin indicator={<LoadingOutlined style={{ fontSize: 18, color: '#d48806', marginRight: '8px' }} spin />} />
+                    <div style={{ padding: '10px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '6px', marginBottom: '15px' }}>
+                        <Spin indicator={<LoadingOutlined style={{ fontSize: 16, color: '#d48806', marginRight: '8px' }} spin />} />
                         <span style={{ color: '#d48806', fontWeight: '500', fontSize: '13px' }}>
                             Đang tự động lắng nghe kết quả từ MoMo...
                         </span>
                     </div>
 
-                    <Button 
-                        type="primary"
-                        icon={<CheckCircleOutlined />}
-                        loading={isConfirmingManual}
-                        onClick={handleManualConfirm}
-                        style={{ 
-                            width: '100%', height: '45px', backgroundColor: '#52c41a', 
-                            borderColor: '#52c41a', fontWeight: 'bold', fontSize: '15px' 
-                        }}
-                    >
-                        Tôi đã nhập OTP trên MoMo (Xác nhận ngay)
-                    </Button>
+                    {/* 🌟 CỤM 2 NÚT GIẢ LẬP KẾT QUẢ THANH TOÁN */}
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                        <Button 
+                            danger
+                            type="default"
+                            icon={<CloseCircleOutlined />}
+                            loading={isConfirmingManual}
+                            onClick={() => handleManualConfirm('1006')}
+                            style={{ 
+                                flex: 1, height: '42px', fontWeight: 'bold', fontSize: '14px' 
+                            }}
+                        >
+                            ❌ Giả lập Thất bại
+                        </Button>
+
+                        <Button 
+                            type="primary"
+                            icon={<CheckCircleOutlined />}
+                            loading={isConfirmingManual}
+                            onClick={() => handleManualConfirm('0')}
+                            style={{ 
+                                flex: 1, height: '42px', backgroundColor: '#52c41a', 
+                                borderColor: '#52c41a', fontWeight: 'bold', fontSize: '14px' 
+                            }}
+                        >
+                            ✔️ Giả lập Thành công
+                        </Button>
+                    </div>
                 </div>
             </Modal>
         </div>

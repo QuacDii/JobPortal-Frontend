@@ -10,8 +10,7 @@ const CvHunter = () => {
     const [loading, setLoading] = useState(false); 
     const [luotXemConLai, setLuotXemConLai] = useState(0); 
     const [danhMucNganh, setDanhMucNganh] = useState([]);
-    
-    // Quản lý trạng thái các ô lọc dữ liệu nâng cao
+
     const [searchParams, setSearchParams] = useState({
         keyword: '',
         nganhNghe: undefined,
@@ -20,30 +19,45 @@ const CvHunter = () => {
     });
 
     useEffect(() => {
-        fetchCvs(); 
+        fetchCvCredits(); // Nạp lượt xem độc lập
+        fetchCvs();       // Nạp danh sách ứng viên
         fetchIndustriesFromDb();
     }, []); 
 
+    // 🌟 API LẤY LƯỢT XEM RIÊNG (Không lo bị ảnh hưởng bởi lỗi danh sách CV)
+    const fetchCvCredits = async () => {
+        try {
+            const res = await apiClient.get('/employer/cv-credits');
+            const data = res?.data !== undefined ? res.data : res;
+            if (data && data.luotXemCvConLai !== undefined) {
+                setLuotXemConLai(data.luotXemCvConLai);
+            }
+        } catch (err) {
+            console.error("Lỗi khi tải số lượt xem CV:", err);
+        }
+    };
+
+    // 🌟 API LẤY DANH SÁCH CV
     const fetchCvs = async (customParams = searchParams) => {
         setLoading(true); 
         try {
-            // Chuyển đổi các bộ lọc thành chuỗi query string truyền lên Backend
             const { keyword, nganhNghe, nganhNgheKhac, skills } = customParams;
             let url = `/employer/hunt-cv?keyword=${keyword || ''}&nganhNghe=${nganhNghe || ''}&nganhNgheKhac=${nganhNgheKhac || ''}&skills=${skills || ''}`;
             
             const response = await apiClient.get(url); 
-            const payload = (response && response.luotXemCvConLai !== undefined) ? response : response?.data; 
-            
-            if (payload && payload.success) {
-                setCvs(payload.data || []); 
-                setLuotXemConLai(payload.luotXemCvConLai || 0); 
-            } else if (payload && payload.success === false) {
-                message.warning(payload.message); 
-                setCvs([]); 
-                setLuotXemConLai(0); 
+            const data = response?.data !== undefined ? response.data : response;
+
+            if (Array.isArray(data)) {
+                setCvs(data);
+            } else if (data && Array.isArray(data.data)) {
+                setCvs(data.data);
+            } else {
+                setCvs([]);
             }
         } catch (err) {
-            message.error("Không thể tải danh sách hồ sơ CV công khai!"); 
+            console.error("Chi tiết lỗi 500 từ Server:", err.response?.data);
+            message.error(err.response?.data?.error || "Không thể tải danh sách hồ sơ CV công khai!"); 
+            setCvs([]);
         } finally {
             setLoading(false); 
         }
@@ -52,21 +66,14 @@ const CvHunter = () => {
     const fetchIndustriesFromDb = async () => {
         try {
             const response = await apiClient.get('/employer/hunt-cv/industries');
-            const payload = (response && response.luotXemCvConLai !== undefined) ? response : (response?.data || response);
-            
-            if (Array.isArray(payload)) {
-                setDanhMucNganh(payload);
-            } else if (payload && Array.isArray(payload.data)) {
-                setDanhMucNganh(payload.data);
-            }
+            const payload = (response && response.data !== undefined) ? response.data : response;
+            if (Array.isArray(payload)) setDanhMucNganh(payload);
         } catch (err) {
-            console.error("Không thể tải danh mục ngành nghề từ hệ thống:", err);
+            console.error("Không thể tải danh mục ngành nghề:", err);
         }
-    }
-
-    const handleSearch = () => {
-        fetchCvs(searchParams);
     };
+
+    const handleSearch = () => fetchCvs(searchParams);
 
     const handleClearFilters = () => {
         const cleared = { keyword: '', nganhNghe: undefined, nganhNgheKhac: '', skills: '' };
@@ -77,8 +84,9 @@ const CvHunter = () => {
     const handleUnlock = async (maCv) => { 
         try {
             await apiClient.post(`/employer/unlock-cv/${maCv}`); 
-            message.success("Khấu trừ tài khoản và mở khóa hồ sơ thành công!"); 
-            fetchCvs(); 
+            message.success("Mở khóa hồ sơ thành công!"); 
+            fetchCvCredits(); // Cập nhật lại số lượt xem ngay lập tức
+            fetchCvs();       // Cập nhật lại trạng thái hiển thị email
         } catch (err) {
             const errorMsg = err.response?.data?.message || err.response?.data || "Lỗi hệ thống khi mở khóa"; 
             message.error(errorMsg); 
@@ -87,10 +95,17 @@ const CvHunter = () => {
 
     const columns = [ 
         { 
-            title: 'Tên ứng viên', 
+            title: 'Thông tin ứng viên', 
             dataIndex: 'hoTen', 
             key: 'hoTen', 
-            render: (text) => <strong style={{ color: '#1e293b' }}>{text}</strong> 
+            render: (text, record) => (
+                <div>
+                    <strong style={{ color: '#1e293b', fontSize: '15px', display: 'block' }}>{text}</strong>
+                    <span style={{ color: '#0284c7', fontSize: '13px', fontWeight: 500 }}>
+                        {record.jobTitle}
+                    </span>
+                </div>
+            ) 
         },
         { 
             title: 'Email liên hệ', 
@@ -112,7 +127,7 @@ const CvHunter = () => {
                         >
                             Mở khóa liên hệ (1 lượt)
                         </Button> 
-                    ) : (
+                    ) : ( 
                         <Button 
                             type="default" 
                             style={{ borderColor: '#52c41a', color: '#52c41a' }} 
@@ -128,13 +143,12 @@ const CvHunter = () => {
     ]; 
 
     const isKhacSelected = searchParams.nganhNghe === "Khác";
-    
+
     return ( 
         <div style={{ padding: '24px', background: '#f8fafc', minHeight: '100vh' }}> 
-            
             <Alert 
                 message={ 
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', wrap: 'wrap' }}> 
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}> 
                         <span>
                             <TrophyOutlined style={{ marginRight: 8, color: '#eab308' }} /> 
                             Tài khoản doanh nghiệp của bạn đang sở hữu: <strong>{luotXemConLai} lượt</strong> mở khóa hồ sơ CV ứng viên tiềm năng. 
@@ -153,8 +167,6 @@ const CvHunter = () => {
 
             <Card style={{ borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.03)', marginBottom: 20 }}>
                 <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', color: '#0f172a' }}>Bộ lọc tìm kiếm ứng viên cao cấp</h3>
-                
-                {/* Tính toán tỷ lệ co giãn linh hoạt để vừa khít 24 cột hệ thống */}
                 <Row gutter={[16, 16]} align="bottom">
                     <Col xs={24} md={isKhacSelected ? 5 : 6}>
                         <span style={{ display: 'block', marginBottom: 6, fontWeight: 500, color: '#475569' }}>Từ khóa chính</span>
@@ -176,14 +188,11 @@ const CvHunter = () => {
                             onChange={(val) => setSearchParams({ ...searchParams, nganhNghe: val, nganhNgheKhac: val === "Khác" ? searchParams.nganhNgheKhac : "" })}
                         >
                             {danhMucNganh.map((nganh) => (
-                                <Option key={nganh} value={nganh}>
-                                    {nganh}
-                                </Option>
+                                <Option key={nganh} value={nganh}>{nganh}</Option>
                             ))}
                         </Select>
                     </Col>
                     
-                    {/* SỬA LỖI: Bọc điều kiện hiển thị động và tinh chỉnh lại tỷ lệ md = 5 */}
                     {isKhacSelected && (
                         <Col xs={24} md={5}>
                             <span style={{ display: 'block', marginBottom: 6, fontWeight: 500, color: '#0284c7' }}>Ngành nghề khác</span>
@@ -208,12 +217,8 @@ const CvHunter = () => {
                     
                     <Col xs={24} md={isKhacSelected ? 4 : 5}>
                         <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
-                            <Button icon={<ClearOutlined />} onClick={handleClearFilters}>
-                                Xóa lọc
-                            </Button>
-                            <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} loading={loading}>
-                                Tìm kiếm
-                            </Button>
+                            <Button icon={<ClearOutlined />} onClick={handleClearFilters}>Xóa lọc</Button>
+                            <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} loading={loading}>Tìm kiếm</Button>
                         </Space>
                     </Col>
                 </Row>
@@ -236,4 +241,4 @@ const CvHunter = () => {
     ); 
 };
 
-export default CvHunter; 
+export default CvHunter;

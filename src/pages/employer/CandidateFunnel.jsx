@@ -53,6 +53,19 @@ const CandidateFunnel = () => {
         }
     };
 
+    const handleTriggerAiSingle = async (maDon) => {
+        try {
+            message.loading({ content: "Đang gửi yêu cầu phân tích AI...", key: "ai_loading" });
+            const res = await apiClient.post(`/recruitment/applications/${maDon}/re-analyze`);
+            if (res?.data?.success || res?.success) {
+                message.success({ content: "Phân tích AI hoàn tất!", key: "ai_loading" });
+                fetchCandidates(); // Reload lại bảng phễu
+            }
+        } catch (err) {
+            message.error({ content: "Lỗi khi kích hoạt phân tích AI", key: "ai_loading" });
+        }
+    };
+
     // 2. Hàm lấy danh sách ứng viên
     const fetchCandidates = async () => {
         setLoading(true);
@@ -238,15 +251,31 @@ const CandidateFunnel = () => {
             title: 'Hành động',
             key: 'hanhDong',
             align: 'center',
-            render: (_, record) => (
-                <Button 
-                    type="primary" 
-                    icon={<RobotOutlined />} 
-                    onClick={() => navigate(`/employer/applications/${record.maDon}/ai-details`)}
-                >
-                    Phân tích AI & Duyệt
-                </Button>
-            )
+            render: (_, record) => {
+                // Nếu CV cũ chưa được phân tích AI
+                if (record.isPendingAi) {
+                    return (
+                        <Button 
+                            type="default"
+                            style={{ borderColor: '#fa8c16', color: '#fa8c16' }}
+                            icon={<RobotOutlined />} 
+                            onClick={() => handleTriggerAiSingle(record.maDon)}
+                        >
+                            Chấm điểm AI ngay
+                        </Button>
+                    );
+                }
+
+                return (
+                    <Button 
+                        type="primary" 
+                        icon={<RobotOutlined />} 
+                        onClick={() => navigate(`/employer/applications/${record.maDon}/ai-details`)}
+                    >
+                        Phân tích AI & Duyệt
+                    </Button>
+                );
+            }
         }
     ];
 

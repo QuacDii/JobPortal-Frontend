@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Form, Input, Button, Upload, Card, message, Typography, 
-    Row, Col, Alert, Spin, Image, Tag, Space, Divider, Tooltip, Avatar 
+    Row, Col, Alert, Spin, Image, Tag, Space, Avatar 
 } from 'antd';
 import { 
     UploadOutlined, BuildOutlined, CheckCircleOutlined, 
     SyncOutlined, WarningOutlined, FileImageOutlined, 
     FilePdfOutlined, MailOutlined, SafetyCertificateOutlined,
     EnvironmentOutlined, NumberOutlined, TeamOutlined, EditOutlined,
-    InfoCircleOutlined
+    InfoCircleOutlined, IdcardOutlined, BulbOutlined
 } from '@ant-design/icons';
 import apiClient from '../../api/apiClient';
 
@@ -46,7 +46,8 @@ const CompanyProfile = ({ onStatusChange }) => {
                     quyMo: data.quyMo,
                     diaChi: data.diaChi,
                     moTa: data.moTa,
-                    mauEmailInterview: data.mauEmailInterview
+                    mauEmailInterview: data.mauEmailInterview,
+                    chuKyEmail: data.chuKyEmail
                 });
                 setCompanyStatus(data.trangThai ? 1 : 0);
                 setCurrentLogo(data.logo);
@@ -54,7 +55,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                 setCurrentBack(data.giayPhepKinhDoanhMatSau);
                 setYeuCauBoSung(data.yeuCauBoSung);
                 setHasPendingUpdate(!!data.duLieuChoDuyetJson);
-
                 if (onStatusChange) onStatusChange(data.trangThai ? "APPROVED" : "PENDING");
             } else {
                 if (onStatusChange) onStatusChange("NO_COMPANY");
@@ -86,14 +86,11 @@ const CompanyProfile = ({ onStatusChange }) => {
     const isPdfUrl = (url) => url && url.toLowerCase().endsWith('.pdf');
 
     const onFinish = async (values) => {
-        // 1. Validation Bắt buộc có LOGO
         const hasLogo = currentLogo || logoFileList.length > 0;
         if (!hasLogo) {
             message.error("Vui lòng tải lên Logo của doanh nghiệp!");
             return;
         }
-
-        // 2. Validation Bắt buộc có GPKD Mặt trước
         const hasFrontGpkd = currentFront || frontFileList.length > 0;
         if (!hasFrontGpkd) {
             message.error("Vui lòng tải lên Giấy phép kinh doanh (Mặt trước / Bản chính)!");
@@ -109,6 +106,8 @@ const CompanyProfile = ({ onStatusChange }) => {
             formData.append('DiaChi', values.diaChi);
             formData.append('MoTa', values.moTa || '');
             formData.append('MauEmailInterview', values.mauEmailInterview || '');
+            formData.append('ChuKyEmail', values.chuKyEmail || '');
+
             if (logoFileList.length > 0) formData.append('LogoFile', logoFileList[0].originFileObj);
             if (frontFileList.length > 0) formData.append('GiayPhepKinhDoanhMatTruocFile', frontFileList[0].originFileObj);
             if (backFileList.length > 0) formData.append('GiayPhepKinhDoanhMatSauFile', backFileList[0].originFileObj);
@@ -116,18 +115,15 @@ const CompanyProfile = ({ onStatusChange }) => {
             const response = await apiClient.post('/employer/company', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
-
             const resPayload = response?.data || response;
             if (resPayload.success) {
                 message.success(resPayload.message || "Lưu thông tin hồ sơ thành công!");
-                
                 setLogoFileList([]);
                 setFrontFileList([]);
                 setBackFileList([]);
                 fetchCompanyData();
             }
         } catch (error) {
-            // Hiển thị thông báo lỗi (bao gồm lỗi trùng Mã số thuế từ Backend)
             message.error(error.response?.data?.message || 'Lưu thông tin thất bại!');
         } finally {
             setLoading(false);
@@ -137,7 +133,7 @@ const CompanyProfile = ({ onStatusChange }) => {
     if (pageLoading) return <div style={{ textAlign: 'center', padding: '100px 0' }}><Spin size="large" tip="Đang tải dữ liệu hồ sơ..." /></div>;
 
     return (
-        <div style={{ padding: '24px', maxWidth: '1180px', margin: '0 auto', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
+        <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
             
             {/* HEADER HERO BANNER */}
             <Card 
@@ -167,7 +163,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                             </Text>
                         </div>
                     </Space>
-
                     <div>
                         {companyStatus === 1 && !hasPendingUpdate && (
                             <Tag color="success" style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600 }}>
@@ -239,12 +234,12 @@ const CompanyProfile = ({ onStatusChange }) => {
 
             {/* FORM CHÍNH */}
             <Form layout="vertical" form={form} onFinish={onFinish}>
-                <Row gutter={[24, 24]} align="stretch">
-
-                    {/* CỘT TRÁI: THÔNG TIN CHUNG & EMAIL */}
+                
+                {/* TẦNG 1: THÔNG TIN CÔNG TY & LOGO / PHÁP LÝ */}
+                <Row gutter={[24, 24]} align="stretch" style={{ marginBottom: 24 }}>
+                    
+                    {/* CỘT TRÁI: THÔNG TIN CÔNG TY */}
                     <Col xs={24} lg={15} style={{ display: 'flex', flexDirection: 'column' }}>
-                        
-                        {/* CARD 1: THÔNG TIN CÔNG TY */}
                         <Card 
                             title={
                                 <Space>
@@ -252,7 +247,20 @@ const CompanyProfile = ({ onStatusChange }) => {
                                     <span>Thông tin chung Doanh nghiệp</span>
                                 </Space>
                             }
-                            style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: 24 }}
+                            style={{ 
+                                borderRadius: 12, 
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.04)', 
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column'
+                            }}
+                            styles={{
+                                body: {
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    flex: 1
+                                }
+                            }}
                         >
                             <Form.Item 
                                 label="Tên Công ty chính thức" 
@@ -264,26 +272,24 @@ const CompanyProfile = ({ onStatusChange }) => {
                             
                             <Row gutter={16}>
                                 <Col span={12}>
-                                    {/* MÃ SỐ THUẾ - BẮT BUỘC CHỈ NHẬP SỐ */}
                                     <Form.Item 
                                         label="Mã số thuế" 
                                         name="maSoThue" 
                                         rules={[
                                             { required: true, message: 'Vui lòng nhập mã số thuế!' },
-                                            { pattern: /^[0-9]+$/, message: 'Mã số thuế chỉ được nhập chữ số!' }
+                                            { pattern: /^\d+$/, message: 'Mã số thuế chỉ được nhập chữ số!' }
                                         ]}
                                     >
                                         <Input size="large" placeholder="VD: 0101234567" prefix={<NumberOutlined style={{ color: '#cbd5e1' }} />} />
                                     </Form.Item>
                                 </Col>
                                 <Col span={12}>
-                                    {/* QUY MÔ NHÂN SỰ - BẮT BUỘC CHỈ NHẬP SỐ */}
                                     <Form.Item 
                                         label="Quy mô nhân sự (Số lượng)" 
                                         name="quyMo" 
                                         rules={[
                                             { required: true, message: 'Vui lòng nhập quy mô nhân sự!' },
-                                            { pattern: /^[0-9]+$/, message: 'Quy mô nhân sự chỉ được nhập chữ số!' }
+                                            { pattern: /^\d+$/, message: 'Quy mô nhân sự chỉ được nhập chữ số!' }
                                         ]}
                                     >
                                         <Input size="large" placeholder="VD: 100" prefix={<TeamOutlined style={{ color: '#cbd5e1' }} />} />
@@ -299,109 +305,46 @@ const CompanyProfile = ({ onStatusChange }) => {
                                 <Input size="large" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" prefix={<EnvironmentOutlined style={{ color: '#cbd5e1' }} />} />
                             </Form.Item>
 
-                            {/* BẮT BUỘC NHẬP GIỚI THIỆU CÔNG TY */}
                             <Form.Item 
                                 label="Giới thiệu về công ty" 
                                 name="moTa"
                                 rules={[{ required: true, message: 'Vui lòng nhập giới thiệu về công ty!' }]}
+                                style={{ marginBottom: 16 }}
                             >
                                 <TextArea 
-                                    autoSize={{ minRows: 6, maxRows: 12 }} 
+                                    autoSize={{ minRows: 5, maxRows: 8 }}
                                     placeholder="Mô tả tầm nhìn, sứ mệnh, văn hóa doanh nghiệp..." 
                                     showCount 
                                     maxLength={1000} 
+                                    style={{ width: '100%' }}
                                 />
                             </Form.Item>
-                        </Card>
 
-                        {/* CARD 2: CẤU HÌNH MẪU EMAIL */}
-                        <Card 
-                            title={
-                                <Space>
-                                    <MailOutlined style={{ color: '#1677ff' }} />
-                                    <span>Mẫu Email Mời Phỏng Vấn (Tự động)</span>
-                                </Space>
-                            }
-                            style={{ 
-                                borderRadius: 12, 
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                flex: 1,
-                                width: '100%'
-                            }}
-                            styles={{ 
-                                body: { 
-                                    display: 'flex', 
-                                    flexDirection: 'column', 
-                                    flex: 1,
-                                    width: '100%'
-                                } 
-                            }}
-                        >
-                            <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 12 }}>
-                                Thiết lập mẫu email sẵn có. Hệ thống sẽ tự động điền các từ khóa thông tin khi bạn duyệt ứng viên sang bước Phỏng vấn.
-                            </Paragraph>
-
-                            <div style={{ marginBottom: 12, padding: '8px 12px', backgroundColor: '#f1f5f9', borderRadius: 8, fontSize: 12, width: '100%' }}>
-                                <Text strong style={{ color: '#475569', display: 'block', marginBottom: 4 }}>Từ khóa hệ thống hỗ trợ:</Text>
-                                <Space wrap size={[6, 6]}>
-                                    <Tag color="blue">{`{TenUngVien}`}</Tag>
-                                    <Tag color="blue">{`{TenViTri}`}</Tag>
-                                    <Tag color="blue">{`{TenCongTy}`}</Tag>
-                                    <Tag color="blue">{`{ThoiGian}`}</Tag>
-                                    <Tag color="blue">{`{DiaDiem}`}</Tag>
-                                    <Tag color="green">{`{LinkBaiTest}`}</Tag>
-                                    <Tag color="purple">{`{ChuKyEmail}`}</Tag>
-                                </Space>
+                            {/* ✨ KHỐI GỢI Ý ĐƯỢC ĐẨY TỰ ĐỘNG XUỐNG DƯỚI ĐÁY (MARGIN-TOP: AUTO) */}
+                            <div style={{ 
+                                marginTop: 'auto', 
+                                padding: '12px 16px', 
+                                backgroundColor: '#f8fafc', 
+                                borderRadius: 8, 
+                                border: '1px dashed #cbd5e1', 
+                                fontSize: 12 
+                            }}>
+                                <Text strong style={{ color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                                    <BulbOutlined style={{ color: '#eab308' }} /> Gợi ý giúp hồ sơ thương hiệu thu hút ứng viên hơn:
+                                </Text>
+                                <ul style={{ margin: 0, paddingLeft: 18, color: '#475569', lineHeight: 1.6 }}>
+                                    <li>Lĩnh vực hoạt động cốt lõi và sản phẩm/dịch vụ tiêu biểu.</li>
+                                    <li>Tầm nhìn chiến lược, sứ mệnh và giá trị văn hóa doanh nghiệp.</li>
+                                    <li>Môi trường làm việc, cơ hội thăng tiến và đãi ngộ nổi bật.</li>
+                                </ul>
                             </div>
-
-                            <Form.Item 
-                                name="mauEmailInterview" 
-                                style={{ 
-                                    marginBottom: 0, 
-                                    flex: 1, 
-                                    display: 'flex', 
-                                    flexDirection: 'column',
-                                    width: '100%'
-                                }}
-                                className="full-height-form-item"
-                            >
-                                <TextArea 
-                                    style={{ 
-                                        flex: 1, 
-                                        minHeight: '180px', 
-                                        height: '100%', 
-                                        width: '100%',
-                                        resize: 'none' 
-                                    }} 
-                                    placeholder={`Chào {TenUngVien},\n\nCông ty {TenCongTy} trân trọng mời bạn tham gia phỏng vấn vị trí {TenViTri}.\n• Thời gian: {ThoiGian}\n• Địa điểm: {DiaDiem}\n\n{LinkBaiTest}\n\nTrân trọng,\n{ChuKyEmail}`} 
-                                />
-                            </Form.Item>
-
-                            <style>{`
-                                .full-height-form-item,
-                                .full-height-form-item .ant-form-item-row,
-                                .full-height-form-item .ant-form-item-control,
-                                .full-height-form-item .ant-form-item-control-input,
-                                .full-height-form-item .ant-form-item-control-input-content {
-                                    height: 100% !important;
-                                    width: 100% !important;
-                                    display: flex !important;
-                                    flex-direction: column !important;
-                                    flex: 1 !important;
-                                }
-                                .full-height-form-item textarea {
-                                    width: 100% !important;
-                                }
-                            `}</style>
                         </Card>
                     </Col>
 
-                    {/* CỘT PHẢI: LOGO & TÀI LIỆU PHÁP LÝ */}
-                    <Col xs={24} lg={9}>
+                    {/* CỘT PHẢI: LOGO & GIẤY PHÉP KINH DOANH */}
+                    <Col xs={24} lg={9} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                         
-                        {/* CARD 3: LOGO DOANH NGHIỆP (BẮT BUỘC) */}
+                        {/* LOGO DOANH NGHIỆP */}
                         <Card 
                             title={
                                 <Space>
@@ -409,14 +352,14 @@ const CompanyProfile = ({ onStatusChange }) => {
                                     <Text type="danger">*</Text>
                                 </Space>
                             } 
-                            style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', marginBottom: 24, textAlign: 'center' }}
+                            style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', textAlign: 'center' }}
                         >
-                            <div style={{ padding: '12px 0' }}>
+                            <div style={{ padding: '4px 0' }}>
                                 {currentLogo && logoFileList.length === 0 ? (
-                                    <div style={{ marginBottom: 16 }}>
+                                    <div style={{ marginBottom: 10 }}>
                                         <Image 
                                             src={currentLogo} 
-                                            style={{ width: 110, height: 110, objectFit: 'contain', borderRadius: 8, border: '1px solid #e2e8f0', padding: 4 }} 
+                                            style={{ width: 90, height: 90, objectFit: 'contain', borderRadius: 8, border: '1px solid #e2e8f0', padding: 4 }} 
                                         />
                                     </div>
                                 ) : null}
@@ -427,15 +370,15 @@ const CompanyProfile = ({ onStatusChange }) => {
                                     maxCount={1} 
                                     accept="image/*"
                                 >
-                                    <Button icon={<UploadOutlined />}>Tải Logo Mới</Button>
+                                    <Button icon={<UploadOutlined />} size="middle">Tải Logo Mới</Button>
                                 </Upload>
-                                <div style={{ marginTop: 8 }}>
+                                <div style={{ marginTop: 6 }}>
                                     <Text type="secondary" style={{ fontSize: 12 }}>Định dạng: JPG, PNG, WEBP (Tối đa 10MB)</Text>
                                 </div>
                             </div>
                         </Card>
 
-                        {/* CARD 4: GIẤY PHÉP KINH DOANH */}
+                        {/* GIẤY PHÉP KINH DOANH */}
                         <Card 
                             title={
                                 <Space>
@@ -443,25 +386,24 @@ const CompanyProfile = ({ onStatusChange }) => {
                                     <span>Xác Minh Giấy Phép KD</span>
                                 </Space>
                             }
-                            style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}
+                            style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', flex: 1 }}
                         >
-                            <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 16 }}>
+                            <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 12 }}>
                                 Vui lòng tải lên bản chụp/scan Giấy phép kinh doanh chính thức (Ảnh chụp rõ nét hoặc file PDF).
                             </Paragraph>
 
-                            {/* UPLOAD GPKD MẶT TRƯỚC (BẮT BUỘC) */}
-                            <div style={{ marginBottom: 20, border: '1px dashed #0284c7', padding: '16px', borderRadius: '10px', textAlign: 'center', backgroundColor: '#f0f9ff' }}>
-                                <Text strong style={{ display: 'block', marginBottom: 8, color: '#0369a1' }}>
+                            <div style={{ marginBottom: 12, border: '1px dashed #0284c7', padding: '10px', borderRadius: '10px', textAlign: 'center', backgroundColor: '#f0f9ff' }}>
+                                <Text strong style={{ display: 'block', marginBottom: 4, color: '#0369a1', fontSize: 13 }}>
                                     <FileImageOutlined /> Mặt Trước / Bản Chính <Text type="danger">*</Text>
                                 </Text>
                                 {currentFront && frontFileList.length === 0 && (
-                                    <div style={{ marginBottom: 12 }}>
+                                    <div style={{ marginBottom: 6 }}>
                                         {isPdfUrl(currentFront) ? (
                                             <Button type="primary" ghost icon={<FilePdfOutlined />} href={currentFront} target="_blank" size="small">
                                                 Xem File GPKD (PDF)
                                             </Button>
                                         ) : (
-                                            <Image src={currentFront} style={{ maxHeight: 120, objectFit: 'contain', borderRadius: 6, border: '1px solid #cbd5e1' }} />
+                                            <Image src={currentFront} style={{ maxHeight: 75, objectFit: 'contain', borderRadius: 6, border: '1px solid #cbd5e1' }} />
                                         )}
                                     </div>
                                 )}
@@ -472,23 +414,22 @@ const CompanyProfile = ({ onStatusChange }) => {
                                     maxCount={1} 
                                     accept="image/*,.pdf"
                                 >
-                                    <Button icon={<UploadOutlined />}>Tải tệp mặt trước</Button>
+                                    <Button icon={<UploadOutlined />} size="small">Tải tệp mặt trước</Button>
                                 </Upload>
                             </div>
 
-                            {/* UPLOAD GPKD MẶT SAU (TÙY CHỌN) */}
-                            <div style={{ border: '1px dashed #0284c7', padding: '16px', borderRadius: '10px', textAlign: 'center', backgroundColor: '#f0f9ff' }}>
-                                <Text strong style={{ display: 'block', marginBottom: 8, color: '#0369a1' }}>
+                            <div style={{ border: '1px dashed #0284c7', padding: '10px', borderRadius: '10px', textAlign: 'center', backgroundColor: '#f0f9ff' }}>
+                                <Text strong style={{ display: 'block', marginBottom: 4, color: '#0369a1', fontSize: 13 }}>
                                     <FileImageOutlined /> Mặt Sau (Tùy chọn)
                                 </Text>
                                 {currentBack && backFileList.length === 0 && (
-                                    <div style={{ marginBottom: 12 }}>
+                                    <div style={{ marginBottom: 6 }}>
                                         {isPdfUrl(currentBack) ? (
                                             <Button type="primary" ghost icon={<FilePdfOutlined />} href={currentBack} target="_blank" size="small">
                                                 Xem File Mặt Sau (PDF)
                                             </Button>
                                         ) : (
-                                            <Image src={currentBack} style={{ maxHeight: 120, objectFit: 'contain', borderRadius: 6, border: '1px solid #cbd5e1' }} />
+                                            <Image src={currentBack} style={{ maxHeight: 75, objectFit: 'contain', borderRadius: 6, border: '1px solid #cbd5e1' }} />
                                         )}
                                     </div>
                                 )}
@@ -499,21 +440,91 @@ const CompanyProfile = ({ onStatusChange }) => {
                                     maxCount={1} 
                                     accept="image/*,.pdf"
                                 >
-                                    <Button icon={<UploadOutlined />}>Tải tệp mặt sau</Button>
+                                    <Button icon={<UploadOutlined />} size="small">Tải tệp mặt sau</Button>
                                 </Upload>
                             </div>
                         </Card>
                     </Col>
                 </Row>
 
+                {/* TẦNG 2: MẪU MAIL & CHỮ KÝ CHIẾM FULL CHIỀU NGANG */}
+                <Card 
+                    title={
+                        <Space>
+                            <MailOutlined style={{ color: '#1677ff' }} />
+                            <span>Giao tiếp HR Automation (Mẫu Mail & Chữ ký)</span>
+                        </Space>
+                    }
+                    style={{ 
+                        borderRadius: 12, 
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                        marginBottom: 24
+                    }}
+                >
+                    <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 12 }}>
+                        Thiết lập mẫu email phỏng vấn và chữ ký thương hiệu. Hệ thống sẽ tự động ghép thông tin khi bạn duyệt ứng viên.
+                    </Paragraph>
+
+                    <div style={{ marginBottom: 20, padding: '10px 14px', backgroundColor: '#f1f5f9', borderRadius: 8, fontSize: 12 }}>
+                        <Text strong style={{ color: '#475569', display: 'block', marginBottom: 6 }}>Từ khóa hệ thống hỗ trợ:</Text>
+                        <Space wrap size={[6, 6]}>
+                            <Tag color="blue">{`{TenUngVien}`}</Tag>
+                            <Tag color="blue">{`{TenViTri}`}</Tag>
+                            <Tag color="blue">{`{TenCongTy}`}</Tag>
+                            <Tag color="blue">{`{ThoiGian}`}</Tag>
+                            <Tag color="blue">{`{DiaDiem}`}</Tag>
+                            <Tag color="green">{`{LinkBaiTest}`}</Tag>
+                        </Space>
+                    </div>
+
+                    <Row gutter={[20, 20]}>
+                        <Col xs={24} lg={14}>
+                            <Form.Item 
+                                label={
+                                    <Space>
+                                        <MailOutlined style={{ color: '#1677ff' }} />
+                                        <span>Mẫu Thư Mời Phỏng Vấn (Nội dung chính)</span>
+                                    </Space>
+                                }
+                                name="mauEmailInterview" 
+                                style={{ marginBottom: 0 }}
+                            >
+                                <TextArea 
+                                    autoSize={{ minRows: 6, maxRows: 10 }}
+                                    placeholder={`Chào {TenUngVien},\n\nCông ty {TenCongTy} trân trọng mời bạn tham gia phỏng vấn vị trí {TenViTri}.\n• Thời gian: {ThoiGian}\n• Địa điểm: {DiaDiem}\n\n{LinkBaiTest}`} 
+                                    style={{ width: '100%' }}
+                                />
+                            </Form.Item>
+                        </Col>
+
+                        <Col xs={24} lg={10}>
+                            <Form.Item 
+                                label={
+                                    <Space>
+                                        <IdcardOutlined style={{ color: '#1677ff' }} />
+                                        <span>Chữ ký Email Doanh nghiệp (Cuối thư)</span>
+                                    </Space>
+                                }
+                                name="chuKyEmail" 
+                                style={{ marginBottom: 0 }}
+                            >
+                                <TextArea 
+                                    autoSize={{ minRows: 6, maxRows: 10 }}
+                                    placeholder={`Trân trọng,\nPhòng Tuyển dụng - Công ty JobsNow\nHotline: 090x xxx xxx | Website: jobsnow.vn\nĐịa chỉ: Tòa nhà ABC, Q.1, TP.HCM`} 
+                                    style={{ width: '100%' }}
+                                />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                </Card>
+
                 {/* BOTTOM ACTION BAR */}
                 <div 
                     style={{ 
-                        marginTop: 24, 
                         padding: '20px 24px', 
                         backgroundColor: '#ffffff', 
                         borderRadius: 12, 
-                        boxShadow: '0 -2px 10px rgba(0,0,0,0.03)',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -541,7 +552,7 @@ const CompanyProfile = ({ onStatusChange }) => {
                         Lưu & Nộp lại hồ sơ
                     </Button>
                     <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic', color: '#64748b' }}>
-                        * Thông tin phụ (Logo, Mô tả, Quy mô) sẽ được cập nhật ngay. Thay đổi Tên/MST/GPKD sẽ gửi thẩm định lại.
+                        * Thông tin phụ (Logo, Mô tả, Quy mô, Chữ ký Email) sẽ được cập nhật ngay. Thay đổi Tên/MST/GPKD sẽ gửi thẩm định lại.
                     </Text>
                 </div>
             </Form>

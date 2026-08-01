@@ -25,7 +25,7 @@ const AdminLayout = ({ children, user }) => {
         navigate(e.key); 
     };
 
-    // 👉 PHÂN CHIA LẠI CẤU TRÚC MENU THEO YÊU CẦU HÌNH ẢNH
+    // PHÂN CHIA LẠI CẤU TRÚC MENU THEO YÊU CẦU HÌNH ẢNH
     const menuItems = user?.vaiTro === "0" ? [
         { 
             key: '/admin/dashboard', 
