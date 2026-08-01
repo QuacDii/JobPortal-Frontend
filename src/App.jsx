@@ -24,6 +24,7 @@ import ApproveCompanies from './pages/Admin/ApproveCompanies';
 import CompanyDetailAdmin from './pages/Admin/CompanyDetailAdmin';
 import ApproveJobPosts from './pages/Admin/ApproveJobPosts';
 import AdminDashboard from './pages/Admin/AdminDashboard';
+import ApproveCampaigns from './pages/Admin/ApproveCampaigns';
 
 import CandidateLayout from './Layouts/CandidateLayout';
 import AdminLayout from './Layouts/AdminLayout';
@@ -162,7 +163,8 @@ const App = () => {
         <Route path="/admin/approve-companies" element={user && (user.vaiTro === "0" || user.vaiTro === 0) ? <AdminLayout user={user}><ApproveCompanies /></AdminLayout> : <Navigate to="/login" replace />} />
         <Route path="/admin/company-detail/:id" element={user && (user.vaiTro === "0" || user.vaiTro === 0) ? <AdminLayout user={user}><CompanyDetailAdmin /></AdminLayout> : <Navigate to="/login" replace />} />
         <Route path="/admin/approve-job-posts" element={user && (user.vaiTro === "0" || user.vaiTro === 0) ? <AdminLayout user={user}><ApproveJobPosts /></AdminLayout> : <Navigate to="/login" replace />} />
-
+        <Route path="/admin/approve-campaigns" element={user && (user.vaiTro === "0" || user.vaiTro === 0) ? <AdminLayout user={user}><ApproveCampaigns /></AdminLayout> : <Navigate to="/login" replace />} />
+        
         {/* TRANG NHÀ TUYỂN DỤNG (BỌC BẢO VỆ QUA RENDEREMPLOYERROUTE) */}
         <Route path="/employer/dashboard" element={renderEmployerRoute(<EmployerDashboard />)} />
         <Route path="/employer/company-profile" element={renderEmployerRoute(<CompanyProfile />)} />
