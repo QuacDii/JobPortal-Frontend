@@ -63,10 +63,18 @@ const JobDetail = ({ isEmployer = false }) => {
                     else if (response.success && response.data) finalJobData = response.data;
                     else if (response.title || response.id) finalJobData = response;
                 }
+
                 if (finalJobData) {
                     setJob(finalJobData);
                     if (finalJobData.danhSachViTri && finalJobData.danhSachViTri.length > 0) {
                         setSelectedViTri(finalJobData.danhSachViTri[0].maViTri);
+                    }
+
+                    // TỰ ĐỘNG GỌI API ĐẾM LƯỢT XEM NGẦM (Chỉ đếm khi là Ứng viên xem)
+                    if (!isEmployer) {
+                        apiClient.post(`/Jobs/${id}/view`).catch(err => {
+                            console.error("Lỗi đếm lượt xem tin:", err);
+                        });
                     }
                 } else {
                     message.error("Không tìm thấy thông tin công việc!");
@@ -77,8 +85,9 @@ const JobDetail = ({ isEmployer = false }) => {
                 setLoading(false);
             }
         };
+
         if (id) fetchJobDetail();
-    }, [id]);
+    }, [id, isEmployer]);
 
     useEffect(() => {
         if (isApplyModalOpen && !isEmployer) {
