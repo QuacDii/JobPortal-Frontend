@@ -1,30 +1,69 @@
 import React, { useState, useEffect } from 'react'; 
-import { Table, Button, message, Input, Card, Alert, Tag, Space, Row, Col, Select } from 'antd'; 
-import { UnlockOutlined, EyeOutlined, SearchOutlined, TrophyOutlined, ClearOutlined } from '@ant-design/icons'; 
+import { 
+    Table, Button, message, Input, Card, Alert, Tag, Space, 
+    Row, Col, Select, Switch, Popover, Tooltip 
+} from 'antd'; 
+import { 
+    UnlockOutlined, EyeOutlined, SearchOutlined, TrophyOutlined, 
+    ClearOutlined, StarOutlined, StarFilled, EditOutlined 
+} from '@ant-design/icons'; 
 import apiClient from '../../api/apiClient'; 
 
 const { Option } = Select; 
+const { TextArea } = Input;
+
+// 🌟 Component con giúp quản lý state ô nhập Ghi chú mượt mà
+const NotePopoverContent = ({ record, onSave }) => {
+    const [noteText, setNoteText] = useState(record.ghiChuCaNhan || '');
+
+    useEffect(() => {
+        setNoteText(record.ghiChuCaNhan || '');
+    }, [record.ghiChuCaNhan]);
+
+    return (
+        <div style={{ width: 260 }}>
+            <span style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13 }}>
+                Ghi chú nội bộ HR:
+            </span>
+            <TextArea 
+                rows={3} 
+                value={noteText} 
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="VD: Phù hợp với vị trí full stack develop cty đang cần..." 
+                style={{ marginBottom: 8 }}
+            />
+            <div style={{ textAlign: 'right' }}>
+                <Button type="primary" size="small" onClick={() => onSave(record.maCv, noteText)}>
+                    Lưu ghi chú
+                </Button>
+            </div>
+        </div>
+    );
+};
 
 const CvHunter = () => {
     const [cvs, setCvs] = useState([]); 
     const [loading, setLoading] = useState(false); 
     const [luotXemConLai, setLuotXemConLai] = useState(0); 
     const [danhMucNganh, setDanhMucNganh] = useState([]);
+    
+    // 🌟 State quản lý Popover nào đang mở (null = đóng tất cả)
+    const [openPopoverId, setOpenPopoverId] = useState(null);
 
     const [searchParams, setSearchParams] = useState({
         keyword: '',
         nganhNghe: undefined,
         nganhNgheKhac: '',
-        skills: ''
+        skills: '',
+        onlySaved: false
     });
 
     useEffect(() => {
-        fetchCvCredits(); // Nạp lượt xem độc lập
-        fetchCvs();       // Nạp danh sách ứng viên
+        fetchCvCredits(); 
+        fetchCvs();       
         fetchIndustriesFromDb();
     }, []); 
 
-    // 🌟 API LẤY LƯỢT XEM RIÊNG (Không lo bị ảnh hưởng bởi lỗi danh sách CV)
     const fetchCvCredits = async () => {
         try {
             const res = await apiClient.get('/employer/cv-credits');
@@ -37,7 +76,6 @@ const CvHunter = () => {
         }
     };
 
-    // 🌟 API LẤY DANH SÁCH CV
     const fetchCvs = async (customParams = searchParams) => {
         setLoading(true); 
         try {
@@ -46,7 +84,6 @@ const CvHunter = () => {
             
             const response = await apiClient.get(url); 
             const data = response?.data !== undefined ? response.data : response;
-
             if (Array.isArray(data)) {
                 setCvs(data);
             } else if (data && Array.isArray(data.data)) {
@@ -55,8 +92,8 @@ const CvHunter = () => {
                 setCvs([]);
             }
         } catch (err) {
-            console.error("Chi tiết lỗi 500 từ Server:", err.response?.data);
-            message.error(err.response?.data?.error || "Không thể tải danh sách hồ sơ CV công khai!"); 
+            console.error("Lỗi tải danh sách CV:", err);
+            message.error(err.response?.data?.error || "Không thể tải danh sách hồ sơ CV!"); 
             setCvs([]);
         } finally {
             setLoading(false); 
@@ -76,7 +113,7 @@ const CvHunter = () => {
     const handleSearch = () => fetchCvs(searchParams);
 
     const handleClearFilters = () => {
-        const cleared = { keyword: '', nganhNghe: undefined, nganhNgheKhac: '', skills: '' };
+        const cleared = { keyword: '', nganhNghe: undefined, nganhNgheKhac: '', skills: '', onlySaved: false };
         setSearchParams(cleared);
         fetchCvs(cleared);
     };
@@ -85,15 +122,77 @@ const CvHunter = () => {
         try {
             await apiClient.post(`/employer/unlock-cv/${maCv}`); 
             message.success("Mở khóa hồ sơ thành công!"); 
-            fetchCvCredits(); // Cập nhật lại số lượt xem ngay lập tức
-            fetchCvs();       // Cập nhật lại trạng thái hiển thị email
+            fetchCvCredits(); 
+            fetchCvs();       
         } catch (err) {
             const errorMsg = err.response?.data?.message || err.response?.data || "Lỗi hệ thống khi mở khóa"; 
             message.error(errorMsg); 
         }
     }; 
 
+    const handleToggleSave = async (record) => {
+        if (!record.isUnlocked) {
+            message.warning("Bạn cần mở khóa liên hệ của ứng viên này trước khi đánh dấu!");
+            return;
+        }
+
+        try {
+            const res = await apiClient.post('/employer/toggle-save-candidate', { maCv: record.maCv });
+            const payload = res?.data || res;
+            message.success(payload.message || "Cập nhật trạng thái thành công!");
+            
+            setCvs(prev => prev.map(item => item.maCv === record.maCv ? { ...item, isSaved: payload.isSaved } : item));
+        } catch (err) {
+            const errorMsg = err.response?.data?.message || "Lỗi khi cập nhật trạng thái lưu!";
+            message.error(errorMsg);
+        }
+    };
+
+    // 🌟 HÀM CẬP NHẬT GHI CHÚ VÀ TỰ ĐỘNG ĐÓNG POPOVER
+    const handleSaveNote = async (maCv, noteText) => {
+        try {
+            await apiClient.put('/employer/update-candidate-note', { maCv, ghiChuCaNhan: noteText });
+            message.success("Đã lưu ghi chú cá nhân!");
+            
+            // 1. Cập nhật dữ liệu vào bảng
+            setCvs(prev => prev.map(item => item.maCv === maCv ? { ...item, ghiChuCaNhan: noteText } : item));
+            
+            // 2. ⚡ TỰ ĐỘNG ĐÓNG POPOVER CỦA CV NÀY
+            setOpenPopoverId(null);
+        } catch (err) {
+            message.error("Lỗi khi cập nhật ghi chú!");
+        }
+    };
+
     const columns = [ 
+        {
+            title: 'Lưu',
+            key: 'isSaved',
+            width: 60,
+            align: 'center',
+            render: (_, record) => {
+                const tooltipText = !record.isUnlocked 
+                    ? "Cần mở khóa liên hệ CV trước khi lưu" 
+                    : (record.isSaved ? "Bỏ lưu ứng viên" : "Lưu ứng viên vào danh sách ưng ý");
+
+                return (
+                    <Tooltip title={tooltipText}>
+                        <Button 
+                            type="text" 
+                            disabled={!record.isUnlocked} 
+                            icon={
+                                record.isSaved ? (
+                                    <StarFilled style={{ color: '#f59e0b', fontSize: 18 }} />
+                                ) : (
+                                    <StarOutlined style={{ color: record.isUnlocked ? '#cbd5e1' : '#f1f5f9', fontSize: 18 }} />
+                                )
+                            } 
+                            onClick={() => handleToggleSave(record)}
+                        />
+                    </Tooltip>
+                );
+            }
+        },
         { 
             title: 'Thông tin ứng viên', 
             dataIndex: 'hoTen', 
@@ -101,9 +200,27 @@ const CvHunter = () => {
             render: (text, record) => (
                 <div>
                     <strong style={{ color: '#1e293b', fontSize: '15px', display: 'block' }}>{text}</strong>
+                    {/* Chữ xanh vị trí công việc size 13px */}
                     <span style={{ color: '#0284c7', fontSize: '13px', fontWeight: 500 }}>
                         {record.jobTitle}
                     </span>
+                    {/* 🌟 TAG ĐÃ TĂNG SIZE CHỮ LÊN 13px BẰNG CHỮ XANH */}
+                    {record.ghiChuCaNhan && (
+                        <div style={{ marginTop: 6 }}>
+                            <Tag 
+                                color="orange" 
+                                style={{ 
+                                    fontSize: '13px', 
+                                    fontStyle: 'italic', 
+                                    padding: '2px 8px', 
+                                    lineHeight: '20px', 
+                                    borderRadius: '4px' 
+                                }}
+                            >
+                                📑 {record.ghiChuCaNhan}
+                            </Tag>
+                        </div>
+                    )}
                 </div>
             ) 
         },
@@ -112,6 +229,30 @@ const CvHunter = () => {
             dataIndex: 'email', 
             key: 'email', 
             render: (email, record) => record.isUnlocked ? <Tag color="success">{email}</Tag> : <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>{email}</span> 
+        },
+        {
+            title: 'Ghi chú cá nhân',
+            key: 'noteAction',
+            align: 'center',
+            width: 140,
+            render: (_, record) => (
+                record.isSaved ? (
+                    /* 🌟 KẾT NỐI OPEN VÀ ONOPENCHANGE ĐỂ ĐIỀU KHIỂN ĐÓNG / MỞ POPOVER */
+                    <Popover 
+                        content={<NotePopoverContent record={record} onSave={handleSaveNote} />} 
+                        title={null} 
+                        trigger="click"
+                        open={openPopoverId === record.maCv}
+                        onOpenChange={(visible) => {
+                            setOpenPopoverId(visible ? record.maCv : null);
+                        }}
+                    >
+                        <Button type="text" icon={<EditOutlined style={{ color: '#4f46e5' }} />}>
+                            {record.ghiChuCaNhan ? "Sửa ghi chú" : "Thêm ghi chú"}
+                        </Button>
+                    </Popover>
+                ) : <span style={{ color: '#cbd5e1', fontSize: 12 }}>{record.isUnlocked ? "Cần lưu CV" : "Cần mở khóa"}</span>
+            )
         },
         {
             title: 'Hành động nghiệp vụ',
@@ -143,6 +284,7 @@ const CvHunter = () => {
     ]; 
 
     const isKhacSelected = searchParams.nganhNghe === "Khác";
+    const displayedCvs = searchParams.onlySaved ? cvs.filter(item => item.isSaved) : cvs;
 
     return ( 
         <div style={{ padding: '24px', background: '#f8fafc', minHeight: '100vh' }}> 
@@ -222,16 +364,28 @@ const CvHunter = () => {
                         </Space>
                     </Col>
                 </Row>
+
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px dashed #e2e8f0', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Switch 
+                        checked={searchParams.onlySaved} 
+                        onChange={(checked) => setSearchParams({ ...searchParams, onlySaved: checked })} 
+                    />
+                    <span style={{ fontWeight: 500, color: '#334155', fontSize: 14 }}>
+                        Chỉ hiển thị ứng viên đã lưu trong Danh sách được chọn (🌟)
+                    </span>
+                </div>
             </Card>
 
             <Card style={{ borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}> 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}> 
-                    <h3 style={{ margin: 0, fontSize: '18px', color: '#0f172a' }}>Săn tìm Tài năng (Talent Pool công khai)</h3> 
+                    <h3 style={{ margin: 0, fontSize: '18px', color: '#0f172a' }}>
+                        Săn tìm Tài năng (Talent Pool công khai)
+                    </h3> 
                 </div> 
                 
                 <Table  
                     columns={columns}  
-                    dataSource={cvs}  
+                    dataSource={displayedCvs}  
                     rowKey="maCv" 
                     loading={loading} 
                     pagination={{ pageSize: 10 }} 

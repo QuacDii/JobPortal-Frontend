@@ -93,7 +93,7 @@ const PostJob = () => {
             </div>
             <Alert
                 message="Lưu ý về tính năng Phân tích hồ sơ bằng AI (HR Tech):"
-                description="Vui lòng mô tả thông tin vị trí việc làm, yêu cầu ứng viên và quyền lợi đầy đủ để hệ thống AI có thể đối chiếu chéo và chấm điểm matching chính xác nhất."
+                description="Vui lòng mô tả thông tin vị trí việc làm, yêu cầu ứng viên và quyền lợi đầy đủ để hệ thống AI có thể đối chiếu chéo và chấm điểm matching chính xác nhất. Tính năng chỉ hoạt động khi kích hoạt gói dịch vụ tương ứng."
                 type="info"
                 showIcon
                 style={{ marginBottom: 24, borderRadius: 6 }}

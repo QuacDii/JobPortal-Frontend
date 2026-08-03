@@ -1,9 +1,11 @@
 import apiClient from '../api/apiClient';
 
 const servicePackage = {
-    getPackages: () => {
-        return apiClient.get('/Service/packages');
+    getEmployerPackages: () => {
+        return apiClient.get('/Service/employer-packages');
     },
+    getCandidatePackages: () => apiClient.get('/Service/candidate-packages'),
+
     purchasePackage: (maGoi) => {
         return apiClient.post('/Service/purchase', { maGoi });
     },

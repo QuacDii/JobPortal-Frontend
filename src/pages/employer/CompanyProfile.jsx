@@ -23,9 +23,13 @@ const CompanyProfile = ({ onStatusChange }) => {
     const [logoFileList, setLogoFileList] = useState([]);
     const [frontFileList, setFrontFileList] = useState([]);
     const [backFileList, setBackFileList] = useState([]);
+
     const [currentLogo, setCurrentLogo] = useState(null);
     const [currentFront, setCurrentFront] = useState(null);
     const [currentBack, setCurrentBack] = useState(null);
+
+    // 🌟 STATE PHỤC VỤ XEM TRƯỚC (PREVIEW) TỨC THÌ KHI CHỌN FILE MỚI
+    const [logoPreview, setLogoPreview] = useState(null);
     
     const [companyStatus, setCompanyStatus] = useState(null);
     const [yeuCauBoSung, setYeuCauBoSung] = useState(null);
@@ -34,6 +38,14 @@ const CompanyProfile = ({ onStatusChange }) => {
     useEffect(() => {
         fetchCompanyData();
     }, []);
+
+    // 🌟 HÀM LẤY ĐỐI TƯỢNG FILE THỰC TẾ AN TOÀN (Tránh bị undefined)
+    const getActualFile = (fileItem) => {
+        if (!fileItem) return null;
+        if (fileItem.originFileObj instanceof File) return fileItem.originFileObj;
+        if (fileItem instanceof File) return fileItem;
+        return null;
+    };
 
     const fetchCompanyData = async () => {
         try {
@@ -86,12 +98,16 @@ const CompanyProfile = ({ onStatusChange }) => {
     const isPdfUrl = (url) => url && url.toLowerCase().endsWith('.pdf');
 
     const onFinish = async (values) => {
-        const hasLogo = currentLogo || logoFileList.length > 0;
+        const logoFile = getActualFile(logoFileList[0]);
+        const frontFile = getActualFile(frontFileList[0]);
+        const backFile = getActualFile(backFileList[0]);
+
+        const hasLogo = currentLogo || logoFile;
         if (!hasLogo) {
             message.error("Vui lòng tải lên Logo của doanh nghiệp!");
             return;
         }
-        const hasFrontGpkd = currentFront || frontFileList.length > 0;
+        const hasFrontGpkd = currentFront || frontFile;
         if (!hasFrontGpkd) {
             message.error("Vui lòng tải lên Giấy phép kinh doanh (Mặt trước / Bản chính)!");
             return;
@@ -108,9 +124,10 @@ const CompanyProfile = ({ onStatusChange }) => {
             formData.append('MauEmailInterview', values.mauEmailInterview || '');
             formData.append('ChuKyEmail', values.chuKyEmail || '');
 
-            if (logoFileList.length > 0) formData.append('LogoFile', logoFileList[0].originFileObj);
-            if (frontFileList.length > 0) formData.append('GiayPhepKinhDoanhMatTruocFile', frontFileList[0].originFileObj);
-            if (backFileList.length > 0) formData.append('GiayPhepKinhDoanhMatSauFile', backFileList[0].originFileObj);
+            // 🌟 TRUYỀN FILE CHÍNH XÁC VÀO FORMDATA
+            if (logoFile) formData.append('LogoFile', logoFile);
+            if (frontFile) formData.append('GiayPhepKinhDoanhMatTruocFile', frontFile);
+            if (backFile) formData.append('GiayPhepKinhDoanhMatSauFile', backFile);
 
             const response = await apiClient.post('/employer/company', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
@@ -121,6 +138,7 @@ const CompanyProfile = ({ onStatusChange }) => {
                 setLogoFileList([]);
                 setFrontFileList([]);
                 setBackFileList([]);
+                setLogoPreview(null);
                 fetchCompanyData();
             }
         } catch (error) {
@@ -131,6 +149,9 @@ const CompanyProfile = ({ onStatusChange }) => {
     };
 
     if (pageLoading) return <div style={{ textAlign: 'center', padding: '100px 0' }}><Spin size="large" tip="Đang tải dữ liệu hồ sơ..." /></div>;
+
+    // Ưu tiên hiển thị Ảnh Xem Trước Mới -> Ảnh cũ từ Server
+    const displayLogoUrl = logoPreview || currentLogo;
 
     return (
         <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
@@ -150,7 +171,7 @@ const CompanyProfile = ({ onStatusChange }) => {
                     <Space size={16} align="center">
                         <Avatar 
                             size={64} 
-                            src={currentLogo} 
+                            src={displayLogoUrl} 
                             icon={<BuildOutlined />} 
                             style={{ backgroundColor: '#1677ff', boxShadow: '0 2px 8px rgba(22,119,255,0.2)' }}
                         />
@@ -163,6 +184,7 @@ const CompanyProfile = ({ onStatusChange }) => {
                             </Text>
                         </div>
                     </Space>
+
                     <div>
                         {companyStatus === 1 && !hasPendingUpdate && (
                             <Tag color="success" style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600 }}>
@@ -188,7 +210,7 @@ const CompanyProfile = ({ onStatusChange }) => {
                 </div>
             </Card>
 
-            {/* CÁC THÔNG BÁO TỪ BAN QUẢN TRỊ */}
+            {/* THÔNG BÁO TỪ ADMIN */}
             {yeuCauBoSung && (
                 <Alert
                     message={<Text strong style={{ color: '#991b1b', fontSize: 15 }}>YÊU CẦU BỔ SUNG / CHỈNH SỬA TỪ ADMIN</Text>}
@@ -209,7 +231,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                     style={{ marginBottom: 24, borderRadius: 10, border: '1px solid #fca5a5', backgroundColor: '#fef2f2' }}
                 />
             )}
-
             {companyStatus === 0 && !yeuCauBoSung && (
                 <Alert 
                     message={<Text strong style={{ color: '#9a3412' }}>Hồ sơ đang trong quá trình thẩm định lần đầu</Text>}
@@ -220,7 +241,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                     style={{ marginBottom: 24, borderRadius: 10, backgroundColor: '#fff7ed', border: '1px solid #ffedd5' }}
                 />
             )}
-
             {companyStatus === 1 && hasPendingUpdate && (
                 <Alert 
                     message={<Text strong style={{ color: '#1e40af' }}>Yêu cầu thay đổi thông tin đang chờ Admin thẩm định</Text>}
@@ -289,10 +309,13 @@ const CompanyProfile = ({ onStatusChange }) => {
                                         name="quyMo" 
                                         rules={[
                                             { required: true, message: 'Vui lòng nhập quy mô nhân sự!' },
-                                            { pattern: /^\d+$/, message: 'Quy mô nhân sự chỉ được nhập chữ số!' }
+                                            { 
+                                                pattern: /^[\p{L}\p{N}\s]+$/u, 
+                                                message: 'Quy mô nhân sự chỉ được nhập chữ và số, không chứa ký tự đặc biệt!' 
+                                            }
                                         ]}
                                     >
-                                        <Input size="large" placeholder="VD: 100" prefix={<TeamOutlined style={{ color: '#cbd5e1' }} />} />
+                                        <Input size="large" placeholder="VD: 100 nhân sự hoặc Trên 500 người" prefix={<TeamOutlined style={{ color: '#cbd5e1' }} />} />
                                     </Form.Item>
                                 </Col>
                             </Row>
@@ -320,7 +343,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                                 />
                             </Form.Item>
 
-                            {/* ✨ KHỐI GỢI Ý ĐƯỢC ĐẨY TỰ ĐỘNG XUỐNG DƯỚI ĐÁY (MARGIN-TOP: AUTO) */}
                             <div style={{ 
                                 marginTop: 'auto', 
                                 padding: '12px 16px', 
@@ -355,17 +377,31 @@ const CompanyProfile = ({ onStatusChange }) => {
                             style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', textAlign: 'center' }}
                         >
                             <div style={{ padding: '4px 0' }}>
-                                {currentLogo && logoFileList.length === 0 ? (
+                                {/* 🌟 KHỐI PREVIEW LOGO (ẢNH MỚI HOẶC ẢNH ĐÃ CÓ TRÊN SERVER) */}
+                                {displayLogoUrl && (
                                     <div style={{ marginBottom: 10 }}>
                                         <Image 
-                                            src={currentLogo} 
+                                            src={displayLogoUrl} 
                                             style={{ width: 90, height: 90, objectFit: 'contain', borderRadius: 8, border: '1px solid #e2e8f0', padding: 4 }} 
                                         />
                                     </div>
-                                ) : null}
+                                )}
+
+                                {/* 🌟 XỬ LÝ SỰ KIỆN TẠO PREVIEW TỨC THÌ TRONG ONCHANGE */}
                                 <Upload 
                                     beforeUpload={(file) => validateFileBeforeUpload(file, true)} 
-                                    onChange={({ fileList }) => setLogoFileList(fileList.slice(-1))} 
+                                    onChange={({ fileList }) => {
+                                        const singleList = fileList.slice(-1);
+                                        setLogoFileList(singleList);
+
+                                        // Tạo Blob URL xem trước ngay lập tức khi chọn file thành công
+                                        const fileObj = getActualFile(singleList[0]);
+                                        if (fileObj) {
+                                            setLogoPreview(URL.createObjectURL(fileObj));
+                                        } else {
+                                            setLogoPreview(null);
+                                        }
+                                    }} 
                                     fileList={logoFileList} 
                                     maxCount={1} 
                                     accept="image/*"
@@ -551,6 +587,7 @@ const CompanyProfile = ({ onStatusChange }) => {
                     >
                         Lưu & Nộp lại hồ sơ
                     </Button>
+
                     <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic', color: '#64748b' }}>
                         * Thông tin phụ (Logo, Mô tả, Quy mô, Chữ ký Email) sẽ được cập nhật ngay. Thay đổi Tên/MST/GPKD sẽ gửi thẩm định lại.
                     </Text>

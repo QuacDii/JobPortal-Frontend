@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Row, Col, Card, Tag, Progress, Input, Button, message, 
-    Spin, Select, Typography, Space, Divider, Modal
+    Spin, Select, Typography, Space, Divider, Modal, DatePicker 
 } from 'antd';
 import { 
     RobotOutlined, CheckCircleOutlined, CloseCircleOutlined, 
@@ -9,6 +9,7 @@ import {
     EnvironmentOutlined, EyeOutlined 
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
 import apiClient from '../../api/apiClient';
 
 const { TextArea } = Input;
@@ -22,10 +23,13 @@ const CandidateAiDetail = () => {
     const [loading, setLoading] = useState(true);
     const [aiDetail, setAiDetail] = useState(null);
     const [noteText, setNoteText] = useState("");
-
+    
     // Các State phục vụ Modal hẹn phỏng vấn
     const [isInterviewModalVisible, setIsInterviewModalVisible] = useState(false);
-    const [interviewData, setInterviewData] = useState({ thoiGian: '', diaDiem: '', linkBaiTest: '', ghiChu: '' });
+    const [interviewData, setInterviewData] = useState({ thoiGian: null, diaDiem: '', linkBaiTest: '', ghiChu: '' });
+    
+    // 🌟 1. STATE QUẢN LÝ HIỆU ỨNG LOADING KHI GỬI MAIL
+    const [sendingMail, setSendingMail] = useState(false);
 
     useEffect(() => {
         if (maDon) {
@@ -40,9 +44,7 @@ const CandidateAiDetail = () => {
             const resPayload = response?.data || response;
             const actualData = resPayload.data ? resPayload.data : resPayload;
             
-            // IN DỮ LIỆU OUT RA CONSOLE ĐỂ KIỂM TRA TÊN BIẾN
             console.log(">>> Dữ liệu AI Detail từ Server:", actualData);
-
             if (actualData && (actualData.aiAnalysis || actualData.maDon)) {
                 setAiDetail(actualData);
                 setNoteText(actualData.ghiChuTuyenDung || "");
@@ -58,11 +60,10 @@ const CandidateAiDetail = () => {
 
     const handleStatusChange = async (newStatus) => {
         if (newStatus === 2) {
-            setInterviewData({ thoiGian: '', diaDiem: '', linkBaiTest: '', ghiChu: '' });
+            setInterviewData({ thoiGian: null, diaDiem: '', linkBaiTest: '', ghiChu: '' });
             setIsInterviewModalVisible(true);
             return;
         }
-
         try {
             await apiClient.put(`/employer/applications/${maDon}/status`, {
                 status: newStatus,
@@ -76,11 +77,37 @@ const CandidateAiDetail = () => {
         }
     };
 
+    // 🌟 HÀM FORMAT THỜI GIAN SANG TIẾNG VIỆT TỰ NHIÊN
+    const formatVietnameseDateTime = (dateObj) => {
+        if (!dateObj) return '';
+        const daysVi = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+        const d = dayjs(dateObj);
+        const dayName = daysVi[d.day()];
+        return `${d.format('HH:mm')} - ${dayName}, ngày ${d.format('DD/MM/YYYY')}`;
+    };
+
+    // 🌟 2. HÀM GỬI LỊCH PHỎNG VẤN KÈM EFFECT LOADING
     const handleSendInterviewInvite = async () => {
+        if (!interviewData.thoiGian) {
+            message.warning("Vui lòng chọn Thời gian phỏng vấn!");
+            return;
+        }
+        if (dayjs(interviewData.thoiGian).isBefore(dayjs())) {
+            message.warning("Thời gian phỏng vấn không được nhỏ hơn thời điểm hiện tại!");
+            return;
+        }
+        if (!interviewData.diaDiem || !interviewData.diaDiem.trim()) {
+            message.warning("Vui lòng nhập Địa điểm phỏng vấn!");
+            return;
+        }
+
+        setSendingMail(true); // ⚡ Bật hiệu ứng Loading
         try {
+            const formattedTime = formatVietnameseDateTime(interviewData.thoiGian);
+
             await apiClient.put(`/employer/applications/${maDon}/status`, {
                 status: 2,
-                thoiGian: interviewData.thoiGian,
+                thoiGian: formattedTime,
                 diaDiem: interviewData.diaDiem,
                 linkBaiTest: interviewData.linkBaiTest, 
                 ghiChu: interviewData.ghiChu || null
@@ -90,6 +117,8 @@ const CandidateAiDetail = () => {
             fetchAiDetails();
         } catch (error) {
             message.error("Lỗi hệ thống khi gửi thư mời phỏng vấn");
+        } finally {
+            setSendingMail(false); // ⚡ Tắt hiệu ứng Loading dù thành công hay thất bại
         }
     };
 
@@ -103,6 +132,28 @@ const CandidateAiDetail = () => {
         } catch (error) {
             message.error("Lỗi khi lưu ghi chú");
         }
+    };
+
+    // VÔ HIỆU HÓA CÁC NGÀY / GIỜ TRONG QUÁ KHỨ
+    const disabledDate = (current) => {
+        return current && current < dayjs().startOf('day');
+    };
+
+    const disabledDateTime = (current) => {
+        if (!current) return {};
+        const now = dayjs();
+        if (current.isSame(now, 'day')) {
+            return {
+                disabledHours: () => Array.from({ length: now.hour() }, (_, i) => i),
+                disabledMinutes: (selectedHour) => {
+                    if (selectedHour === now.hour()) {
+                        return Array.from({ length: now.minute() }, (_, i) => i);
+                    }
+                    return [];
+                }
+            };
+        }
+        return {};
     };
 
     const renderBulletPoints = (text, type) => {
@@ -136,7 +187,6 @@ const CandidateAiDetail = () => {
     }
 
     const ai = aiDetail?.aiAnalysis || {};
-
     const rawCvUrl = 
             aiDetail?.cvUrl || 
             aiDetail?.duongDanCv || 
@@ -163,7 +213,6 @@ const CandidateAiDetail = () => {
                         <Title level={3} style={{ marginBottom: 4 }}>{profile.hoTen || "Ứng viên hệ thống"}</Title>
                         <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>{profile.viTriHienTai || "Chức danh chưa rõ"}</Text>
                         
-                        {/* NÚT XEM CV GỐC ĐÃ ĐƯỢC CHUYỂN VÀO ĐÂY */}
                         <Button 
                             type="primary" 
                             ghost 
@@ -221,7 +270,6 @@ const CandidateAiDetail = () => {
                             </Tag>
                         </div>
 
-                        {/* Thanh tiến trình */}
                         <Row gutter={[32, 16]} style={{ marginBottom: 28 }}>
                             <Col span={12}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -249,7 +297,6 @@ const CandidateAiDetail = () => {
                             </Col>
                         </Row>
 
-                        {/* Điểm mạnh và Điểm thiếu sót */}
                         <Row gutter={16} style={{ marginBottom: 24 }}>
                             <Col span={12}>
                                 <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: 16, borderRadius: 8, height: '100%' }}>
@@ -265,7 +312,6 @@ const CandidateAiDetail = () => {
                             </Col>
                         </Row>
 
-                        {/* Tags Kỹ năng bóc tách */}
                         <div style={{ marginBottom: 28 }}>
                             <Text strong style={{ display: 'block', marginBottom: 12, fontSize: 12, color: '#64748b', letterSpacing: '0.5px' }}>TẤT CẢ KỸ NĂNG TRÍCH XUẤT</Text>
                             <Space wrap>
@@ -279,7 +325,6 @@ const CandidateAiDetail = () => {
                             </Space>
                         </div>
 
-                        {/* Khối Ghi chú nội bộ tuyển dụng */}
                         <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                 <Text strong style={{ fontSize: 12, color: '#64748b' }}>📑 GHI CHÚ TUYỂN DỤNG</Text>
@@ -299,22 +344,31 @@ const CandidateAiDetail = () => {
                 </Col>
             </Row>
 
-            {/* MODAL THIẾT LẬP LỊCH HẸN PHỎNG VẤN */}
+            {/* 🌟 3. MODAL TÍCH HỢP PROPS CONFIRMLOADING & ĐÓNG DÙNG THỰC THỂ */}
             <Modal
                 title="Thiết lập Lịch hẹn Phỏng vấn & Gửi Email"
                 open={isInterviewModalVisible}
                 onOk={handleSendInterviewInvite}
-                onCancel={() => setIsInterviewModalVisible(false)}
+                onCancel={() => !sendingMail && setIsInterviewModalVisible(false)}
+                confirmLoading={sendingMail} // ⚡ Xoay Spinner ngay trên nút "Xác nhận & Gửi Mail"
                 okText="Xác nhận & Gửi Mail"
                 cancelText="Hủy bỏ"
+                cancelButtonProps={{ disabled: sendingMail }} // ⚡ Khóa nút Hủy khi đang gửi
+                maskClosable={!sendingMail} // ⚡ Không cho bấm ra ngoài để tắt modal khi đang gửi
             >
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: 15 }}>
                     <div>
                         <label style={{ display: 'block', marginBottom: 4, fontWeight: 500 }}>Thời gian phỏng vấn:</label>
-                        <Input 
-                            placeholder="VD: 09:30 - Thứ Hai, ngày 15/07/2026" 
-                            value={interviewData.thoiGian}
-                            onChange={(e) => setInterviewData({...interviewData, thoiGian: e.target.value})}
+                        <DatePicker 
+                            showTime={{ format: 'HH:mm' }}
+                            format="HH:mm - DD/MM/YYYY"
+                            placeholder="VD: 09:30 - Thứ Hai, ngày 15/07/2026"
+                            style={{ width: '100%' }}
+                            value={interviewData.thoiGian ? dayjs(interviewData.thoiGian) : null}
+                            onChange={(date) => setInterviewData({ ...interviewData, thoiGian: date })}
+                            disabledDate={disabledDate}
+                            disabledTime={disabledDateTime}
+                            disabled={sendingMail}
                         />
                     </div>
                     <div>
@@ -322,7 +376,8 @@ const CandidateAiDetail = () => {
                         <Input 
                             placeholder="VD: Văn phòng công ty hoặc link Google Meet" 
                             value={interviewData.diaDiem}
-                            onChange={(e) => setInterviewData({...interviewData, diaDiem: e.target.value})}
+                            onChange={(e) => setInterviewData({ ...interviewData, diaDiem: e.target.value })}
+                            disabled={sendingMail}
                         />
                     </div>
                     <div>
@@ -330,7 +385,8 @@ const CandidateAiDetail = () => {
                         <Input 
                             placeholder="VD: https://hackerrank.com/company-test-abc hoặc Google Forms" 
                             value={interviewData.linkBaiTest}
-                            onChange={(e) => setInterviewData({...interviewData, linkBaiTest: e.target.value})}
+                            onChange={(e) => setInterviewData({ ...interviewData, linkBaiTest: e.target.value })}
+                            disabled={sendingMail}
                         />
                     </div>
                     <div>
@@ -339,7 +395,8 @@ const CandidateAiDetail = () => {
                             rows={3} 
                             placeholder="Yêu cầu trang phục hoặc tài liệu cần mang theo..." 
                             value={interviewData.ghiChu}
-                            onChange={(e) => setInterviewData({...interviewData, ghiChu: e.target.value})}
+                            onChange={(e) => setInterviewData({ ...interviewData, ghiChu: e.target.value })}
+                            disabled={sendingMail}
                         />
                     </div>
                 </div>

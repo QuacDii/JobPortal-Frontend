@@ -60,16 +60,14 @@ const ServicePackage = () => {
         fetchData();
     }, []);
 
-    // 1. POLLING TỰ ĐỘNG LẮNG NGHE KẾT QUẢ THANH TOÁN & MUA GÓI TỪ MOMO
+    // POLLING TỰ ĐỘNG LẮNG NGHE KẾT QUẢ THANH TOÁN & MUA GÓI TỪ MOMO
     useEffect(() => {
         let interval = null;
-
         if (isChecking && checkingOrderId && maUser) {
             interval = setInterval(async () => {
                 try {
                     const res = await paymentService.checkStatus(checkingOrderId, maUser, selectedPkgId);
                     const isPaid = res?.data?.isPaid || res?.isPaid;
-
                     if (isPaid) {
                         toast.success(`Nạp tiền & Kích hoạt gói dịch vụ thành công!`);
                         setIsChecking(false);
@@ -77,15 +75,13 @@ const ServicePackage = () => {
                         setIsTopupModalVisible(false);
                         setCheckingOrderId(null);
                         
-                        // Cập nhật lại toàn bộ giao diện Ví & Gói VIP
                         fetchData();
                     }
                 } catch (err) {
                     console.error("Lỗi kiểm tra trạng thái giao dịch:", err);
                 }
-            }, 3000); // 3 giây hỏi 1 lần
+            }, 3000);
         }
-
         return () => {
             if (interval) clearInterval(interval);
         };
@@ -93,8 +89,13 @@ const ServicePackage = () => {
 
     const fetchData = async () => {
         try {
+            // 🌟 CẬP NHẬT: Gọi endpoint chuyên dụng cho Nhà tuyển dụng
+            const pkgCall = servicePackage.getEmployerPackages 
+                ? servicePackage.getEmployerPackages() 
+                : servicePackage.getPackages();
+
             const [pkgRes, histRes, balRes] = await Promise.all([
-                servicePackage.getPackages(),
+                pkgCall,
                 servicePackage.getHistory(),
                 servicePackage.getBalance()
             ]);
@@ -141,7 +142,7 @@ const ServicePackage = () => {
         if (soDuHienTai >= giaThucTe) {
             const isVipActive = ngayHetHan && new Date(ngayHetHan) > new Date();
             const contentMsg = isVipActive 
-                ? `LƯU Ý: Bạn đang sử dụng [${tenGoiHienTai}]. Nếu tiếp tục, hệ thống sẽ trừ ${giaThucTe.toLocaleString()}đ để kích hoạt [${pkg.tenGoi}]. Lượt xem CV sẽ được CỘNG DỒN và Hạn sử dụng sẽ được thay đổi theo quy định của gói mới. Bạn có chắc chắn?`
+                ? `LƯU Ý: Bạn đang sử dụng [${tenGoiHienTai}]. Nếu tiếp tục, hệ thống sẽ trừ ${giaThucTe.toLocaleString()}đ để kích hoạt [${pkg.tenGoi}]. Quyền lợi sẽ được CỘNG DỒN và Hạn sử dụng sẽ được gia hạn. Bạn có chắc chắn?`
                 : `Hệ thống sẽ trừ ${giaThucTe.toLocaleString()} đ từ số dư ví để kích hoạt ${pkg.tenGoi}.`;
 
             confirm({
@@ -173,7 +174,6 @@ const ServicePackage = () => {
         }
     };
 
-    // BƯỚC 1: TẠO GIAO DỊCH VÀ MỞ MODAL HƯỚNG DẪN MOMO
     const handleTopupSubmit = async () => {
         if (!maUser) {
             toast.error("Không tìm thấy thông tin tài khoản, vui lòng đăng nhập lại!");
@@ -186,13 +186,11 @@ const ServicePackage = () => {
             setLoading(true);
             const response = await paymentService.createPaymentUrl(maUser, soTienNap, selectedPkgId);
             const url = response?.url || response?.data?.url || response?.data;
-
             if (url && typeof url === 'string' && url.startsWith('http')) {
                 const orderId = extractOrderId(url);
                 setPayUrl(url);
                 setCheckingOrderId(orderId);
                 
-                // Đóng modal nhập tiền, mở modal chuyển sang MoMo
                 setIsTopupModalVisible(false);
                 setIsPaymentModalOpen(true);
                 setIsChecking(true);
@@ -207,16 +205,11 @@ const ServicePackage = () => {
         }
     };
 
-    // BƯỚC 2: NÚT XÁC NHẬN THỦ CÔNG KHI MOMO SANDBOX BỊ TREO
     const handleManualConfirm = async (resultCode = '0') => {
         setIsConfirmingManual(true);
-        
-        // 🌟 1. Lưu lại đường dẫn trang hiện tại vào localStorage
         localStorage.setItem('payment_redirect', window.location.pathname);
-
         try {
             if (resultCode === '0') {
-                // Gọi API xác nhận nạp tiền & kích hoạt gói VIP
                 await paymentService.confirmFallback({
                     maUser: maUser,
                     amount: Number(topupAmount),
@@ -224,19 +217,14 @@ const ServicePackage = () => {
                     resultCode: '0',
                     maGoi: selectedPkgId
                 });
-
                 setIsPaymentModalOpen(false);
                 setIsChecking(false);
                 setCheckingOrderId(null);
-
-                // 🌟 2. Chuyển hướng sang màn hình PaymentSuccess
                 navigate(`/payment-success?orderId=${checkingOrderId}`);
             } else {
                 setIsPaymentModalOpen(false);
                 setIsChecking(false);
                 setCheckingOrderId(null);
-
-                // 🌟 3. Chuyển hướng sang màn hình PaymentFailed
                 navigate(`/payment-failed?orderId=${checkingOrderId}`);
             }
         } catch (err) {
@@ -246,6 +234,7 @@ const ServicePackage = () => {
             setIsConfirmingManual(false);
         }
     };
+
     const columns = [
         { title: 'Ngày GD', dataIndex: 'ngayGd', render: (t) => new Date(t).toLocaleString('vi-VN') },
         { title: 'Loại', dataIndex: 'loaiGiaoDich', render: (t) => <Tag color={t===1?'green':'red'}>{t===1?'+ Nạp':'- Mua gói'}</Tag> },
@@ -341,15 +330,38 @@ const ServicePackage = () => {
                                 </Title>
                             </div>
 
+                            {/* 🌟 3. HIỂN THỊ ĐỘNG CÁC ĐẶC QUYỀN TỪ BACKEND TRẢ VỀ */}
                             <Space direction="vertical" style={{ width: '100%', textAlign: 'left', marginTop: 15, flex: 1 }}>
                                 <Text>
                                     ⏳ Chu kỳ: <b>
                                         {pkg.donViThoiGian} {pkg.loaiGoi === 3 ? 'năm' : pkg.loaiGoi === 2 ? 'tháng' : 'ngày'}
                                     </b>
                                 </Text>
-                                <Text>👁️ Tặng thêm: <b>{pkg.soLuotXemCv} lượt xem CV</b></Text>
-                                <Text>🚀 Nổi bật: <b>Đẩy bài đăng lên đầu danh sách</b></Text>
-                                <Text>⭐ Cơ chế: <b>Cộng dồn quyền lợi</b></Text>
+
+                                {pkg.soLuotXemCv > 0 && (
+                                    <Text>
+                                        👁️ Lượt xem CV bổ sung: <b>{pkg.soLuotXemCv} lượt</b>
+                                    </Text>
+                                )}
+
+                                {/* Vòng lặp map qua mảng dacQuyens */}
+                                {pkg.dacQuyens && pkg.dacQuyens.length > 0 ? (
+                                    pkg.dacQuyens.map((dq, idx) => (
+                                        <Text key={dq.maDacQuyen || idx} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                                            <span>
+                                                {dq.tenDacQuyen}
+                                                {dq.soLuong ? <b>: {dq.soLuong} lượt</b> : ''}
+                                            </span>
+                                        </Text>
+                                    ))
+                                ) : (
+                                    <Text type="secondary" italic>Gói cơ bản</Text>
+                                )}
+
+                                <Text type="secondary" style={{ fontSize: '12px', marginTop: 8 }}>
+                                    ⭐ Cơ chế: <b>Cộng dồn quyền lợi & tự động kích hoạt</b>
+                                </Text>
                             </Space>
 
                             <Button 
@@ -381,7 +393,7 @@ const ServicePackage = () => {
             </Title>
             <Table dataSource={history} columns={columns} rowKey="maGd" pagination={{ pageSize: 5 }} style={{ marginTop: 20 }} />
 
-            {/* MODAL 1: BÁO SỐ DƯ THIẾU & NHẬP SỐ TIỀN CẦN NẠP */}
+            {/* MODAL 1: BÁO SỐ DƯ THIẾU */}
             <Modal
                 title={<span><ExclamationCircleOutlined style={{ color: '#faad14', marginRight: 8 }} /> Cần nạp thêm tiền</span>}
                 open={isTopupModalVisible}
@@ -402,10 +414,10 @@ const ServicePackage = () => {
                 </div>
             </Modal>
 
-            {/* MODAL 2: MỞ TRANG THANH TOÁN MOMO & XÁC NHẬN KÍCH HOẠT */}
+            {/* MODAL 2: MỞ TRANG THANH TOÁN MOMO */}
             <Modal
                 title={<span style={{ color: '#A50064', fontSize: '18px' }}><PayCircleOutlined /> Kích hoạt thanh toán MoMo (Sandbox)</span>}
-                open={isPaymentModalOpen} // Hoặc isPaymentModalOpen đối với ServicePackage
+                open={isPaymentModalOpen}
                 onCancel={() => { setIsPaymentModalOpen(false); setIsChecking(false); }}
                 footer={null}
                 centered
@@ -436,7 +448,6 @@ const ServicePackage = () => {
                         </span>
                     </div>
 
-                    {/* 🌟 CỤM 2 NÚT GIẢ LẬP KẾT QUẢ THANH TOÁN */}
                     <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                         <Button 
                             danger
@@ -444,13 +455,10 @@ const ServicePackage = () => {
                             icon={<CloseCircleOutlined />}
                             loading={isConfirmingManual}
                             onClick={() => handleManualConfirm('1006')}
-                            style={{ 
-                                flex: 1, height: '42px', fontWeight: 'bold', fontSize: '14px' 
-                            }}
+                            style={{ flex: 1, height: '42px', fontWeight: 'bold', fontSize: '14px' }}
                         >
                             ❌ Giả lập Thất bại
                         </Button>
-
                         <Button 
                             type="primary"
                             icon={<CheckCircleOutlined />}
