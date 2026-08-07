@@ -1,53 +1,53 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Typography, Row, Col, Card, Input, Select, Button, Spin, message, Avatar, Tag } from 'antd';
+import { Typography, Row, Col, Card, Input, Select, Button, Spin, message, Avatar, Tag, Carousel } from 'antd';
 import {
     SearchOutlined,
     EnvironmentOutlined,
     HeartOutlined,
-    CheckCircleOutlined,
-    ThunderboltOutlined,
-    PushpinOutlined
+    HeartFilled,
+    PushpinOutlined,
+    RightOutlined,
+    FireOutlined,
+    CrownOutlined
 } from '@ant-design/icons';
 import apiClient from '../../api/apiClient';
+import '../css/Home.css';
 
 const { Title, Text, Paragraph } = Typography;
+
+const parseJwt = (token) => {
+    try {
+        return JSON.parse(atob(token.split('.')[1]));
+    } catch (e) {
+        return null;
+    }
+};
 
 const Home = () => {
     const navigate = useNavigate();
     const [campaigns, setCampaigns] = useState([]);
     const [loading, setLoading] = useState(true);
     const [thanhPhos, setThanhPhos] = useState([]);
-    const [nganhNghes, setNganhNghes] = useState([]);
-    
-    // 👉 Thêm state lưu trữ danh sách Phường/Xã
     const [phuongXas, setPhuongXas] = useState([]);
 
-    // 👉 1. STATE LƯU TRỮ BỘ LỌC TÌM KIẾM (Bổ sung maPhuong)
+    // 🌟 Khai báo state nganhNghesTree bên trong Component
+    const [nganhNghesTree, setNganhNghesTree] = useState([]);
+    const [activeCategory, setActiveCategory] = useState(null);
+    const [suggestedKeywords, setSuggestedKeywords] = useState([]);
+    const [bookmarkedViTris, setBookmarkedViTris] = useState([]);
+
     const [searchQuery, setSearchQuery] = useState({
         keyword: '',
-        maTP: null,    
-        maPhuong: null, // Thêm trường phường/xã
-        maNganh: null  
+        maTP: null,
+        maPhuong: null,
+        maNganh: null
     });
 
-    // 👉 2. HÀM GỌI API TÌM KIẾM
-    const fetchJobs = async (queryOverrides = null) => {
+    const fetchJobs = async () => {
         setLoading(true);
         try {
-            const currentQuery = queryOverrides || searchQuery;
-
-            const params = {};
-            if (currentQuery.keyword) params.keyword = currentQuery.keyword;
-            if (currentQuery.maTP) params.maTP = currentQuery.maTP;
-            if (currentQuery.maPhuong) params.maPhuong = currentQuery.maPhuong; // Đẩy maPhuong lên API
-            if (currentQuery.maNganh) params.maNganh = currentQuery.maNganh;
-
-            const isSearching = Object.keys(params).length > 0;
-            const endpoint = isSearching ? '/Jobs/search' : '/Jobs';
-
-            const response = await apiClient.get(endpoint, { params });
-
+            const response = await apiClient.get('/Jobs');
             let finalData = null;
             if (response) {
                 if (response.data && response.data.data) finalData = response.data.data;
@@ -55,54 +55,78 @@ const Home = () => {
                 else if (Array.isArray(response)) finalData = response;
                 else if (Array.isArray(response.data)) finalData = response.data;
             }
-
-            if (finalData && Array.isArray(finalData)) {
-                setCampaigns(finalData);
-            } else {
-                setCampaigns([]);
-            }
-
+            setCampaigns(Array.isArray(finalData) ? finalData : []);
         } catch (error) {
-            console.error("❌ Lỗi chi tiết tại Frontend:", error);
+            console.error("❌ Lỗi khi tải chiến dịch:", error);
             message.error("Không thể tải dữ liệu tuyển dụng!");
         } finally {
             setLoading(false);
         }
     };
 
-    // 👉 Hàm gọi API lấy Phường Xã theo maTP
     const fetchPhuongXa = async (maTP) => {
-        if (!maTP) {
+        if (!maTP || maTP === 'all') {
             setPhuongXas([]);
             return;
         }
         try {
-            // Gọi API lấy phường xã dựa trên mã thành phố
-            const res = await apiClient.get('/PhuongXa', { params: { maTP: maTP } });
+            const res = await apiClient.get('/KhuVuc/PhuongXa', { params: { maTP } });
             const data = res?.data?.data || res?.data || (Array.isArray(res) ? res : []);
-            setPhuongXas(data);
+            const filteredWards = data.filter(px => px.maTP === maTP || px.maTp === maTP);
+            setPhuongXas(filteredWards);
         } catch (err) {
             console.error("Lỗi lấy danh sách phường xã", err);
         }
     };
 
-    // Tự động load danh sách khi mới vào trang
     useEffect(() => {
         fetchJobs();
-        
-        apiClient.get('/ThanhPho')
-            .then(res => {
+
+        const token = localStorage.getItem('token');
+        let userId = null;
+        if (token) {
+            const decoded = parseJwt(token);
+            userId = decoded?.maUser ||
+                decoded?.nameid ||
+                decoded?.['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'];
+
+            apiClient.get('/Jobs/bookmarked', {
+                headers: { Authorization: `Bearer ${token}`, maUser: parseInt(userId || 1) }
+            }).then(res => {
                 const data = res?.data?.data || res?.data || (Array.isArray(res) ? res : []);
-                setThanhPhos(data);
-            })
+                setBookmarkedViTris(data);
+            }).catch(err => console.error("Lỗi lấy bài đã lưu", err));
+        }
+
+        // Tải từ khóa gợi ý
+        apiClient.get('/Jobs/suggestions', {
+            headers: userId ? { maUser: parseInt(userId) } : {}
+        }).then(res => {
+            const keywords = res?.data?.data || res?.data || [];
+            if (Array.isArray(keywords) && keywords.length > 0) {
+                setSuggestedKeywords(keywords);
+            } else {
+                setSuggestedKeywords(['Lập trình viên', 'Thực tập sinh', 'Marketing', 'Kinh doanh']);
+            }
+        }).catch(() => {
+            setSuggestedKeywords(['Lập trình viên', 'Thực tập sinh', 'Marketing', 'Kinh doanh']);
+        });
+
+        // Tải danh sách Thành phố
+        apiClient.get('/KhuVuc/ThanhPho')
+            .then(res => setThanhPhos(res?.data?.data || res?.data || (Array.isArray(res) ? res : [])))
             .catch(err => console.error("Lỗi lấy danh sách thành phố", err));
 
-        apiClient.get('/NganhNghe')
+        // Tải danh sách Ngành nghề dạng Cây
+        apiClient.get('/NganhNghe/tree')
             .then(res => {
-                const data = res?.data?.data || res?.data || (Array.isArray(res) ? res : []);
-                setNganhNghes(data);
+                const treeData = Array.isArray(res) ? res : (res?.data?.data || res?.data || []);
+                if (Array.isArray(treeData)) {
+                    setNganhNghesTree(treeData);
+                    if (treeData.length > 0) setActiveCategory(treeData[0]);
+                }
             })
-            .catch(err => console.error("Lỗi lấy danh sách ngành nghề", err));
+            .catch(err => console.error("Lỗi lấy danh sách ngành nghề tree", err));
     }, []);
 
     const handleBookmark = async (maViTri) => {
@@ -110,252 +134,340 @@ const Home = () => {
             message.warning("Chiến dịch này hiện chưa có vị trí cụ thể để lưu!");
             return;
         }
+
+        const token = localStorage.getItem('token');
+        if (!token) {
+            message.warning("Vui lòng đăng nhập để lưu bài tuyển dụng!");
+            return;
+        }
+
+        const decoded = parseJwt(token);
+        const userId = decoded?.maUser || decoded?.nameid || 1;
+
         try {
             const res = await apiClient.post(`/Jobs/${maViTri}/bookmark`, null, {
-                headers: { maUser: 1 }
+                headers: { Authorization: `Bearer ${token}`, maUser: parseInt(userId) }
             });
-            if (res.data && res.data.success) {
-                message.success(res.data.isBookmarked ? "Đã lưu tin thành công!" : "Đã bỏ lưu tin!");
+
+            const success = res?.success !== undefined ? res.success : res?.data?.success;
+            const isBookmarked = res?.isBookmarked !== undefined ? res.isBookmarked : res?.data?.isBookmarked;
+
+            if (success) {
+                if (isBookmarked) {
+                    setBookmarkedViTris(prev => [...prev, maViTri]);
+                    message.success("Đã lưu tin tuyển dụng!");
+                } else {
+                    setBookmarkedViTris(prev => prev.filter(id => id !== maViTri));
+                    message.info("Đã bỏ lưu tin tuyển dụng!");
+                }
             }
         } catch (error) {
             message.error("Đã xảy ra lỗi khi lưu tin!");
         }
     };
 
-    if (loading) return <div style={{ textAlign: 'center', padding: '100px', background: '#141414', minHeight: '100vh' }}><Spin size="large" /></div>;
+    const handleSearchNavigate = () => {
+        const params = new URLSearchParams();
+        if (searchQuery.keyword) params.append('keyword', searchQuery.keyword);
+        if (searchQuery.maTP) params.append('maTP', searchQuery.maTP);
+        if (searchQuery.maPhuong) params.append('maPhuong', searchQuery.maPhuong);
+        if (searchQuery.maNganh) params.append('maNganh', searchQuery.maNganh);
+
+        const queryString = params.toString();
+        navigate(queryString ? `/jobs?${queryString}` : '/jobs');
+    };
+
+    const vipCampaigns = campaigns.filter(c => c.isPromoted === true);
+    const regularCampaigns = campaigns.filter(c => c.isPromoted !== true);
+
+    if (loading) return <div style={{ textAlign: 'center', padding: '120px 0', background: '#f8fafc', minHeight: '100vh' }}><Spin size="large" /></div>;
 
     return (
-        <div style={{ background: '#141414', minHeight: '100vh', paddingBottom: 50 }}>
+        <div style={{ background: '#f8fafc', minHeight: '100vh', paddingBottom: 60, color: '#1f2937' }}>
 
-            {/* ================= HERO SECTION (TÌM KIẾM) ================= */}
-            <div style={{
-                backgroundImage: `linear-gradient(rgba(0, 33, 64, 0.85), rgba(22, 119, 255, 0.7)), url('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1600&q=80')`,
-                backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat',
-                padding: '80px 20px 100px 20px', textAlign: 'center'
-            }}>
-                <Title level={1} style={{ color: 'white', marginBottom: 12, fontSize: 42, fontWeight: 'bold' }}>
-                    Tìm kiếm công việc mơ ước của bạn
-                </Title>
-                <Paragraph style={{ color: '#e6f7ff', fontSize: 16, marginBottom: 45 }}>
-                    Hàng ngàn cơ hội việc làm đang chờ đón bạn
-                </Paragraph>
+            {/* HERO SECTION */}
+            <div className="hero-wrapper">
+                <div className="hero-content-inner">
+                    <Title level={1} style={{ color: '#ffffff', marginBottom: 8, fontSize: 36, fontWeight: '800' }}>
+                        Tạo CV, Tìm Việc Làm, Tuyển Dụng Hiệu Quả
+                    </Title>
+                    <Paragraph style={{ color: '#e6f4ff', fontSize: 15, marginBottom: 24 }}>
+                        Hãy chia sẻ nhu cầu công việc để nhận gợi ý việc làm tốt nhất
+                    </Paragraph>
 
-                {/* KHUNG TÌM KIẾM */}
-                <div style={{
-                    maxWidth: 1000, margin: '0 auto', background: '#1f1f1f', padding: 8,
-                    borderRadius: 8, display: 'flex', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', border: '1px solid #303030'
-                }}>
-                    <Input
-                        prefix={<SearchOutlined style={{ color: '#8c8c8c' }} />}
-                        placeholder="Tên công ty, chiến dịch..."
-                        variant="borderless"
-                        style={{ flex: 1.5, fontSize: 15, color: '#fff' }}
-                        value={searchQuery.keyword}
-                        onChange={(e) => setSearchQuery({ ...searchQuery, keyword: e.target.value })}
-                        // Bỏ onPressEnter để ép người dùng ấn nút TÌM KIẾM
-                    />
-                    <div style={{ width: 1, background: '#303030', margin: '5px 10px' }}></div>
+                    {/* KHUNG TÌM KIẾM HERO */}
+                    <div className="hero-search-box" style={{ gap: 8, flexWrap: 'wrap' }}>
+                        <Input
+                            prefix={<SearchOutlined style={{ color: '#1677ff', fontSize: 18, marginRight: 6 }} />}
+                            placeholder="Vị trí tuyển dụng, tên công ty..."
+                            variant="borderless"
+                            style={{ flex: 1.5, minWidth: 200, fontSize: 15 }}
+                            value={searchQuery.keyword}
+                            onChange={(e) => setSearchQuery({ ...searchQuery, keyword: e.target.value })}
+                            onPressEnter={handleSearchNavigate}
+                        />
 
-                    {/* BỘ LỌC ĐỊA ĐIỂM (TỈNH/THÀNH PHỐ) */}
-                    <Select
-                        value={searchQuery.maTP || "all"}
-                        onChange={(value) => {
-                            const val = value === "all" ? null : value;
-                            setSearchQuery({ ...searchQuery, maTP: val, maPhuong: null }); // Xóa phường/xã khi đổi TP
-                            fetchPhuongXa(val); // Lấy danh sách phường xã mới
-                            // Xóa lệnh fetchJobs(newQuery) ở đây
-                        }}
-                        variant="borderless"
-                        style={{ flex: 1, color: '#fff' }}
-                        suffixIcon={<EnvironmentOutlined style={{ color: '#8c8c8c' }} />}
-                        showSearch
-                        optionFilterProp="children"
-                    >
-                        <Select.Option value="all">Tỉnh / TP</Select.Option>
-                        {thanhPhos.map((tp) => (
-                            <Select.Option key={tp.maTP} value={tp.maTP}>
-                                {tp.tenTP}
-                            </Select.Option>
+                        <div style={{ width: 1, height: 28, background: '#cbd5e1' }}></div>
+
+                        {/* LỌC TỈNH / THÀNH PHỐ */}
+                        <Select
+                            value={searchQuery.maTP || "all"}
+                            onChange={(value) => {
+                                const val = value === "all" ? null : value;
+                                setSearchQuery({ ...searchQuery, maTP: val, maPhuong: null });
+                                fetchPhuongXa(val);
+                            }}
+                            variant="borderless"
+                            style={{ flex: 1, minWidth: 150 }}
+                            suffixIcon={<EnvironmentOutlined style={{ color: '#64748b' }} />}
+                            showSearch
+                            optionFilterProp="children"
+                        >
+                            <Select.Option value="all">Tỉnh / Thành phố</Select.Option>
+                            {thanhPhos.map((tp) => (
+                                <Select.Option key={tp.maTp} value={tp.maTp}>{tp.tenTp}</Select.Option>
+                            ))}
+                        </Select>
+
+                        <div style={{ width: 1, height: 28, background: '#cbd5e1' }}></div>
+
+                        {/* LỌC PHƯỜNG / XÃ */}
+                        <Select
+                            value={searchQuery.maPhuong || "all"}
+                            disabled={!searchQuery.maTP || searchQuery.maTP === "all"}
+                            onChange={(value) => {
+                                const val = value === "all" ? null : value;
+                                setSearchQuery({ ...searchQuery, maPhuong: val });
+                            }}
+                            variant="borderless"
+                            style={{ flex: 1, minWidth: 150 }}
+                            suffixIcon={<EnvironmentOutlined style={{ color: '#64748b' }} />}
+                            showSearch
+                            optionFilterProp="children"
+                        >
+                            <Select.Option value="all">Phường / Xã</Select.Option>
+                            {phuongXas.map((px) => (
+                                <Select.Option key={px.maPhuong} value={px.maPhuong}>{px.tenPhuong}</Select.Option>
+                            ))}
+                        </Select>
+
+                        <Button
+                            type="primary"
+                            className="btn-search-hero"
+                            onClick={handleSearchNavigate}
+                        >
+                            <SearchOutlined style={{ fontSize: 16 }} /> Tìm kiếm
+                        </Button>
+                    </div>
+
+                    {/* GỢI Ý TỪ KHÓA TÌM KIẾM ĐỘNG */}
+                    <div className="search-tag-hint">
+                        <span style={{ fontWeight: 'bold' }}>Gợi ý:</span>
+                        {suggestedKeywords.map((kw, idx) => (
+                            <span
+                                key={idx}
+                                className="hint-item"
+                                onClick={() => navigate(`/jobs?keyword=${encodeURIComponent(kw)}`)}
+                            >
+                                {kw}
+                            </span>
                         ))}
-                    </Select>
+                    </div>
 
-                    <div style={{ width: 1, background: '#303030', margin: '5px 10px' }}></div>
+                    {/* KHUNG BẢNG DANH MỤC LỚN */}
+                    <div className="category-hero-grid">
+                        <div className="category-sidebar">
+                            {nganhNghesTree.slice(0, 6).map((cat) => (
+                                <div
+                                    key={cat.maNganh}
+                                    className={`category-item ${activeCategory?.maNganh === cat.maNganh ? 'active' : ''}`}
+                                    onMouseEnter={() => setActiveCategory(cat)}
+                                >
+                                    <span>{cat.tenNganh}</span>
+                                    <RightOutlined style={{ fontSize: 12, opacity: 0.6 }} />
+                                </div>
+                            ))}
+                        </div>
 
-                    {/* BỘ LỌC ĐỊA ĐIỂM (PHƯỜNG/XÃ) */}
-                    <Select
-                        value={searchQuery.maPhuong || "all"}
-                        onChange={(value) => {
-                            const val = value === "all" ? null : value;
-                            setSearchQuery({ ...searchQuery, maPhuong: val });
-                            // Xóa lệnh fetchJobs(newQuery) ở đây
-                        }}
-                        disabled={!searchQuery.maTP} // Khóa nếu chưa chọn TP
-                        variant="borderless"
-                        style={{ flex: 1, color: '#fff' }}
-                        showSearch
-                        optionFilterProp="children"
-                    >
-                        <Select.Option value="all">Phường / Xã</Select.Option>
-                        {phuongXas.map((px) => (
-                            <Select.Option key={px.maPhuong} value={px.maPhuong}>
-                                {px.tenPhuong}
-                            </Select.Option>
-                        ))}
-                    </Select>
-
-                    <div style={{ width: 1, background: '#303030', margin: '5px 10px' }}></div>
-
-                    {/* BỘ LỌC NGÀNH NGHỀ */}
-                    <Select
-                        value={searchQuery.maNganh || "all"}
-                        onChange={(value) => {
-                            const val = value === "all" ? null : value;
-                            setSearchQuery({ ...searchQuery, maNganh: val });
-                            // Xóa lệnh fetchJobs(newQuery) ở đây
-                        }}
-                        variant="borderless"
-                        style={{ flex: 1, color: '#fff' }}
-                        showSearch
-                        optionFilterProp="children"
-                    >
-                        <Select.Option value="all">Ngành nghề</Select.Option>
-                        {nganhNghes.map((nganh) => (
-                            <Select.Option key={nganh.maNganh} value={nganh.maNganh}>
-                                {nganh.tenNganh}
-                            </Select.Option>
-                        ))}
-                    </Select>
-
-                    {/* 👉 CHỈ LỌC KHI ẤN NÚT NÀY */}
-                    <Button
-                        type="primary"
-                        onClick={() => fetchJobs()}
-                        style={{ background: '#fa8c16', borderColor: '#fa8c16', width: 100, height: 40, borderRadius: 6, marginLeft: 10 }}
-                    >
-                        <SearchOutlined style={{ fontSize: 18 }} />
-                    </Button>
+                        <div className="category-flyout">
+                            {activeCategory && activeCategory.danhSachCon && activeCategory.danhSachCon.length > 0 ? (
+                                <div>
+                                    <Title level={5} style={{ color: '#2563eb', marginBottom: 18, fontWeight: '700' }}>
+                                        {activeCategory.tenNganh} — Vị trí tuyển dụng hàng đầu
+                                    </Title>
+                                    <Row gutter={[16, 14]}>
+                                        {activeCategory.danhSachCon.map((sub) => (
+                                            <Col span={12} key={sub.maNganh}>
+                                                <div
+                                                    className="sub-category-card"
+                                                    onClick={() => navigate(`/jobs?maNganh=${sub.maNganh}`)}
+                                                >
+                                                    <Text strong style={{ display: 'block', color: '#1e293b', fontSize: 14, paddingRight: 20 }}>
+                                                        {sub.tenNganh}
+                                                    </Text>
+                                                    <Text type="secondary" style={{ fontSize: 12 }}>
+                                                        {sub.viTriChuyenMon?.length || 0} chuyên môn mở rộng
+                                                    </Text>
+                                                </div>
+                                            </Col>
+                                        ))}
+                                    </Row>
+                                </div>
+                            ) : (
+                                <Carousel autoplay style={{ borderRadius: 12, overflow: 'hidden' }}>
+                                    <div>
+                                        <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=60" alt="Banner 1" style={{ width: '100%', height: '280px', objectFit: 'cover' }} />
+                                    </div>
+                                    <div>
+                                        <img src="https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=800&q=60" alt="Banner 2" style={{ width: '100%', height: '280px', objectFit: 'cover' }} />
+                                    </div>
+                                </Carousel>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* ================= DANH SÁCH CHIẾN DỊCH DẠNG LƯỚI ================= */}
-            <div style={{ maxWidth: 1200, margin: '30px auto 40px auto', padding: '0 20px', position: 'relative', zIndex: 2 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 20 }}>
-                    <Title level={3} style={{ color: '#e6f4ff', margin: 0 }}>Chiến dịch nổi bật</Title>
-                    <a href="#" style={{ color: '#1890ff', fontSize: 15 }}>Xem tất cả →</a>
+            {/* VIỆC LÀM VIP */}
+            <div style={{ maxWidth: 1200, margin: '40px auto 0 auto', padding: '0 20px' }}>
+                <div className="vip-section">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                        <div>
+                            <Title level={3} style={{ color: '#d46b08', margin: 0, fontWeight: '700' }}>
+                                <CrownOutlined style={{ marginRight: 8, color: '#fa8c16' }} />
+                                THƯƠNG HIỆU TUYỂN DỤNG HÀNG ĐẦU (VIP)
+                            </Title>
+                            <Text style={{ color: '#475569', fontSize: 14 }}>
+                                Các doanh nghiệp hàng đầu đang mở cơ hội việc làm hấp dẫn
+                            </Text>
+                        </div>
+                        <Button type="link" onClick={() => navigate('/jobs')} style={{ color: '#fa8c16', fontWeight: 'bold' }}>
+                            Xem tất cả VIP <RightOutlined />
+                        </Button>
+                    </div>
+
+                    <Row gutter={[20, 20]}>
+                        {vipCampaigns.length === 0 ? (
+                            <Col span={24}>
+                                <Text type="secondary" style={{ fontStyle: 'italic' }}>Hiện chưa có tin tuyển dụng VIP nổi bật.</Text>
+                            </Col>
+                        ) : (
+                            vipCampaigns.map((campaign, index) => {
+                                const maViTriDauTien = campaign.viTris && campaign.viTris.length > 0 ? (campaign.viTris[0].id || campaign.viTris[0].maViTri) : null;
+                                const isBookmarked = bookmarkedViTris.includes(maViTriDauTien);
+
+                                return (
+                                    <Col xs={24} md={12} lg={8} key={campaign.maTin || index}>
+                                        <Card
+                                            hoverable
+                                            className="vip-card"
+                                            styles={{ body: { padding: '20px' } }}
+                                            onClick={() => navigate(`/job/${campaign.maTin || campaign.id}`)}
+                                        >
+                                            <div className="vip-badge">HOT PRO</div>
+
+                                            <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                                                <Avatar shape="square" size={56} src={campaign.logo} style={{ border: '1px solid #e2e8f0', background: '#fff' }} />
+                                                <div style={{ flex: 1, paddingRight: 20 }}>
+                                                    <Title level={5} style={{ margin: 0, color: '#0f172a', fontSize: 16 }}>{campaign.tieuDeChienDich || campaign.title}</Title>
+                                                    <Text style={{ color: '#0284c7', fontSize: 13, fontWeight: '600', display: 'block', marginTop: 2 }}>{campaign.companyName}</Text>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px dashed #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Tag color="orange" style={{ fontWeight: 'bold' }}>
+                                                    Đang mở {campaign.viTris?.length || 0} vị trí
+                                                </Tag>
+                                                {isBookmarked ? (
+                                                    <HeartFilled className="bookmark-icon bookmarked" onClick={(e) => { e.stopPropagation(); handleBookmark(maViTriDauTien); }} />
+                                                ) : (
+                                                    <HeartOutlined className="bookmark-icon" onClick={(e) => { e.stopPropagation(); handleBookmark(maViTriDauTien); }} />
+                                                )}
+                                            </div>
+                                        </Card>
+                                    </Col>
+                                );
+                            })
+                        )}
+                    </Row>
+                </div>
+            </div>
+
+            {/* VIỆC LÀM MỚI CẬP NHẬT */}
+            <div style={{ maxWidth: 1200, margin: '20px auto 50px auto', padding: '0 20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                    <div>
+                        <Title level={3} style={{ color: '#1f2937', margin: 0, fontWeight: '700' }}>
+                            <FireOutlined style={{ color: '#ff4d4f', marginRight: 8 }} />
+                            Việc Làm Mới Cập Nhật
+                        </Title>
+                        <Text style={{ color: '#6b7280', fontSize: 14 }}>
+                            Hàng ngàn công việc chất lượng dành cho bạn
+                        </Text>
+                    </div>
+
+                    <Button type="link" onClick={() => navigate('/jobs')} style={{ color: '#1677ff', fontWeight: '600' }}>
+                        Xem tất cả <RightOutlined style={{ fontSize: 12 }} />
+                    </Button>
                 </div>
 
                 <Row gutter={[24, 24]}>
-                    {campaigns.length === 0 ? (
-                        <Col span={24} style={{ textAlign: 'center', color: '#8c8c8c', padding: 40 }}>
-                            Không tìm thấy chiến dịch nào phù hợp với điều kiện lọc.
+                    {regularCampaigns.length === 0 ? (
+                        <Col span={24}>
+                            <Card style={{ textAlign: 'center', background: '#ffffff', borderRadius: 12, padding: '40px 0' }}>
+                                <Text style={{ color: '#9ca3af' }}>Không tìm thấy chiến dịch tuyển dụng nào.</Text>
+                            </Card>
                         </Col>
                     ) : (
-                        campaigns.map((campaign, index) => (
-                            <Col span={8} key={campaign.maTin || campaign.id || index}>
-                                <Card
-                                    hoverable
-                                    styles={{ body: { padding: '20px', position: 'relative', display: 'flex', flexDirection: 'column', height: '100%' } }}
-                                    style={{ borderRadius: 12, background: '#1f1f1f', border: '1px solid #303030', height: '100%', cursor: 'pointer' }}
-                                    onClick={() => {
-                                        const campaignId = campaign.maTin || campaign.id;
-                                        if (campaignId) navigate(`/job/${campaignId}`);
-                                    }}
-                                >
-                                    {/* THÔNG TIN CHIẾN DỊCH VÀ CÔNG TY */}
-                                    <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                                        <div style={{ border: '1px solid #303030', borderRadius: 8, padding: 4, marginRight: 16, background: '#141414' }}>
-                                            <Avatar shape="square" size={50} src={campaign.logo} alt={campaign.companyName} />
+                        regularCampaigns.map((campaign, index) => {
+                            const maViTriDauTien = campaign.viTris && campaign.viTris.length > 0 ? (campaign.viTris[0].id || campaign.viTris[0].maViTri) : null;
+                            const isBookmarked = bookmarkedViTris.includes(maViTriDauTien);
+
+                            return (
+                                <Col xs={24} md={12} lg={8} key={campaign.maTin || index}>
+                                    <Card
+                                        hoverable
+                                        className="regular-card"
+                                        styles={{ body: { padding: '20px', display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' } }}
+                                        onClick={() => navigate(`/job/${campaign.maTin || campaign.id}`)}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                                            <Avatar shape="square" size={52} src={campaign.logo} style={{ border: '1px solid #f0f0f0', background: '#fff' }} />
+                                            <div style={{ flex: 1, paddingRight: 28 }}>
+                                                <Title level={5} style={{ margin: '0 0 4px 0', fontSize: 16, color: '#111827', fontWeight: '700' }}>
+                                                    {campaign.tieuDeChienDich || campaign.title}
+                                                </Title>
+                                                <Text style={{ color: '#4b5563', fontSize: 13, display: 'block' }}>
+                                                    {campaign.companyName}
+                                                </Text>
+                                            </div>
                                         </div>
 
-                                        <div style={{ flex: 1, paddingRight: 25 }}>
-                                            <Title level={5} style={{ margin: '0 0 4px 0', fontSize: 15, color: '#e6f4ff', lineHeight: 1.4 }}>
-                                                {campaign.tieuDeChienDich || campaign.title}
-                                            </Title>
-                                            <Text style={{ color: '#8c8c8c', fontSize: 13, display: 'block' }}>
-                                                {campaign.companyName}
-                                            </Text>
-                                        </div>
-                                    </div>
-
-                                    {/* CỜ VIP & NÚT LƯU TIN (BOOKMARK) */}
-                                    <div style={{ position: 'absolute', top: 20, right: 20, display: 'flex', alignItems: 'center' }}>
-                                        {campaign.isPromoted && (
-                                            <Tag color="#f50" style={{ marginRight: 12, fontWeight: 'bold', border: 'none' }}>HOT</Tag>
-                                        )}
-                                        <HeartOutlined
-                                            style={{ fontSize: 18, color: '#8c8c8c', cursor: 'pointer', transition: 'color 0.3s' }}
-                                            onMouseEnter={(e) => e.target.style.color = '#ff4d4f'}
-                                            onMouseLeave={(e) => e.target.style.color = '#8c8c8c'}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                const maViTriDauTien = campaign.viTris && campaign.viTris.length > 0 ? campaign.viTris[0].maViTri || campaign.viTris[0].id : null;
-                                                handleBookmark(maViTriDauTien);
-                                            }}
-                                        />
-                                    </div>
-
-                                    {/* HIỂN THỊ SƠ LƯỢC CÁC VỊ TRÍ BÊN TRONG */}
-                                    <div style={{
-                                        marginTop: 'auto', paddingTop: 16, borderTop: '1px dashed #303030', display: 'flex', flexDirection: 'column', gap: 8
-                                    }}>
-                                        <Text style={{ color: '#1890ff', fontSize: 13 }}>
-                                            <PushpinOutlined /> Đang mở {campaign.viTris?.length || 0} vị trí:
-                                        </Text>
-
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                            {campaign.viTris?.slice(0, 2).map(vt => (
-                                                <Tag
-                                                    key={vt.maViTri || vt.id}
-                                                    style={{ background: '#11284d', borderColor: '#164c7e', color: '#1677ff', margin: 0, borderRadius: 4, cursor: 'pointer' }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const campaignId = campaign.maTin || campaign.id;
-                                                        if (campaignId) navigate(`/job/${campaignId}`);
-                                                    }}
-                                                >
-                                                    {vt.tenViTri || vt.title}
-                                                </Tag>
-                                            ))}
-                                            {campaign.viTris?.length > 2 && (
-                                                <Tag style={{ background: '#141414', borderColor: '#303030', color: '#8c8c8c' }}>
-                                                    +{campaign.viTris.length - 2}
-                                                </Tag>
+                                        <div style={{ position: 'absolute', top: 18, right: 18 }}>
+                                            {isBookmarked ? (
+                                                <HeartFilled className="bookmark-icon bookmarked" onClick={(e) => { e.stopPropagation(); handleBookmark(maViTriDauTien); }} />
+                                            ) : (
+                                                <HeartOutlined className="bookmark-icon" onClick={(e) => { e.stopPropagation(); handleBookmark(maViTriDauTien); }} />
                                             )}
                                         </div>
-                                    </div>
-                                </Card>
-                            </Col>
-                        ))
+
+                                        <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px dashed #f0f0f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                            <Text style={{ color: '#1677ff', fontSize: 13, fontWeight: '600' }}>
+                                                <PushpinOutlined style={{ marginRight: 4 }} /> Đang mở {campaign.viTris?.length || 0} vị trí tuyển dụng
+                                            </Text>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                                {campaign.viTris?.slice(0, 2).map(vt => (
+                                                    <Tag key={vt.id || vt.maViTri} style={{ background: '#e6f4ff', borderColor: '#91caff', color: '#0958d9', margin: 0 }}>
+                                                        {vt.title || vt.tenViTri}
+                                                    </Tag>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </Card>
+                                </Col>
+                            );
+                        })
                     )}
-                </Row>
-            </div>
-
-            {/* ================= SECTION TẠI SAO CHỌN JOBSNOW ================= */}
-            <div style={{ maxWidth: 1000, margin: '80px auto', padding: '0 20px', textAlign: 'center' }}>
-                <Title level={3} style={{ marginBottom: 40, color: '#e6f4ff' }}>Tại sao chọn JobsNow?</Title>
-
-                <Row gutter={48}>
-                    <Col span={8}>
-                        <div style={{ background: '#11284d', width: 70, height: 70, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-                            <SearchOutlined style={{ fontSize: 30, color: '#1890ff' }} />
-                        </div>
-                        <Title level={5} style={{ color: '#e6f4ff' }}>Tìm kiếm dễ dàng</Title>
-                        <Paragraph style={{ color: '#8c8c8c' }}>Hàng ngàn việc làm được cập nhật mỗi ngày</Paragraph>
-                    </Col>
-                    <Col span={8}>
-                        <div style={{ background: '#0f3315', width: 70, height: 70, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-                            <CheckCircleOutlined style={{ fontSize: 30, color: '#52c41a' }} />
-                        </div>
-                        <Title level={5} style={{ color: '#e6f4ff' }}>Ứng tuyển nhanh</Title>
-                        <Paragraph style={{ color: '#8c8c8c' }}>Chỉ với vài cú click chuột</Paragraph>
-                    </Col>
-                    <Col span={8}>
-                        <div style={{ background: '#2b164d', width: 70, height: 70, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
-                            <ThunderboltOutlined style={{ fontSize: 30, color: '#b37feb' }} />
-                        </div>
-                        <Title level={5} style={{ color: '#e6f4ff' }}>Cơ hội tốt</Title>
-                        <Paragraph style={{ color: '#8c8c8c' }}>Kết nối với các công ty hàng đầu</Paragraph>
-                    </Col>
                 </Row>
             </div>
         </div>

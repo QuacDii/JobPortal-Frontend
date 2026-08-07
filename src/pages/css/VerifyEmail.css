@@ -1,0 +1,66 @@
+/* ========================================================
+   VERIFY EMAIL PAGE - LIGHT MODE UI
+   ======================================================== */
+
+.verify-email-container {
+    min-height: 100vh;
+    background-color: #f4f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+}
+
+.verify-email-card {
+    width: 100%;
+    max-width: 480px;
+    background-color: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e8e8e8;
+    padding: 36px 32px;
+}
+
+.verify-email-icon-box {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #e6f7ff;
+    color: #1890ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    margin: 0 auto 20px auto;
+}
+
+.otp-input-large .ant-input-otp-input {
+    height: 52px !important;
+    font-size: 24px !important;
+    font-weight: bold !important;
+    border-radius: 8px !important;
+    border-color: #d9d9d9 !important;
+}
+
+.otp-input-large .ant-input-otp-input:focus,
+.otp-input-large .ant-input-otp-input-active {
+    border-color: #1890ff !important;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+}
+
+.btn-primary-blue {
+    height: 46px !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;
+    background: #1890ff !important;
+    border-color: #1890ff !important;
+    box-shadow: 0 4px 12px rgba(24, 144, 255, 0.25) !important;
+    transition: all 0.25s ease !important;
+}
+
+.btn-primary-blue:hover {
+    background: #40a9ff !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(24, 144, 255, 0.35) !important;
+}

@@ -1,0 +1,286 @@
+/* ================= BỐ CỤC CHUNG ================= */
+.search-page-container {
+    min-height: 100vh;
+    padding-bottom: 60px;
+    transition: background 0.3s ease;
+}
+
+.search-page-container.light {
+    background: #f8fafc;
+    color: #1e293b;
+}
+
+.search-page-container.dark {
+    background: #0f172a;
+    color: #f1f5f9;
+}
+
+/* ================= THANH TÌM KIẾM CỐ ĐỊNH ================= */
+.top-search-bar {
+    background: #001529;
+    padding: 20px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.top-search-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-input-field {
+    flex: 1.5;
+    min-width: 220px;
+    height: 44px;
+    border-radius: 8px;
+    font-size: 15px;
+}
+
+.search-select-field {
+    flex: 1;
+    min-width: 160px;
+    height: 44px;
+}
+
+.btn-search-submit {
+    height: 44px;
+    padding: 0 28px;
+    background: #00b96b !important;
+    border-color: #00b96b !important;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 15px;
+}
+
+.btn-search-submit:hover {
+    background: #009655 !important;
+}
+
+/* ================= BỐ CỤC SIDEBAR & BÀI TUYỂN DỤNG ================= */
+.main-layout {
+    max-width: 1200px;
+    margin: 30px auto 0 auto;
+    padding: 0 20px;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 24px;
+}
+
+/* SIDEBAR BỘ LỌC */
+.filter-sidebar {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #e2e8f0;
+    height: fit-content;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+}
+
+.dark .filter-sidebar {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.dark .filter-header {
+    border-bottom-color: #334155;
+}
+
+.filter-sidebar-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.dark .filter-sidebar-title {
+    color: #f8fafc;
+}
+
+.filter-section {
+    margin-bottom: 24px;
+}
+
+.filter-section-title {
+    font-weight: 600;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dark .filter-section-title {
+    color: #cbd5e1;
+}
+
+.radio-group-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dark .ant-radio-wrapper {
+    color: #cbd5e1;
+}
+
+.btn-apply-sidebar {
+    height: 42px;
+    font-weight: bold;
+    border-radius: 8px;
+    background: #1677ff;
+}
+
+/* BẢNG THẺ BÀI TUYỂN DỤNG */
+.result-count-header {
+    margin-bottom: 16px;
+    font-size: 15px;
+    font-weight: 500;
+}
+
+.job-cards-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.job-item-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #e2e8f0;
+    transition: all 0.25s ease;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+.dark .job-item-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.job-item-card:hover {
+    border-color: #60a5fa;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.1);
+}
+
+.job-item-card.promoted-item {
+    border: 2px solid #f59e0b;
+    background: linear-gradient(180deg, #ffffff 0%, #fffbeb 100%);
+}
+
+.dark .job-item-card.promoted-item {
+    background: linear-gradient(180deg, #1e293b 0%, #291e11 100%);
+}
+
+.job-card-header {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.company-logo {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #f1f5f9;
+}
+
+.job-meta {
+    flex: 1;
+}
+
+.job-campaign-title {
+    margin: 0 0 4px 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dark .job-campaign-title {
+    color: #f8fafc;
+}
+
+.company-name {
+    color: #475569;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.dark .company-name {
+    color: #94a3b8;
+}
+
+.job-location {
+    font-size: 13px;
+    color: #64748b;
+    margin-top: 6px;
+}
+
+.job-action-box {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+}
+
+.salary-text {
+    font-size: 16px;
+    font-weight: 700;
+    color: #059669;
+}
+
+.heart-btn {
+    padding: 4px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.heart-btn:hover {
+    transform: scale(1.2);
+}
+
+.job-tags-row {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed #f1f5f9;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.dark .job-tags-row {
+    border-top-color: #334155;
+}
+
+.position-tag {
+    border-radius: 6px;
+    padding: 2px 10px;
+    font-size: 12px;
+}
+
+.empty-card {
+    text-align: center;
+    padding: 60px 0;
+    border-radius: 12px;
+}

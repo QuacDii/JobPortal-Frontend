@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Typography, Row, Col, message } from 'antd';
+import { Form, Input, Button, Typography, Row, Col, message, Modal } from 'antd';
 import { MailOutlined, LockOutlined, GoogleOutlined, FacebookFilled } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { jwtDecode } from 'jwt-decode'; 
+import { jwtDecode } from 'jwt-decode';
 import apiClient from '../api/apiClient';
-import { useGoogleLogin } from '@react-oauth/google'; 
+import { useGoogleLogin } from '@react-oauth/google';
 import FacebookLoginRaw from 'react-facebook-login/dist/facebook-login-render-props';
 
 const FacebookLogin = FacebookLoginRaw.default || FacebookLoginRaw;
@@ -16,9 +16,9 @@ const Login = () => {
     const [form] = Form.useForm();
 
     // HỆ MÀU SẮC LIGHT MODE
-    const primaryColor = '#1890ff'; 
-    const textColor = '#595959'; 
-    const headingColor = '#262626'; 
+    const primaryColor = '#1890ff';
+    const textColor = '#595959';
+    const headingColor = '#262626';
 
     // Hàm điều hướng thông minh dựa vào Quyền (Role) trong Token
     const handleRoleNavigation = (token) => {
@@ -30,7 +30,7 @@ const Login = () => {
         } else if (role === "1") {
             window.location.href = '/employer/dashboard';
         } else {
-            window.location.href = '/'; 
+            window.location.href = '/';
         }
     };
 
@@ -39,14 +39,14 @@ const Login = () => {
         try {
             // 1. Ép Antd quét kiểm tra các ô dữ liệu xem điền đúng/đủ chưa
             const values = await form.validateFields();
-            
+
             console.log("Form hợp lệ! Đang bắn API đăng nhập với data:", values);
             setLoading(true);
 
             // 2. Gọi API xuống Backend
             const response = await apiClient.post('/auth/login', {
                 email: values.email,
-                matKhau: values.matKhau 
+                matKhau: values.matKhau
             });
 
             if (response.success) {
@@ -60,7 +60,7 @@ const Login = () => {
                 console.warn("❌ Người dùng chưa điền đủ Form:", error);
                 return;
             }
-            
+
             console.error("❌ Lỗi từ API Backend:", error);
             const errorMsg = error.response?.data?.message || 'Tài khoản hoặc mật khẩu không chính xác!';
             message.error(errorMsg);
@@ -74,7 +74,7 @@ const Login = () => {
         onSuccess: async (tokenResponse) => {
             try {
                 const response = await apiClient.post('/auth/google-login', {
-                    accessToken: tokenResponse.access_token 
+                    accessToken: tokenResponse.access_token
                 });
 
                 if (response.success) {
@@ -94,9 +94,9 @@ const Login = () => {
 
     return (
         <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            
+
             <div style={{ width: '100%', maxWidth: 480, backgroundColor: '#ffffff', padding: '40px', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.05)' }}>
-                
+
                 <div style={{ marginBottom: 32, textAlign: 'center' }}>
                     <Title level={3} style={{ color: headingColor, margin: '0 0 8px 0', fontWeight: '800' }}>
                         Chào mừng bạn quay lại!
@@ -108,7 +108,7 @@ const Login = () => {
 
                 {/*Form chỉ làm nhiệm vụ giữ trạng thái, không tham gia vào hành vi submit của HTML */}
                 <Form form={form} layout="vertical">
-                    
+
                     {/* Ô NHẬP EMAIL */}
                     <Form.Item
                         label={<span style={{ color: headingColor, fontWeight: 500 }}>Email</span>}
@@ -133,7 +133,7 @@ const Login = () => {
                     >
                         <Input.Password
                             size="large"
-                            placeholder="Nhập mật khẩu của bạn" 
+                            placeholder="Nhập mật khẩu của bạn"
                             prefix={<LockOutlined style={{ color: '#bfbfbf', marginRight: 8, fontSize: 18 }} />}
                             style={{ borderRadius: 6, padding: '10px 14px' }}
                         />
@@ -161,25 +161,25 @@ const Login = () => {
                         <span style={{ backgroundColor: '#fff', padding: '0 10px', position: 'relative', zIndex: 1 }}>Hoặc đăng nhập bằng</span>
                         <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', backgroundColor: '#e8e8e8', zIndex: 0 }}></div>
                     </div>
-                    
+
                     <Row gutter={16} style={{ marginBottom: 24 }}>
                         {/* NÚT GOOGLE */}
                         <Col span={12}>
-                            <Button 
-                                size="large" 
-                                block 
-                                icon={<GoogleOutlined />} 
+                            <Button
+                                size="large"
+                                block
+                                icon={<GoogleOutlined />}
                                 onClick={() => loginWithGoogle()}
                                 style={{ backgroundColor: '#ea4335', color: '#fff', border: 'none', fontWeight: '600', borderRadius: 6 }}
                             >
                                 Google
                             </Button>
                         </Col>
-                        
+
                         {/* NÚT FACEBOOK */}
                         <Col span={12}>
                             <FacebookLogin
-                                appId="1594501296013131" 
+                                appId="1594501296013131"
                                 fields="name,email,picture"
                                 scope="public_profile,email"
                                 callback={async (response) => {
@@ -191,7 +191,26 @@ const Login = () => {
                                             if (res.success) {
                                                 message.success(res.message);
                                                 localStorage.setItem('token', res.token);
-                                                handleRoleNavigation(res.token); 
+                                                const decoded = jwtDecode(res.token);
+                                                const role = decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"];
+
+                                                // 1. Nếu là Admin (Role = 0), chuyển thẳng vào Admin Dashboard
+                                                if (role === "0") {
+                                                    window.location.href = '/admin/dashboard';
+                                                    return;
+                                                }
+                                                if (res.requireUpdateEmail) {
+                                                    Modal.warning({
+                                                        title: 'Cập nhật Email nhận thông báo',
+                                                        content: 'Tài khoản Facebook của bạn chưa có Email chính thức. Vui lòng cập nhật Email thực tế để nhận báo việc làm và thông báo tuyển dụng.',
+                                                        okText: 'Cập nhật ngay',
+                                                        onOk: () => {
+                                                            navigate('/verify-email');
+                                                        }
+                                                    });
+                                                } else {
+                                                    handleRoleNavigation(res.token);
+                                                }
                                             }
                                         } catch (error) {
                                             message.error('Đăng nhập Facebook thất bại tại Server!');
@@ -201,10 +220,10 @@ const Login = () => {
                                     }
                                 }}
                                 render={renderProps => (
-                                    <Button 
-                                        size="large" 
+                                    <Button
+                                        size="large"
                                         block
-                                        icon={<FacebookFilled />} 
+                                        icon={<FacebookFilled />}
                                         style={{ backgroundColor: '#1877f2', color: '#fff', border: 'none', fontWeight: '600', borderRadius: 6 }}
                                         onClick={renderProps.onClick}
                                     >

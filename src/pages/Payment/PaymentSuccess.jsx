@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Result, Button } from 'antd';
+import apiClient from '../../api/apiClient';
 
 const PaymentSuccess = () => {
     const [searchParams] = useSearchParams();
@@ -18,6 +19,27 @@ const PaymentSuccess = () => {
             }
             localStorage.removeItem('payment_redirect');
         }
+
+        // 2. LÀM MỚI DỮ LIỆU USER NGAY SAU KHI THANH TOÁN (CÁCH 2)
+        const refreshUserStatus = async () => {
+            try {
+                // 1. Gọi API cấp lại Token mới. 
+                const response = await apiClient.post('/Auth/refresh-token');
+
+                if (response.data && response.data.token) {
+                    // 2. Lưu đè Token mới (chứa hạn VIP mới) vào LocalStorage
+                    localStorage.setItem('token', response.data.token);
+
+                    // 3. Kích hoạt sự kiện để Header (UserDropdown) biết và tự động cập nhật UI ngay lập tức
+                    window.dispatchEvent(new Event('storage'));
+                }
+            } catch (error) {
+                console.error("Lỗi khi làm mới trạng thái VIP:", error);
+            }
+        };
+
+        refreshUserStatus();
+
     }, []);
 
     return (
@@ -28,7 +50,7 @@ const PaymentSuccess = () => {
                 subTitle={`Hệ thống đã ghi nhận mã đơn hàng: ${orderId || 'Thành công'}. Các quyền lợi dịch vụ của bạn đã được kích hoạt tự động an toàn.`}
                 extra={[
                     <Button type="primary" key="console" size="large">
-                        <Link to={returnUrl}>{btnText}</Link>
+                        <a href={returnUrl}>{btnText}</a>
                     </Button>
                 ]}
             />

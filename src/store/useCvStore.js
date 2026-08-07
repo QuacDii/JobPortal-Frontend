@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import set from 'lodash/set';
 import get from 'lodash/get';
-import DefaultLayoutJson from '../Components/CvEngine/LayoutTemplate1.json';
 
 const useCvStore = create((setStore, getStore) => ({
   // Dữ liệu nội dung CV khởi tạo ban đầu
@@ -17,11 +16,6 @@ const useCvStore = create((setStore, getStore) => ({
     activities: [],
     projects: []
   },
-
-  // Bản vẽ cấu trúc cây JSON Layout của CV
-  layoutSchema: DefaultLayoutJson,
-
-  // Các cấu hình phong cách, font chữ, kích thước toàn cục chuẩn TopCV
   layoutSettings: {
     fontFamily: '"Be Vietnam Pro", sans-serif',
     fontSize: 14,
@@ -30,7 +24,7 @@ const useCvStore = create((setStore, getStore) => ({
     backgroundStyle: 'none' 
   },
 
-  // 🚀 2. ĐẠI TU HÀM NÀY: Tiếp nhận trực tiếp dữ liệu chuẩn hóa đổ từ CvBuilder sang
+  //Tiếp nhận trực tiếp dữ liệu chuẩn hóa đổ từ CvBuilder sang
   setInitialData: (layoutJson, contentData) => setStore((state) => ({
     layoutSchema: layoutJson ? layoutJson : state.layoutSchema,
     cvData: contentData ? contentData : state.cvData
@@ -54,7 +48,7 @@ const useCvStore = create((setStore, getStore) => ({
   },
 
   /* ========================================================
-     BỔ SUNG 3 HÀM DÀNH RIÊNG CHO ATOMIC RENDERER ĐIỀU KHIỂN
+    HÀM DÀNH RIÊNG CHO ATOMIC RENDERER ĐIỀU KHIỂN
   ======================================================== */
   addLoopItem: (arrayPath) => setStore((state) => {
     const newCvData = JSON.parse(JSON.stringify(state.cvData));

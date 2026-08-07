@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { 
     Table, Button, Space, message, Card, Popconfirm, Tag, 
-    Drawer, Descriptions, Divider, Typography, Avatar, Badge, List 
+    Drawer, Descriptions, Typography, Avatar, Badge, List, Row, Col 
 } from 'antd';
 import { 
     CheckOutlined, CloseOutlined, NotificationOutlined, 
@@ -236,7 +236,7 @@ const ApproveJobPosts = () => {
                                 <Card 
                                     key={viTri.maViTri || index} 
                                     style={{ marginBottom: 16, borderRadius: 10, border: '1px solid #cbd5e1' }}
-                                    bodyStyle={{ padding: 16 }}
+                                    styles={{ body: { padding: 16 } }}
                                 >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                                         <Text strong style={{ fontSize: 16, color: '#1e293b' }}>
@@ -248,7 +248,7 @@ const ApproveJobPosts = () => {
                                     <Row gutter={[16, 8]} style={{ marginBottom: 12, backgroundColor: '#f1f5f9', padding: '8px 12px', borderRadius: 6 }}>
                                         <Col span={12}>
                                             <Text type="secondary"><DollarOutlined /> Mức lương: </Text>
-                                            <Text strong color="green">{viTri.luong || 'Thỏa thuận'}</Text>
+                                            <Text strong style={{ color: '#16a34a' }}>{viTri.luong || 'Thỏa thuận'}</Text>
                                         </Col>
                                         <Col span={12}>
                                             <Text type="secondary"><TeamOutlined /> Số lượng tuyển: </Text>

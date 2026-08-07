@@ -1,0 +1,310 @@
+/* ================= 1. HERO SECTION (HỌA TIẾT HÌNH HỌC 3D TOPCV) ================= */
+.hero-wrapper {
+    position: relative;
+    background-color: #091e36;
+    background-image: radial-gradient(circle at 50% 30%, #1e40af 0%, #0a192f 80%);
+    padding: 60px 20px 80px 20px;
+    color: #ffffff;
+    overflow: hidden;
+}
+
+/* Họa tiết bên trái - Đã đẩy xuống nền dưới cùng (z-index: 0) */
+.hero-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 380px;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.3) 0%, rgba(30, 58, 138, 0.05) 100%);
+    clip-path: polygon(0 0, 65% 0, 25% 100%, 0% 100%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Họa tiết bên phải - Đã đẩy xuống nền dưới cùng (z-index: 0) */
+.hero-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 380px;
+    height: 100%;
+    background: linear-gradient(-135deg, rgba(37, 99, 235, 0.3) 0%, rgba(30, 58, 138, 0.05) 100%);
+    clip-path: polygon(35% 0, 100% 0, 100% 100%, 75% 100%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.hero-content-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 2;
+}
+
+/* ================= 2. ĐẶT Z-INDEX CHO CÁC NỘI DUNG HIỂN THỊ ĐÈ LÊN NỀN ================= */
+
+/* Ô Tìm kiếm: Thiết lập z-index: 10 để nổi lên trên cùng */
+.hero-search-box {
+    position: relative;
+    z-index: 10;
+    background: #ffffff;
+    padding: 8px 14px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    margin-bottom: 16px;
+}
+
+/* Khung gợi ý từ khóa */
+.search-tag-hint {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+    font-size: 13px;
+    color: #cbd5e1;
+}
+
+/* Khung Bảng Danh Mục */
+.category-hero-grid {
+    position: relative;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: 310px 1fr;
+    background: #ffffff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15);
+}
+
+/* ================= 2. NÚT TÌM KIẾM CÓ HIỆU ỨNG NỔI & PHÁT SÁNG ================= */
+.btn-search-hero {
+    background: linear-gradient(135deg, #00b96b 0%, #009655 100%) !important;
+    border: none !important;
+    color: #ffffff !important;
+    height: 46px !important;
+    padding: 0 32px !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;
+    box-shadow: 0 4px 14px rgba(0, 185, 107, 0.35) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    position: relative;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* Hiệu ứng Rê chuột (Hover state): Phóng to nhẹ, tỏa sáng rực rỡ */
+.btn-search-hero:hover {
+    background: linear-gradient(135deg, #00d078 0%, #00b96b 100%) !important;
+    transform: translateY(-2px) scale(1.02) !important;
+    box-shadow: 0 8px 25px rgba(0, 185, 107, 0.55) !important;
+}
+
+/* Hiệu ứng Nhấn nút (Active state) */
+.btn-search-hero:active {
+    transform: translateY(1px) scale(0.98) !important;
+    box-shadow: 0 2px 8px rgba(0, 185, 107, 0.4) !important;
+}
+
+/* Vệt sáng chạy lướt qua nút khi Hover */
+.btn-search-hero::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -60%;
+    width: 40%;
+    height: 200%;
+    background: rgba(255, 255, 255, 0.25);
+    transform: rotate(30deg);
+    transition: all 0.6s ease;
+}
+
+.btn-search-hero:hover::after {
+    left: 130%;
+}
+
+.hero-content-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 2;
+}
+
+/* Khung Tìm kiếm Glassmorphism (Kính mờ) */
+.hero-search-box {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    padding: 8px 14px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    margin-bottom: 16px;
+}
+
+.search-tag-hint {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+    font-size: 13px;
+    color: #cbd5e1;
+}
+
+.search-tag-hint .hint-item {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    padding: 3px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    transition: all 0.25s ease;
+}
+
+.search-tag-hint .hint-item:hover {
+    background: #ffffff;
+    color: #1e40af;
+    transform: translateY(-1px);
+}
+
+/* ================= 2. HIỆU ỨNG TƯƠNG TÁC NGÀNH NGHỀ CON ================= */
+.category-hero-grid {
+    display: grid;
+    grid-template-columns: 310px 1fr;
+    background: #ffffff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.15);
+}
+
+.category-sidebar {
+    background: #f8fafc;
+    border-right: 1px solid #f1f5f9;
+    padding: 10px 0;
+}
+
+.category-item {
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #334155;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.category-item:hover,
+.category-item.active {
+    background: linear-gradient(90deg, #eff6ff 0%, #ffffff 100%);
+    color: #2563eb;
+    padding-left: 24px;
+    border-left: 4px solid #2563eb;
+}
+
+.category-flyout {
+    padding: 24px;
+    background: #ffffff;
+    min-height: 340px;
+}
+
+/* Thẻ Ngành Con: Hiệu ứng nổi bứt phá + Mũi tên trượt */
+.sub-category-card {
+    padding: 14px 16px;
+    background: #f8fafc;
+    border-radius: 12px;
+    cursor: pointer;
+    border: 1px solid #e2e8f0;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.sub-category-card:hover {
+    background: #ffffff;
+    border-color: #3b82f6;
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: 0 10px 25px rgba(59, 130, 246, 0.12);
+}
+
+.sub-category-card::after {
+    content: '→';
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%) translateX(-8px);
+    opacity: 0;
+    color: #2563eb;
+    font-weight: bold;
+    font-size: 16px;
+    transition: all 0.25s ease;
+}
+
+.sub-category-card:hover::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}
+
+/* ================= 3. KHUNG VIP HOÀNG GIA (PRO/PREMIUM CARD) ================= */
+.vip-section {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #eff6ff 100%);
+    border: 1.5px solid #fde68a;
+    border-radius: 20px;
+    padding: 32px 28px;
+    box-shadow: 0 12px 30px rgba(245, 158, 11, 0.08);
+}
+
+.vip-card {
+    border-radius: 16px !important;
+    background: #ffffff !important;
+    border: 2px solid #f59e0b !important;
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.12) !important;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.vip-card:hover {
+    transform: translateY(-6px) scale(1.015) !important;
+    box-shadow: 0 20px 40px rgba(245, 158, 11, 0.25) !important;
+    border-color: #d97706 !important;
+}
+
+/* Badge VIP lấp lánh Kim Kim */
+.vip-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: linear-gradient(135deg, #dc2626 0%, #f59e0b 100%);
+    color: #ffffff;
+    padding: 4px 14px;
+    font-size: 11px;
+    font-weight: 800;
+    border-bottom-left-radius: 12px;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+}
+
+/* ================= 4. VIỆC LÀM THƯỜNG ================= */
+.regular-card {
+    border-radius: 14px !important;
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    transition: all 0.25s ease !important;
+}
+
+.regular-card:hover {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.1) !important;
+    transform: translateY(-3px);
+}

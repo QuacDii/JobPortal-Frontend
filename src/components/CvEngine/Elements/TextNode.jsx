@@ -5,32 +5,53 @@ import get from 'lodash/get';
 const TextNode = ({ dataPath, placeholder, styles, dataScope }) => {
   const updateCvDataPath = useCvStore((state) => state.updateCvDataPath);
 
-  // 🚀 SỬA LỖI 1: Tính toán chính xác tuyệt đối đường dẫn mảng lặp
+  // 1. Tính toán chính xác tuyệt đối đường dẫn mảng lặp
   let finalPath = dataPath;
   if (dataScope && dataScope.parentPath !== undefined) {
     finalPath = `${dataScope.parentPath}[${dataScope.index}].${dataPath}`;
   }
 
-  // 🚀 SỬA LỖI 2: Chỉ lấy đúng dữ liệu của ô này từ store để tránh re-render vô ích
+  // 2. Chỉ lấy đúng dữ liệu của ô này từ store để tránh re-render vô ích
   const value = useCvStore((state) => get(state.cvData, finalPath, '')); 
   const elementRef = useRef(null);
 
-  // 🚀 SỬA LỖI 3: Bảo vệ DOM không bị ghi đè khi đang nhấp nháy chuột gõ chữ
+  // KIỂM TRA CHẾ ĐỘ XEM / XUẤT PDF (/xem-cv HOẶC .is-exporting)
+  const isExportMode = typeof window !== 'undefined' && (
+    document.querySelector('.is-exporting') !== null || 
+    window.location.pathname.includes('/xem-cv')
+  );
+
+  // 3. Bảo vệ DOM không bị ghi đè khi đang nhấp nháy chuột gõ chữ 
   useEffect(() => {
-    if (elementRef.current) {
+    if (elementRef.current && !isExportMode) {
       const isCurrentlyFocused = document.activeElement === elementRef.current;
       if (!isCurrentlyFocused && elementRef.current.innerText !== value) {
         elementRef.current.innerText = value;
       }
     }
-  }, [value]);
+  }, [value, isExportMode]);
 
-  // Đổi sang onBlur (khi click/di chuyển chuột ra ngoài mới lưu) để tăng hiệu năng
   const handleBlur = (e) => {
     const text = e.target.innerText;
     updateCvDataPath(finalPath, text);
   };
 
+  // TRƯỜNG HỢP 1: Ở TRANG XEM / XUẤT PDF -> ĐỂ TRẮNG HOÀN TOÀN KHI RỖNG
+  if (isExportMode) {
+    return (
+      <span
+        style={{
+          outline: 'none',
+          display: 'inline-block',
+          ...styles
+        }}
+      >
+        {value || ''}
+      </span>
+    );
+  }
+
+  // TRƯỜNG HỢP 2: Ở TRANG CV BUILDER -> GIỮ NGUYÊN PLACEHOLDER ĐỂ CHỈNH SỬA
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <div

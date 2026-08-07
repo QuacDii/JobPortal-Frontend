@@ -1,74 +1,133 @@
- .custom-radio-group .ant-radio-wrapper {
-     display: flex;
-     align-items: flex-start;
-     width: 100%;
-     background-color: #1f1f1f;
-     border: 1px solid #303030;
-     border-radius: 8px;
-     padding: 16px;
-     margin-bottom: 12px;
-     color: #fff;
-     transition: all 0.3s;
-     margin-inline-end: 0px !important;
- }
+/* ========================================================
+   1. CẤU TRÚC CHUNG (Áp dụng cho cả Light và Dark Mode) 
+   ======================================================== */
+.filter-scroll-container::-webkit-scrollbar {
+    display: none;
+}
 
- .custom-radio-group .ant-radio-wrapper-checked {
-     border-color: #1890ff !important;
-     background-color: rgba(24, 144, 255, 0.03);
- }
+/* Custom Select Input - Light Mode */
+.custom-light-select .ant-select-selector {
+    background-color: #ffffff !important;
+    border: 1px solid #d9d9d9 !important;
+    color: #262626 !important;
+    border-radius: 8px !important;
+    height: 44px !important;
+    align-items: center;
+    font-weight: 500;
+}
 
- .custom-radio-group .ant-radio-checked .ant-radio-inner {
-     border-color: #1890ff !important;
-     background-color: #1890ff !important;
- }
+.custom-light-select:hover .ant-select-selector {
+    border-color: #1890ff !important;
+}
 
- .custom-radio-group .ant-radio-inner:after {
-     background-color: #fff !important;
- }
+/* Custom Select Input - Dark Mode */
+.custom-dark-select .ant-select-selector {
+    background-color: #141414 !important;
+    border: 1px solid #303030 !important;
+    color: #ffffff !important;
+    border-radius: 8px !important;
+    height: 44px !important;
+    align-items: center;
+    font-weight: 500;
+}
 
- .custom-radio-inner-text {
-     display: flex;
-     flex-direction: column;
-     margin-left: 8px;
-     width: 100%;
- }
+.custom-dark-select:hover .ant-select-selector {
+    border-color: #1890ff !important;
+}
 
- .lang-pill-badge {
-     background-color: #1890ff;
-     color: #fff;
-     border: 1px solid #1890ff;
-     border-radius: 20px;
-     padding: 4px 20px;
-     font-size: 13px;
-     font-weight: 500;
-     display: inline-block;
-     text-align: center;
- }
+/* Custom Select Dropdown Popup */
+.custom-select-dropdown {
+    border-radius: 8px !important;
+    padding: 6px !important;
+}
 
- .dark-select-input .ant-select-selector {
-     background-color: #141414 !important;
-     border: 1px solid #303030 !important;
-     color: #fff !important;
-     height: 40px !important;
-     display: flex;
-     align-items: center;
- }
+/* ========================================================
+   2. GIAO DIỆN TỐI (Kích hoạt khi hệ thống/trình duyệt ở Dark Mode)
+   ======================================================== */
+@media (prefers-color-scheme: dark) {
+    .custom-select-dropdown {
+        background-color: #1f1f1f !important;
+        border: 1px solid #303030 !important;
+    }
 
- .dark-select-dropdown {
-     background-color: #1f1f1f !important;
-     border: 1px solid #303030;
- }
+    .custom-select-dropdown .ant-select-item {
+        color: #a6a6a6 !important;
+        border-radius: 6px !important;
+    }
 
- .dark-select-dropdown .ant-select-item {
-     color: #fff !important;
- }
+    .custom-select-dropdown .ant-select-item-option-selected {
+        background-color: #1890ff !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }
 
- .dark-select-dropdown .ant-select-item-option-selected {
-     background-color: #1890ff !important;
-     color: #fff !important;
- }
+    .custom-select-dropdown .ant-select-item-option-active {
+        background-color: rgba(24, 144, 255, 0.1) !important;
+        color: #1890ff !important;
+    }
+}
 
- .dark-select-dropdown .ant-select-item-option-active {
-     background-color: rgba(24, 144, 255, 0.1) !important;
-     color: #1890ff !important;
- }
+/* Custom Modal styling */
+.custom-preview-modal .ant-modal-content {
+    border-radius: 16px !important;
+    padding: 28px 24px !important;
+    transition: background-color 0.3s ease;
+}
+/* ========================================================
+   3. CUSTOM UPLOAD BUTTON & UPLOADED FILE ITEM
+   ======================================================== */
+
+/* Hiệu ứng Hover nút Tải file lên */
+.ant-upload-select .ant-btn {
+    transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+}
+
+.ant-upload-select .ant-btn:hover {
+    background-color: #e6f7ff !important;
+    border-color: #1890ff !important;
+    color: #096dd9 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(24, 144, 255, 0.15) !important;
+}
+
+/* Khung hiển thị File PDF đã tải lên (Lúc chưa hover) */
+.ant-upload-list-item {
+    border-radius: 8px !important;
+    padding: 6px 12px !important;
+    background-color: rgba(0, 0, 0, 0.03) !important;
+    border: 1px solid #e8e8e8 !important;
+    transition: all 0.25s ease-in-out !important;
+    margin-top: 10px !important;
+}
+
+/* Khung hiển thị File PDF khi Rê chuột (Hover) */
+.ant-upload-list-item:hover {
+    background-color: #e6f7ff !important;
+    border-color: #91d5ff !important;
+}
+
+/* Tên file PDF */
+.ant-upload-list-item-name {
+    font-weight: 500 !important;
+    color: #333333 !important;
+    transition: color 0.2s ease !important;
+}
+
+.ant-upload-list-item:hover .ant-upload-list-item-name {
+    color: #1890ff !important;
+}
+
+/* Nút Thùng rác Xóa file - Hiển thị tinh tế lúc chưa hover & Đỏ nổi bật khi hover */
+.ant-upload-list-item .ant-upload-list-item-card-actions-btn {
+    opacity: 0.6;
+    transition: all 0.2s ease !important;
+}
+
+.ant-upload-list-item:hover .ant-upload-list-item-card-actions-btn {
+    opacity: 1;
+}
+
+.ant-upload-list-item .ant-upload-list-item-card-actions-btn:hover {
+    color: #ff4d4f !important; /* Đổi sang màu đỏ khi hover vào thùng rác */
+    transform: scale(1.15);
+}

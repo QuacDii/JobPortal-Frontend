@@ -1,60 +1,104 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Row, Col, Card, Typography, Button, Space, Divider, message, Spin } from 'antd';
+import { Row, Col, Card, Typography, Button, Space, Divider, message, Spin, Modal, Tag, Badge } from 'antd';
 import {
     ArrowLeftOutlined,
     CheckCircleFilled,
+    CheckCircleOutlined,
     CrownFilled,
     RobotOutlined,
     FilePdfOutlined,
     UnlockOutlined,
     RocketOutlined,
-    SafetyCertificateOutlined
+    SafetyCertificateOutlined,
+    FireOutlined,
+    CalendarOutlined,
+    ClockCircleOutlined,
+    CloseCircleOutlined
 } from '@ant-design/icons';
-
-// 1. THÊM jwtDecode để lấy ID từ Token
-import { jwtDecode } from 'jwt-decode'; 
-import apiClient from '../api/apiClient'; 
+import { jwtDecode } from 'jwt-decode';
+import apiClient from '../api/apiClient';
 
 const { Title, Text } = Typography;
 
 const UpgradeVip = () => {
     const navigate = useNavigate();
-    const [selectedPackage, setSelectedPackage] = useState(null); 
+    const [selectedPackage, setSelectedPackage] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [vipPackages, setVipPackages] = useState([]);
     const [isLoadingPackages, setIsLoadingPackages] = useState(true);
 
-    // Lấy danh sách gói dịch vụ từ Database
-    useEffect(() => {
-        const fetchPackages = async () => {
-            try {
-                setIsLoadingPackages(true);
-                const response = await apiClient.get('/Service/packages');
-                const responseData = response.data || response;
-                // 2. LỌC GÓI CHO ỨNG VIÊN (Ví dụ: Các gói có soLuotXemCv == 0)
-                const applicantPackages = responseData.filter(pkg => pkg.soLuotXemCv === 0);
-                
-                setVipPackages(applicantPackages);
-                
-                // Mặc định chọn gói số 2 (nếu có), không thì chọn gói đầu tiên
-                if (applicantPackages && applicantPackages.length > 0) {
-                    const defaultIndex = applicantPackages.length >= 2 ? 1 : 0;
-                    setSelectedPackage(applicantPackages[defaultIndex].maGoi); 
-                }
-            } catch (error) {
-                console.error("LỖI TẢI GÓI:", error);
-                message.error('Không thể tải danh sách gói dịch vụ từ hệ thống');
-            } finally {
-                setIsLoadingPackages(false);
+    // GIAO DIỆN SÁNG ĐỒNG BỘ VỚI THƯ VIỆN CV
+    const isDarkMode = false;
+
+    // STATE QUẢN LÝ POPUP MOMO FALLBACK
+    const [isMomoModalVisible, setIsMomoModalVisible] = useState(false);
+    const [momoPayUrl, setMomoPayUrl] = useState('');
+    const [isConfirmingFallback, setIsConfirmingFallback] = useState(false);
+    const [isPolling, setIsPolling] = useState(false);
+
+    const [currentOrderData, setCurrentOrderData] = useState({
+        maUser: null,
+        soTien: 0,
+        maGoi: null,
+        orderId: ''
+    });
+
+    const [userBalanceInfo, setUserBalanceInfo] = useState({
+        tenGoiHienTai: 'Miễn phí',
+        ngayHetHanGoi: null,
+        ngayMua: null,
+        soDuVi: 0,
+        danhSachGoiDaMua: []
+    });
+
+    // HÀM LẤY BẢNG GIÁ VÀ THÔNG TIN HẠN SỬ DỤNG
+    const fetchData = async () => {
+        try {
+            setIsLoadingPackages(true);
+
+            const [pkgRes, balRes] = await Promise.all([
+                apiClient.get('/Service/candidate-packages'),
+                apiClient.get('/Service/balance').catch(() => null)
+            ]);
+
+            const pkgData = pkgRes?.data !== undefined ? pkgRes.data : pkgRes;
+            const applicantPackages = Array.isArray(pkgData) ? pkgData : [];
+            setVipPackages(applicantPackages);
+
+            if (applicantPackages.length > 0) {
+                const defaultIndex = applicantPackages.length >= 2 ? 1 : 0;
+                setSelectedPackage(applicantPackages[defaultIndex].maGoi);
             }
-        };
-        fetchPackages();
+
+            if (balRes) {
+                const balData = balRes.data !== undefined ? balRes.data : balRes;
+                setUserBalanceInfo({
+                    tenGoiHienTai: balData?.tenGoiHienTai || 'Miễn phí',
+                    ngayHetHanGoi: balData?.ngayHetHanGoi || null,
+                    ngayMua: balData?.ngayMua || null,
+                    soDuVi: Number(balData?.soDuVi) || 0,
+                    // 🌟 Lấy danh sách các gói đã mua
+                    danhSachGoiDaMua: balData?.danhSachGoiDaMua || []
+                });
+            }
+
+        } catch (error) {
+            console.error("LỖI TẢI DỮ LIỆU:", error);
+        } finally {
+            setIsLoadingPackages(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
     }, []);
 
-    // Hàm xử lý thanh toán
-    const handlePayment = async (paymentMethod) => {
-        const pkg = vipPackages.find(p => p.maGoi === selectedPackage);
+    // HÀM XỬ LÝ THANH TOÁN
+    const handlePayment = async (paymentMethod, pkgIdOverride = null) => {
+        const targetPackageId = pkgIdOverride || selectedPackage;
+        const pkg = vipPackages.find(p => p.maGoi === targetPackageId);
+
         if (!pkg) {
             message.warning("Vui lòng chọn một gói dịch vụ!");
             return;
@@ -64,18 +108,17 @@ const UpgradeVip = () => {
         message.loading({ content: `Đang kết nối cổng thanh toán ${paymentMethod}...`, key: 'payment' });
 
         try {
-            // 3. LẤY MÃ USER THẬT TỪ TOKEN TRONG LOCALSTORAGE
             const token = localStorage.getItem('token');
             if (!token) {
                 message.error("Vui lòng đăng nhập lại để thực hiện giao dịch!");
-                navigate('/login'); // Đá về trang đăng nhập
+                navigate('/login');
                 return;
             }
 
             const decodedToken = jwtDecode(token);
-            const maUser = decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"] 
-                        || decodedToken.nameid 
-                        || decodedToken.sub;
+            const maUser = decodedToken["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"]
+                || decodedToken.nameid
+                || decodedToken.sub;
 
             if (!maUser) {
                 message.error("Không thể xác định danh tính. Vui lòng đăng nhập lại!");
@@ -83,203 +126,442 @@ const UpgradeVip = () => {
                 return;
             }
 
-            // Tính toán giá thực tế: Ưu tiên giá khuyến mãi nếu có
             const giaThucTe = (pkg.giaKhuyenMai && pkg.giaKhuyenMai > 0) ? pkg.giaKhuyenMai : pkg.giaTien;
 
-            // ĐÃ SỬA LỖI TẠI ĐÂY: Xóa bỏ /api/ ở đầu đường dẫn
             const response = await apiClient.post(`/Payment/create?maUser=${maUser}&soTien=${giaThucTe}&maGoi=${pkg.maGoi}`);
             const responseData = response.data || response;
-            // Chuyển hướng người dùng sang trang thanh toán của MoMo/VNPay
+
             if (responseData && responseData.url) {
-                window.location.href = responseData.url; 
+                if (paymentMethod === 'MOMO') {
+                    let orderId = new Date().getTime().toString();
+
+                    try {
+                        const urlObj = new URL(responseData.url);
+                        if (urlObj.searchParams.get('orderId')) {
+                            orderId = urlObj.searchParams.get('orderId');
+                        }
+                    } catch (e) { }
+
+                    setCurrentOrderData({ maUser, soTien: giaThucTe, maGoi: pkg.maGoi, orderId });
+                    setMomoPayUrl(responseData.url);
+
+                    message.success({ content: 'Khởi tạo MoMo thành công!', key: 'payment', duration: 2 });
+                    setIsMomoModalVisible(true);
+                    setIsPolling(true);
+
+                } else {
+                    message.success({ content: 'Đang chuyển hướng...', key: 'payment', duration: 2 });
+                    window.location.href = responseData.url;
+                }
+
             } else {
                 throw new Error("Không nhận được URL thanh toán từ server");
             }
-            
+
         } catch (error) {
             console.error(error);
             message.error({ content: 'Lỗi khởi tạo thanh toán. Vui lòng thử lại!', key: 'payment', duration: 2 });
+        } finally {
             setIsProcessing(false);
         }
     };
 
+    // HÀM XÁC NHẬN FALLBACK THỦ CÔNG & KÍCH HOẠT VIP TỨC THÌ
+    const handleConfirmFallback = async () => {
+        setIsConfirmingFallback(true);
+        try {
+            const fallbackRequestData = {
+                MaUser: currentOrderData.maUser,
+                Amount: currentOrderData.soTien,
+                OrderId: String(currentOrderData.orderId),
+                ResultCode: "0",
+                MaGoi: currentOrderData.maGoi
+            };
+
+            await apiClient.post('/Payment/confirm-fallback', fallbackRequestData);
+
+            // 🌟 PHÁT SỰ KIỆN CẬP NHẬT TRẠNG THÁI VIP REAL-TIME CHO TOÀN BỘ APP
+            window.dispatchEvent(new Event('update_vip_status'));
+
+            message.success("Xác nhận giao dịch thành công!");
+            setIsMomoModalVisible(false);
+
+            window.location.href = `/payment-success?orderId=${currentOrderData.orderId}`;
+
+        } catch (error) {
+            console.error("Fallback Error:", error);
+            message.error("Lỗi khi xác nhận giao dịch dự phòng!");
+        } finally {
+            setIsConfirmingFallback(false);
+        }
+    };
+
+    const handleConfirmFailed = () => {
+        setIsMomoModalVisible(false);
+        setIsPolling(false);
+        navigate(`/payment-failed?orderId=${currentOrderData.orderId}`);
+    };
+
+    const isVipActive = userBalanceInfo.ngayHetHanGoi && new Date(userBalanceInfo.ngayHetHanGoi) > new Date();
+
+    // BẢNG MÀU CHUẨN SÁNG ĐỒNG BỘ VỚI THƯ VIỆN CV
+    const themeColors = {
+        bgColor: '#f4f5f5',
+        textColor: '#333333',
+        subTextColor: '#595959',
+        cardBg: '#ffffff',
+        cardBorder: '#e8e8e8',
+        iconBg: '#e6f7ff',
+        dividerColor: '#f0f0f0',
+        vipCardBg: 'linear-gradient(135deg, #ffffff 0%, #fffbe6 100%)',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)'
+    };
+
     return (
-        <div style={{ backgroundColor: '#141414', minHeight: '100vh', padding: '40px 10%', color: '#fff' }}>
-            {/* Header */}
-            <div style={{ marginBottom: '40px' }}>
-                <Button 
-                    type="text" 
-                    icon={<ArrowLeftOutlined />} 
-                    onClick={() => navigate(-1)} 
-                    style={{ color: '#8c8c8c', marginBottom: '16px', padding: 0 }}
+        <div style={{ backgroundColor: themeColors.bgColor, minHeight: '100vh', padding: '40px 8%', color: themeColors.textColor, transition: 'all 0.3s ease' }}>
+            {/* Header Nút quay lại */}
+            <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginBottom: '16px' }}>
+                <Button
+                    type="text"
+                    icon={<ArrowLeftOutlined />}
+                    onClick={() => navigate(-1)}
+                    style={{ color: themeColors.subTextColor, padding: 0, fontWeight: '500' }}
                 >
                     Quay lại
                 </Button>
-                <div style={{ textAlign: 'center' }}>
-                    <CrownFilled style={{ fontSize: '48px', color: '#faad14', marginBottom: '16px' }} />
-                    <Title level={2} style={{ color: '#fff', margin: 0 }}>Nâng Cấp Tài Khoản VIP</Title>
-                    <Text style={{ color: '#a6a6a6', fontSize: '16px' }}>Đầu tư cho sự nghiệp - Mở khóa toàn bộ giới hạn</Text>
-                </div>
             </div>
 
-            <Row gutter={[40, 32]} align="middle">
-                {/* CỘT TRÁI: DANH SÁCH ĐẶC QUYỀN */}
-                <Col xs={24} lg={11}>
+            {/* TIÊU ĐỀ TRANG */}
+            <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                <CrownFilled style={{ fontSize: '48px', color: '#faad14', marginBottom: '12px' }} />
+                <Title level={2} style={{ color: themeColors.textColor, margin: 0, fontWeight: '700', fontSize: '32px' }}>Nâng Cấp Tài Khoản VIP</Title>
+                <Text style={{ color: themeColors.subTextColor, fontSize: '15px', display: 'block', marginTop: '8px' }}>Đầu tư cho sự nghiệp - Mở khóa toàn bộ giới hạn</Text>
+            </div>
+
+            {/* KHỐI TRẠNG THÁI GÓI HIỆN TẠI & HẠN SỬ DỤNG */}
+            {/* KHỐI TRẠNG THÁI GÓI HIỆN TẠI & HẠN SỬ DỤNG */}
+            <Row justify="center" style={{ marginBottom: '40px' }}>
+                <Col xs={24} md={18} lg={16}>
+                    <Card
+                        style={{
+                            background: themeColors.vipCardBg,
+                            borderColor: isVipActive ? '#faad14' : themeColors.cardBorder,
+                            borderRadius: '16px',
+                            boxShadow: themeColors.boxShadow
+                        }}
+                        styles={{ body: { padding: '20px 28px' } }}
+                    >
+                        <Row align="middle" justify="space-between" gutter={[16, 16]}>
+                            <Col xs={24} sm={14}>
+                                <Space direction="vertical" size={6} style={{ width: '100%' }}>
+                                    <Text style={{ color: themeColors.subTextColor, fontSize: '13px', fontWeight: 600 }}>TRẠNG THÁI HIỆN TẠI</Text>
+
+                                    {/* 🌟 HIỂN THỊ DANH SÁCH CÁC GÓI ĐÃ MUA DẠNG TAG */}
+                                    {userBalanceInfo.danhSachGoiDaMua.length > 0 ? (
+                                        <Space wrap size={[6, 6]}>
+                                            {userBalanceInfo.danhSachGoiDaMua.map((item, index) => (
+                                                <Tag key={index} color="gold" style={{ fontWeight: 'bold', fontSize: '13px', padding: '4px 10px', borderRadius: '6px' }}>
+                                                    ✓ {item.tenGoi}
+                                                </Tag>
+                                            ))}
+                                        </Space>
+                                    ) : (
+                                        <Title level={4} style={{ color: themeColors.textColor, margin: 0, fontWeight: '700' }}>
+                                            {userBalanceInfo.tenGoiHienTai}
+                                        </Title>
+                                    )}
+                                </Space>
+                            </Col>
+
+                            <Col xs={24} sm={10}>
+                                {isVipActive ? (
+                                    <Space direction="vertical" size={2} style={{ textAlign: 'right', width: '100%' }}>
+                                        <Text style={{ color: '#ff4d4f', fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                                            <ClockCircleOutlined /> Tổng hạn VIP: {new Date(userBalanceInfo.ngayHetHanGoi).toLocaleDateString('vi-VN')}
+                                        </Text>
+                                        <Text style={{ color: '#52c41a', fontSize: '12.5px', fontWeight: '500' }}>
+                                            (Đã cộng dồn thời gian của các gói)
+                                        </Text>
+                                    </Space>
+                                ) : (
+                                    <Tag color="default" style={{ background: '#f0f0f0', color: themeColors.subTextColor, padding: '6px 12px', borderRadius: '8px', fontWeight: '500' }}>
+                                        Chưa đăng ký VIP
+                                    </Tag>
+                                )}
+                            </Col>
+                        </Row>
+                    </Card>
+                </Col>
+            </Row>
+
+            <Row gutter={[40, 32]}>
+                {/* CỘT TRÁI: GIỚI THIỆU ĐẶC QUYỀN TĨNH */}
+                <Col xs={24} lg={10}>
                     <div style={{ paddingRight: '20px' }}>
-                        <Title level={4} style={{ color: '#faad14', marginBottom: '24px' }}>Đặc quyền khi trở thành VIP</Title>
-                        
+                        <Title level={4} style={{ color: '#1890ff', marginBottom: '24px', fontWeight: '700' }}>Đặc quyền khi trở thành VIP</Title>
+
                         <Space direction="vertical" size="large" style={{ width: '100%' }}>
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                                <div style={{ padding: '12px', background: '#242424', borderRadius: '12px', border: '1px solid #333' }}>
+                                <div style={{ padding: '12px', background: themeColors.iconBg, borderRadius: '12px', border: `1px solid ${themeColors.cardBorder}` }}>
                                     <RobotOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
                                 </div>
                                 <div>
-                                    <Title level={5} style={{ color: '#fff', margin: '0 0 4px 0' }}>Trợ lý AI Gemini Thông Minh</Title>
-                                    <Text style={{ color: '#8c8c8c' }}>Tự động phân tích và viết mục tiêu nghề nghiệp, kinh nghiệm làm việc theo đúng ngành nghề ứng tuyển chỉ trong 3 giây.</Text>
+                                    <Title level={5} style={{ color: themeColors.textColor, margin: '0 0 4px 0', fontWeight: '700' }}>Trợ lý AI Gemini Thông Minh</Title>
+                                    <Text style={{ color: themeColors.subTextColor, lineHeight: '1.5' }}>Tự động phân tích và viết mục tiêu nghề nghiệp, kinh nghiệm làm việc theo đúng ngành nghề ứng tuyển chỉ trong 3 giây.</Text>
                                 </div>
                             </div>
 
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                                <div style={{ padding: '12px', background: '#242424', borderRadius: '12px', border: '1px solid #333' }}>
-                                    <UnlockOutlined style={{ fontSize: '24px', color: '#00b14f' }} />
+                                <div style={{ padding: '12px', background: themeColors.iconBg, borderRadius: '12px', border: `1px solid ${themeColors.cardBorder}` }}>
+                                    <UnlockOutlined style={{ fontSize: '24px', color: '#52c41a' }} />
                                 </div>
                                 <div>
-                                    <Title level={5} style={{ color: '#fff', margin: '0 0 4px 0' }}>Tạo CV Không Giới Hạn</Title>
-                                    <Text style={{ color: '#8c8c8c' }}>Phá bỏ giới hạn 5 CV của tài khoản thường. Thoải mái tạo hàng chục phiên bản CV để rải CV cho từng vị trí khác nhau.</Text>
+                                    <Title level={5} style={{ color: themeColors.textColor, margin: '0 0 4px 0', fontWeight: '700' }}>Tạo CV Không Giới Hạn</Title>
+                                    <Text style={{ color: themeColors.subTextColor, lineHeight: '1.5' }}>Phá bỏ giới hạn 5 CV của tài khoản thường. Thoải mái tạo hàng chục phiên bản CV để rải CV cho từng vị trí khác nhau.</Text>
                                 </div>
                             </div>
 
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                                <div style={{ padding: '12px', background: '#242424', borderRadius: '12px', border: '1px solid #333' }}>
+                                <div style={{ padding: '12px', background: themeColors.iconBg, borderRadius: '12px', border: `1px solid ${themeColors.cardBorder}` }}>
                                     <FilePdfOutlined style={{ fontSize: '24px', color: '#ff4d4f' }} />
                                 </div>
                                 <div>
-                                    <Title level={5} style={{ color: '#fff', margin: '0 0 4px 0' }}>Xóa Logo (Watermark) Tải PDF</Title>
-                                    <Text style={{ color: '#8c8c8c' }}>Hồ sơ PDF tải xuống sẽ sạch sẽ, chuyên nghiệp và không còn đính kèm bất kỳ ký hiệu hay logo nào của hệ thống.</Text>
+                                    <Title level={5} style={{ color: themeColors.textColor, margin: '0 0 4px 0', fontWeight: '700' }}>Xóa Logo (Watermark) Tải PDF</Title>
+                                    <Text style={{ color: themeColors.subTextColor, lineHeight: '1.5' }}>Hồ sơ PDF tải xuống sẽ sạch sẽ, chuyên nghiệp và không còn đính kèm bất kỳ ký hiệu hay logo nào của hệ thống.</Text>
                                 </div>
                             </div>
 
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-                                <div style={{ padding: '12px', background: '#242424', borderRadius: '12px', border: '1px solid #333' }}>
+                                <div style={{ padding: '12px', background: themeColors.iconBg, borderRadius: '12px', border: `1px solid ${themeColors.cardBorder}` }}>
                                     <RocketOutlined style={{ fontSize: '24px', color: '#faad14' }} />
                                 </div>
                                 <div>
-                                    <Title level={5} style={{ color: '#fff', margin: '0 0 4px 0' }}>Ưu tiên hiển thị với NTD</Title>
-                                    <Text style={{ color: '#8c8c8c' }}>Hồ sơ của bạn sẽ được đánh dấu VIP và ưu tiên đề xuất lên Top đầu khi Nhà tuyển dụng tìm kiếm ứng viên.</Text>
+                                    <Title level={5} style={{ color: themeColors.textColor, margin: '0 0 4px 0', fontWeight: '700' }}>Ưu tiên hiển thị với NTD</Title>
+                                    <Text style={{ color: themeColors.subTextColor, lineHeight: '1.5' }}>Hồ sơ của bạn sẽ được đánh dấu VIP và ưu tiên đề xuất lên Top đầu khi Nhà tuyển dụng tìm kiếm ứng viên.</Text>
                                 </div>
                             </div>
                         </Space>
                     </div>
                 </Col>
 
-                {/* CỘT PHẢI: BẢNG GIÁ VÀ THANH TOÁN */}
-                <Col xs={24} lg={13}>
-                    <Card style={{ background: '#1a1a1a', borderColor: '#333', borderRadius: '16px' }} bodyStyle={{ padding: '32px' }}>
-                        <Title level={4} style={{ color: '#fff', textAlign: 'center', marginBottom: '24px' }}>Chọn gói phù hợp với bạn</Title>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
-                            {isLoadingPackages ? (
-                                <div style={{ textAlign: 'center', padding: '20px' }}>
-                                    <Spin size="large" />
-                                    <p style={{ marginTop: '10px', color: '#8c8c8c' }}>Đang tải bảng giá...</p>
-                                </div>
-                            ) : vipPackages.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '20px', color: '#8c8c8c' }}>
-                                    Hiện chưa có gói dịch vụ nào cho ứng viên.
-                                </div>
-                            ) : (
-                                vipPackages.map((pkg, index) => {
-                                    const isSelected = selectedPackage === pkg.maGoi;
-                                    const hasDiscount = pkg.giaKhuyenMai && pkg.giaKhuyenMai > 0;
-                                    const priceToDisplay = hasDiscount ? pkg.giaKhuyenMai : pkg.giaTien;
-                                    
-                                    const timeLabel = `${pkg.donViThoiGian} ${pkg.loaiGoi === 1 ? 'Ngày' : pkg.loaiGoi === 2 ? 'Tháng' : 'Năm'}`;
-                                    const isPopular = index === 1; 
+                {/* CỘT PHẢI: BẢNG GIÁ VÀ DANH SÁCH GÓI */}
+                <Col xs={24} lg={14}>
+                    <Title level={3} style={{ textAlign: 'center', marginBottom: '24px', color: '#1890ff', fontWeight: '700' }}>
+                        Chọn Gói VIP Phù Hợp Với Bạn
+                    </Title>
 
-                                    return (
-                                        <div 
-                                            key={pkg.maGoi}
-                                            onClick={() => setSelectedPackage(pkg.maGoi)}
-                                            style={{
-                                                position: 'relative',
-                                                padding: '16px 24px',
-                                                background: isSelected ? 'rgba(250, 173, 20, 0.1)' : '#242424',
-                                                border: `2px solid ${isSelected ? '#faad14' : '#333'}`,
-                                                borderRadius: '12px',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s',
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center'
-                                            }}
-                                        >
-                                            {isPopular && (
-                                                <div style={{ position: 'absolute', top: '-12px', left: '20px', background: '#faad14', color: '#000', fontSize: '12px', fontWeight: 'bold', padding: '2px 10px', borderRadius: '10px' }}>
-                                                    PHỔ BIẾN NHẤT
-                                                </div>
+                    {isLoadingPackages ? (
+                        <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                            <Spin size="large" indicator={<Spin style={{ fontSize: 36, color: '#1890ff' }} spin />} />
+                            <p style={{ marginTop: '16px', color: themeColors.subTextColor }}>Đang tải bảng giá gói dịch vụ...</p>
+                        </div>
+                    ) : vipPackages.length === 0 ? (
+                        <Card style={{ backgroundColor: themeColors.cardBg, borderColor: themeColors.cardBorder, textAlign: 'center', padding: '40px', borderRadius: '12px' }}>
+                            <Text style={{ color: themeColors.subTextColor }}>Hiện chưa có gói dịch vụ nào dành cho Ứng viên.</Text>
+                        </Card>
+                    ) : (
+                        <Row gutter={[24, 24]} justify="center">
+                            {vipPackages.map((pkg, index) => {
+                                const isSelected = selectedPackage === pkg.maGoi;
+                                const isDiscount = pkg.giaKhuyenMai && pkg.giaKhuyenMai > 0 && pkg.giaKhuyenMai < pkg.giaTien;
+                                const priceToDisplay = isDiscount ? pkg.giaKhuyenMai : pkg.giaTien;
+                                const isPopular = index === 1;
+
+                                const timeLabel = `${pkg.donViThoiGian} ${pkg.loaiGoi === 3 ? 'năm' : pkg.loaiGoi === 2 ? 'tháng' : 'ngày'}`;
+                                const privileges = pkg.dacQuyens || pkg.DacQuyens || [];
+
+                                const CardInnerContent = (
+                                    <Card
+                                        hoverable
+                                        onClick={() => setSelectedPackage(pkg.maGoi)}
+                                        style={{
+                                            backgroundColor: themeColors.cardBg,
+                                            borderColor: isSelected ? '#1890ff' : themeColors.cardBorder,
+                                            borderRadius: '16px',
+                                            height: '100%',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            boxShadow: isSelected ? '0 6px 20px rgba(24, 144, 255, 0.2)' : themeColors.boxShadow,
+                                            transition: 'all 0.3s ease'
+                                        }}
+                                        styles={{ body: { padding: '28px 24px', flex: 1, display: 'flex', flexDirection: 'column' } }}
+                                    >
+                                        <Title level={4} style={{ color: isSelected ? '#1890ff' : themeColors.textColor, textAlign: 'center', margin: '0 0 12px 0', fontWeight: '700' }}>
+                                            {pkg.tenGoi}
+                                        </Title>
+
+                                        <div style={{ margin: '12px 0 24px 0', textAlign: 'center', minHeight: '60px' }}>
+                                            {isDiscount ? (
+                                                <Text delete style={{ color: '#8c8c8c', fontSize: '14px', display: 'block' }}>
+                                                    {pkg.giaTien.toLocaleString('vi-VN')} đ
+                                                </Text>
+                                            ) : (
+                                                <div style={{ height: '21px' }}></div>
                                             )}
-                                            <div>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    {isSelected ? <CheckCircleFilled style={{ color: '#faad14', fontSize: '18px' }}/> : <div style={{ width: '18px', height: '18px', borderRadius: '50%', border: '2px solid #555' }}/>}
-                                                    <Text style={{ color: isSelected ? '#faad14' : '#fff', fontSize: '16px', fontWeight: 'bold' }}>{pkg.tenGoi}</Text>
-                                                </div>
-                                                <Text style={{ color: '#8c8c8c', marginLeft: '26px' }}>Hạn sử dụng: {timeLabel}</Text>
-                                            </div>
-                                            <div style={{ textAlign: 'right' }}>
-                                                {hasDiscount && (
-                                                    <Text delete style={{ color: '#666', fontSize: '13px', display: 'block' }}>{pkg.giaTien.toLocaleString('vi-VN')} đ</Text>
-                                                )}
-                                                <Text style={{ color: isSelected ? '#faad14' : '#fff', fontSize: '20px', fontWeight: 'bold' }}>{priceToDisplay.toLocaleString('vi-VN')} đ</Text>
-                                            </div>
+                                            <Title level={2} style={{ color: '#1890ff', margin: 0, fontWeight: 'bold' }}>
+                                                {priceToDisplay.toLocaleString('vi-VN')} <span style={{ fontSize: '16px' }}>đ</span>
+                                            </Title>
                                         </div>
-                                    )
-                                })
-                            )}
-                        </div>
 
-                        <Divider style={{ borderColor: '#333' }} />
+                                        <Divider style={{ borderColor: themeColors.dividerColor, margin: '0 0 20px 0' }} />
 
-                        <div style={{ textAlign: 'center' }}>
-                            <Text style={{ color: '#8c8c8c', display: 'block', marginBottom: '16px' }}><SafetyCertificateOutlined /> Giao dịch được mã hóa và bảo mật an toàn 100%</Text>
-                            
-                            <Space size="middle" style={{ width: '100%', justifyContent: 'center' }}>
-                                <Button 
-                                    size="large" 
-                                    onClick={() => handlePayment('MOMO')}
-                                    disabled={isProcessing || isLoadingPackages || vipPackages.length === 0}
-                                    style={{ 
-                                        backgroundColor: '#a50064', 
-                                        borderColor: '#a50064', 
-                                        color: '#fff', 
-                                        fontWeight: 'bold', 
-                                        height: '50px',
-                                        minWidth: '180px',
-                                        borderRadius: '8px'
-                                    }}
-                                >
-                                    Thanh toán MoMo
-                                </Button>
-                                <Button 
-                                    size="large" 
-                                    onClick={() => handlePayment('VNPAY')}
-                                    disabled={isProcessing || isLoadingPackages || vipPackages.length === 0}
-                                    style={{ 
-                                        backgroundColor: '#005baa', 
-                                        borderColor: '#005baa', 
-                                        color: '#fff', 
-                                        fontWeight: 'bold', 
-                                        height: '50px',
-                                        minWidth: '180px',
-                                        borderRadius: '8px'
-                                    }}
-                                >
-                                    Thanh toán VNPay
-                                </Button>
-                            </Space>
-                        </div>
-                    </Card>
+                                        {/* HIỂN THỊ CÁC ĐẶC QUYỀN TỪ DATABASE */}
+                                        <Space direction="vertical" size="middle" style={{ width: '100%', flex: 1, marginBottom: '28px' }}>
+                                            <Text style={{ color: themeColors.textColor, fontSize: '13.5px' }}>
+                                                ⏳ Thời hạn sử dụng: <b style={{ color: '#1890ff' }}>{timeLabel}</b>
+                                            </Text>
+
+                                            {privileges.length > 0 ? (
+                                                privileges.map((dq, idx) => {
+                                                    const tenDq = dq.tenDacQuyen || dq.TenDacQuyen;
+                                                    const sl = dq.soLuong !== undefined ? dq.soLuong : dq.SoLuong;
+
+                                                    return (
+                                                        <div key={dq.maDacQuyen || idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                                            <CheckCircleFilled style={{ color: '#52c41a', fontSize: '15px', marginTop: '3px' }} />
+                                                            <Text style={{ color: themeColors.textColor, fontSize: '13.5px', lineHeight: '1.5' }}>
+                                                                {tenDq}
+                                                                {sl > 0 ? <b style={{ color: '#1890ff' }}>: {sl} lượt</b> : (sl === -1 ? <b style={{ color: '#1890ff' }}> (Vô hạn)</b> : '')}
+                                                            </Text>
+                                                        </div>
+                                                    )
+                                                })
+                                            ) : (
+                                                <Text style={{ color: themeColors.subTextColor }} italic>Đầy đủ đặc quyền VIP ứng viên</Text>
+                                            )}
+                                        </Space>
+
+                                        {/* NÚT BẤM THANH TOÁN */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: 'auto' }}>
+                                            <Button
+                                                type="primary"
+                                                size="large"
+                                                block
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedPackage(pkg.maGoi);
+                                                    handlePayment('MOMO', pkg.maGoi);
+                                                }}
+                                                disabled={isProcessing}
+                                                style={{ backgroundColor: '#a50064', borderColor: '#a50064', color: '#fff', fontWeight: 'bold', borderRadius: '8px', height: '42px' }}
+                                            >
+                                                Thanh toán MoMo
+                                            </Button>
+                                            <Button
+                                                type="primary"
+                                                size="large"
+                                                block
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedPackage(pkg.maGoi);
+                                                    handlePayment('VNPAY', pkg.maGoi);
+                                                }}
+                                                disabled={isProcessing}
+                                                style={{ backgroundColor: '#005baa', borderColor: '#005baa', color: '#fff', fontWeight: 'bold', borderRadius: '8px', height: '42px' }}
+                                            >
+                                                Thanh toán VNPay
+                                            </Button>
+                                        </div>
+                                    </Card>
+                                );
+
+                                return (
+                                    <Col xs={24} md={12} key={pkg.maGoi}>
+                                        {isPopular ? (
+                                            <Badge.Ribbon text={<><FireOutlined /> PHỔ BIẾN NHẤT</>} color="red">
+                                                {CardInnerContent}
+                                            </Badge.Ribbon>
+                                        ) : CardInnerContent}
+                                    </Col>
+                                );
+                            })}
+                        </Row>
+                    )}
+
+                    <div style={{ textAlign: 'center', marginTop: '40px' }}>
+                        <Text style={{ color: themeColors.subTextColor, fontSize: '13.5px' }}>
+                            <SafetyCertificateOutlined style={{ color: '#52c41a', marginRight: '6px' }} />
+                            Mọi giao dịch thanh toán đều được mã hóa bảo mật 100% qua cổng thanh toán chính thức.
+                        </Text>
+                    </div>
                 </Col>
             </Row>
+
+            {/* POPUP MOMO FALLBACK */}
+            <Modal
+                title={
+                    <span style={{ color: '#a50064', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ border: '2px solid #a50064', borderRadius: '50%', width: '22px', height: '22px', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', fontSize: '14px', fontWeight: 'bold' }}>¥</span>
+                        Kích hoạt thanh toán MoMo (Sandbox)
+                    </span>
+                }
+                open={isMomoModalVisible}
+                onCancel={() => !isConfirmingFallback && setIsMomoModalVisible(false)}
+                footer={null}
+                centered
+                styles={{ content: { borderRadius: '16px', padding: '24px 20px' } }}
+            >
+                <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: '15px', color: '#333', marginBottom: '24px' }}>
+                        Đơn nạp tiền <b>#{currentOrderData.orderId}</b> đã sẵn sàng. Vui lòng nhấn mở cổng MoMo hoặc chọn kết quả giả lập bên dưới:
+                    </p>
+
+                    <a
+                        href={momoPayUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                            display: 'inline-block', width: '100%', padding: '12px 0',
+                            backgroundColor: '#a50064', color: '#fff', fontWeight: 'bold',
+                            fontSize: '15px', borderRadius: '8px', textAlign: 'center',
+                            textDecoration: 'none', marginBottom: '16px'
+                        }}
+                    >
+                        🚀 MỞ TRANG THANH TOÁN MOMO
+                    </a>
+
+                    <div style={{
+                        background: '#fffbe6',
+                        border: '1px solid #ffe58f',
+                        padding: '10px',
+                        borderRadius: '6px',
+                        marginBottom: '16px',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: '10px'
+                    }}>
+                        <Spin size="small" spinning={isPolling} />
+                        <span style={{ color: '#d48806', fontWeight: '500', fontSize: '13px' }}>
+                            Đang tự động lắng nghe kết quả từ MoMo...
+                        </span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                        <Button
+                            danger
+                            type="default"
+                            icon={<CloseCircleOutlined />}
+                            onClick={handleConfirmFailed}
+                            style={{ flex: 1, height: '42px', fontWeight: 'bold', fontSize: '14px', borderRadius: '8px' }}
+                        >
+                            ❌ Giả lập Thất bại
+                        </Button>
+                        <Button
+                            type="primary"
+                            icon={<CheckCircleOutlined />}
+                            loading={isConfirmingFallback}
+                            onClick={handleConfirmFallback}
+                            style={{
+                                flex: 1, height: '42px', backgroundColor: '#52c41a',
+                                borderColor: '#52c41a', fontWeight: 'bold', fontSize: '14px', borderRadius: '8px'
+                            }}
+                        >
+                            ✔️ Giả lập Thành công
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Layout, Space, Button, Modal, Form, Input } from 'antd';
 import { 
     UserOutlined, 
@@ -21,17 +21,46 @@ const CandidateLayout = ({ children, user }) => {
     // 1. STATE QUẢN LÝ ĐĂNG NHẬP VÀ POPUP
     const [isPopupOpen, setIsPopupOpen] = useState(false);
     const [loginLoading, setLoginLoading] = useState(false);
+    const [currentUser, setCurrentUser] = useState(user);
 
-    // 2. HÀM KIỂM TRA QUYỀN TRƯỚC KHI THAO TÁC
+    // CẬP NHẬT USER DỮ LIỆU MỚI TỪ PROP
+    useEffect(() => {
+        setCurrentUser(user);
+    }, [user]);
+
+    // 🌟 2. LẮNG NGHE SỰ KIỆN MUA VIP THÀNH CÔNG ĐỂ TỰ ĐỘNG LÀM MỚI HEADER REAL-TIME
+    useEffect(() => {
+        const handleVipUpdate = () => {
+            // Khi nhận tín hiệu mua gói từ UpgradeVip, gọi API cập nhật lại số dư & gói VIP
+            apiClient.get('/Service/balance')
+                .then(res => {
+                    const balData = res.data !== undefined ? res.data : res;
+                    const isVipActive = balData?.ngayHetHanGoi && new Date(balData.ngayHetHanGoi) > new Date();
+                    
+                    // Cập nhật lại State User hiện tại để UserDropdown đổi sang nhãn PRO/VIP ngay tức thì
+                    setCurrentUser(prev => ({
+                        ...prev,
+                        isVip: isVipActive,
+                        tenGoiHienTai: balData?.tenGoiHienTai
+                    }));
+                })
+                .catch(err => console.error("Lỗi cập nhật VIP Header:", err));
+        };
+
+        window.addEventListener('update_vip_status', handleVipUpdate);
+        return () => window.removeEventListener('update_vip_status', handleVipUpdate);
+    }, []);
+
+    // 3. HÀM KIỂM TRA QUYỀN TRƯỚC KHI THAO TÁC
     const handleProtectedAction = (targetPath) => {
-        if (!user) {
+        if (!currentUser) {
             setIsPopupOpen(true);
         } else {
             navigate(targetPath);
         }
     };
 
-    // 3. HÀM XỬ LÝ ĐĂNG NHẬP NHANH TRÊN POPUP
+    // 4. HÀM XỬ LÝ ĐĂNG NHẬP NHANH TRÊN POPUP
     const handlePopupLogin = (values) => {
         setLoginLoading(true);
         apiClient.post('/Auth/login', values)
@@ -52,15 +81,9 @@ const CandidateLayout = ({ children, user }) => {
 
     return (
         <Layout style={{ minHeight: '100vh' }}>
-            {/* ==========================================
-                HEADER THANH ĐIỀU HƯỚNG TỔNG
-            ========================================== */}
+            {/* HEADER THANH ĐIỀU HƯỚNG TỔNG */}
             <Header className="topcv-header">
-                
-                {/* Khối bên trái: LOGO & MENU */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                    
-                    {/* Logo JobsNow */}
                     <div 
                         style={{ color: '#fff', fontSize: '22px', fontWeight: 'bold', letterSpacing: '0.5px', cursor: 'pointer' }} 
                         onClick={() => navigate('/')}
@@ -68,37 +91,26 @@ const CandidateLayout = ({ children, user }) => {
                         JOBS<span style={{ color: '#1890ff' }}>NOW</span>
                     </div>
 
-                    {/* Thanh Menu Chính */}
                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                        
-                        {/* 1. Menu "Việc làm" */}
                         <JobsMenu handleProtectedAction={handleProtectedAction} />
-
-                        {/* 2. Menu "Tạo CV" */}
                         <CreateCvMenu />
-
-                        {/* 3. Tab "Công ty" (Đã được chèn vào đây) */}
                         <div 
                             className={`topcv-nav-link ${location.pathname.startsWith('/cong-ty') ? 'active' : ''}`}
                             onClick={() => navigate('/cong-ty')}
                         >
                             Công ty
                         </div>
-
                     </div>
                 </div>
 
-                {/* Khối bên phải: ĐỒNG BỘ THEO TRẠNG THÁI USER */}
+                {/* KHỐI USER BÊN PHẢI (TRUYỀN CURRENTUSER ĐÃ DYNAMIC) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    
-                    {user ? (
-                        // Đã đăng nhập
+                    {currentUser ? (
                         <Space size={12}>
                             <div className="header-icon-btn"><BellOutlined /></div>
-                            <UserDropdown user={user} />
+                            <UserDropdown user={currentUser} />
                         </Space>
                     ) : (
-                        // Chưa đăng nhập
                         <Space size={10}>
                             <Button className="btn-topcv-register" onClick={() => navigate('/register')}>
                                 Đăng ký
@@ -111,14 +123,9 @@ const CandidateLayout = ({ children, user }) => {
                 </div>
             </Header>
 
-            {/* ==========================================
-                NỘI DUNG RUỘT
-            ========================================== */}
             <Content>{children}</Content>
 
-            {/* ==========================================
-                POPUP ĐĂNG NHẬP NHANH
-            ========================================== */}
+            {/* POPUP ĐĂNG NHẬP NHANH */}
             <Modal
                 title={<div style={{ textAlign: 'center', fontSize: '20px', fontWeight: 'bold' }}>Chào mừng bạn quay lại JOBSNOW</div>}
                 open={isPopupOpen}
@@ -157,7 +164,6 @@ const CandidateLayout = ({ children, user }) => {
                     Chưa có tài khoản? <span style={{ color: '#1890ff', cursor: 'pointer', fontWeight: 500 }} onClick={() => { setIsPopupOpen(false); navigate('/register'); }}>Đăng ký ngay</span>
                 </div>
             </Modal>
-
         </Layout>
     );
 };

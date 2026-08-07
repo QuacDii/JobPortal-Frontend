@@ -39,7 +39,7 @@ apiClient.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
-        // 👉 FIX CHÍ MẠNG: Kiểm tra xem request bị lỗi có phải là luồng đăng nhập/đăng ký hay không
+        // Kiểm tra xem request bị lỗi có phải là luồng đăng nhập/đăng ký hay không
         const isAuthEndpoint = originalRequest.url.includes('/auth/login') || 
                                originalRequest.url.includes('/auth/google-login') || 
                                originalRequest.url.includes('/auth/facebook-login') ||

@@ -1,75 +1,91 @@
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400&family=Montserrat:wght@300;400;500;600;700&family=Nunito:wght@300;400;500;600;700&family=Open+Sans:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Quicksand:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap');
 
 /* =========================================
-   1. GIAO DIỆN TỔNG THỂ (HEADER, SIDEBAR...)
+   1. GIAO DIỆN TỔNG THỂ (Đã đồng bộ Light Mode)
    ========================================= */
-.cv-builder-header { background-color: #1a1a1a; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; z-index: 10; }
-.cv-title-input { color: #fff !important; font-weight: 500; font-size: 15px; background-color: transparent !important; border: 1px solid transparent !important; padding: 4px 8px; width: 300px; transition: 0.3s; }
-.cv-title-input:hover, .cv-title-input:focus { border-color: #333 !important; background-color: #242424 !important; border-radius: 4px; }
+.cv-builder-wrapper { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.cv-builder-header { padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e8e8e8; z-index: 10; background-color: #ffffff; }
+.cv-title-input { font-weight: 500; font-size: 15px; background-color: transparent !important; border: 1px solid transparent !important; padding: 4px 8px; width: 300px; transition: 0.3s; color: #262626 !important; }
+.cv-title-input:hover, .cv-title-input:focus { border-radius: 4px; border: 1px solid #d9d9d9 !important; }
 .builder-body { display: flex; flex: 1; height: calc(100vh - 65px); overflow: hidden; }
-.sidebar-menu { width: 90px; min-width: 90px; flex-shrink: 0; background-color: #1a1a1a; border-right: 1px solid #333; display: flex; flex-direction: column; align-items: center; padding-top: 16px; overflow-y: auto; }
+.sidebar-menu { width: 90px; min-width: 90px; flex-shrink: 0; background-color: #ffffff; border-right: 1px solid #e8e8e8; display: flex; flex-direction: column; align-items: center; padding-top: 16px; overflow-y: auto; }
 .sidebar-menu::-webkit-scrollbar { display: none; }
-.menu-btn { width: 100%; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #a6a6a6; cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; }
-.menu-btn:hover { background-color: #242424; color: #fff; }
-.menu-btn.active { background-color: rgba(0, 177, 79, 0.1); color: #00b14f; border-left: 3px solid #00b14f; }
+.menu-btn { width: 100%; height: 75px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #595959; cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; }
+.menu-btn:hover { background-color: rgba(24, 144, 255, 0.08); color: #1890ff; }
+.menu-btn.active { background-color: rgba(24, 144, 255, 0.1); color: #1890ff; border-left: 3px solid #1890ff; }
 .menu-btn .anticon { font-size: 20px; margin-bottom: 6px; }
 .menu-btn span { font-size: 11px; text-align: center; font-weight: 500; }
-.settings-panel { width: 340px; min-width: 340px; background-color: #1f1f1f; border-right: 1px solid #333; display: flex; flex-direction: column; transition: all 0.3s ease; }
+.settings-panel { width: 340px; min-width: 340px; background-color: #ffffff; border-right: 1px solid #e8e8e8; display: flex; flex-direction: column; transition: all 0.3s ease; }
 .settings-panel.hidden { width: 0; min-width: 0; border: none; overflow: hidden; }
-.panel-header { padding: 16px 20px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+.panel-header { padding: 16px 20px; border-bottom: 1px solid #e8e8e8; display: flex; justify-content: space-between; align-items: center; }
 .panel-content { flex: 1; overflow-y: auto; padding: 20px; }
 .panel-content::-webkit-scrollbar { width: 6px; }
-.panel-content::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
-.workspace-area { flex: 1; background-color: #0f0f0f; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: 40px; }
-.custom-form-label { color: #a6a6a6 !important; font-size: 12px; margin-bottom: 10px; display: block; font-weight: bold; text-transform: uppercase;}
-.custom-input { background-color: #141414 !important; color: #fff !important; border: 1px solid #333 !important; border-radius: 6px; }
-.custom-input:focus { border-color: #00b14f !important; box-shadow: none !important; }
+.panel-content::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+.workspace-area { flex: 1; background-color: #e4e7eb; overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: 40px; }
+.custom-form-label { color: #595959 !important; font-size: 12px; margin-bottom: 10px; display: block; font-weight: bold; text-transform: uppercase;}
+.custom-input { background-color: #f5f7fa !important; color: #262626 !important; border: 1px solid #d9d9d9 !important; border-radius: 6px; }
+.custom-input:focus { border-color: #1890ff !important; box-shadow: none !important; }
 .color-circle { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; display: inline-block; }
 .color-circle:hover { transform: scale(1.1); }
-.color-circle.active { border-color: #fff; box-shadow: 0 0 0 2px #00b14f; }
-.topcv-lang-button { background: #262626; border: 1px solid #434343; color: #a6a6a6; font-weight: 500; padding: 6px 16px; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
-.topcv-lang-button:hover { color: #fff; border-color: #595959; }
-.topcv-lang-button.active { background: rgba(0, 177, 79, 0.08); border-color: #00b14f; color: #00b14f; }
+.color-circle.active { border-color: #fff; box-shadow: 0 0 0 2px #1890ff; }
+.topcv-lang-button { background: #f5f7fa; border: 1px solid #d9d9d9; color: #595959; font-weight: 500; padding: 6px 16px; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+.topcv-lang-button:hover { color: #1890ff; border-color: #1890ff; }
+.topcv-lang-button.active { background: rgba(24, 144, 255, 0.1); border-color: #1890ff; color: #1890ff; }
 .bg-pattern-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
-.bg-pattern-item { aspect-ratio: 1 / 1.414; width: 100%; border-radius: 4px; cursor: pointer; position: relative; border: 2px solid #333; overflow: hidden; transition: 0.15s; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
-.bg-pattern-item[style*="background: #1a1a1a"] { border-color: transparent; }
+.bg-pattern-item { aspect-ratio: 1 / 1.414; width: 100%; border-radius: 4px; cursor: pointer; position: relative; border: 2px solid #d9d9d9; overflow: hidden; transition: 0.15s; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
 .bg-pattern-item:hover { transform: translateY(-2px); }
-.bg-pattern-item.active { border-color: #00b14f; }
-.bg-pattern-check-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.2); display: flex; justify-content: center; align-items: center; color: #00b14f; font-size: 18px; font-weight: bold; }
+.bg-pattern-item.active { border-color: #1890ff; }
+.bg-pattern-check-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.2); display: flex; justify-content: center; align-items: center; color: #1890ff; font-size: 18px; font-weight: bold; }
 
 /* =========================================
-   2. KHUNG TỜ GIẤY CV VÀ XUẤT FILE PDF
+   2. KHUNG TỜ GIẤY CV VÀ PLACEHOLDER
    ========================================= */
-.cv-preview-page { background-color: #ffffff !important; color: #333333 !important; color-scheme: light !important; width: 210mm; min-height: 297mm; border-radius: 4px; box-shadow: 0 12px 48px rgba(0,0,0,0.6); overflow: hidden; flex-shrink: 0; position: relative; }
+.cv-preview-page { background-color: #ffffff !important; color: #333333 !important; color-scheme: light !important; width: 210mm; min-height: 297mm; border-radius: 4px; box-shadow: 0 12px 48px rgba(0,0,0,0.15); overflow: hidden; flex-shrink: 0; position: relative; }
 .cv-preview-page * { color-scheme: light !important; }
+.watermark-jobsnow { position: absolute; bottom: 15px; right: 25px; opacity: 0.4; font-size: 12px; font-family: Arial, sans-serif; color: #000; z-index: 9999; pointer-events: none; user-select: none; }
 
-/* Ẩn placeholder và viền khi tải PDF hoặc Xem trước */
-.cv-preview-page.is-exporting ::-webkit-input-placeholder { color: transparent !important; }
-.cv-preview-page.is-exporting ::-moz-placeholder { color: transparent !important; }
-.cv-preview-page.is-exporting :-ms-input-placeholder { color: transparent !important; }
-.cv-preview-page.is-exporting ::placeholder { color: transparent !important; }
-.cv-preview-page.is-exporting [contenteditable]:empty::before,
-.cv-preview-page.is-exporting [contenteditable][data-placeholder]:empty::before,
-.cv-preview-page.is-exporting [data-placeholder]:empty::before { content: "" !important; display: none !important; color: transparent !important; }
-.cv-preview-page.is-exporting .ProseMirror p.is-editor-empty:first-child::before,
-.cv-preview-page.is-exporting .ProseMirror .is-empty::before,
-.cv-preview-page.is-exporting .ProseMirror[data-placeholder]::before,
-.cv-preview-page.is-exporting .ProseMirror p:empty::before { content: "" !important; display: none !important; color: transparent !important; }
+/* HIỂN THỊ PLACEHOLDER KHI CHỈNH SỬA */
+[data-placeholder]:empty::before,
+[contenteditable][data-placeholder]:empty::before { content: attr(data-placeholder); color: #a6a6a6 !important; opacity: 0.65; pointer-events: none; display: inline-block; }
+.ProseMirror p.is-editor-empty:first-child::before,
+.ProseMirror .is-empty::before { content: attr(data-placeholder); color: #a6a6a6 !important; opacity: 0.65; float: left; height: 0; pointer-events: none; }
+
+/* ẨN PLACEHOLDER KHI XUẤT ẢNH / XEM TRƯỚC */
+.is-exporting ::placeholder,
+.is-exporting ::-webkit-input-placeholder { color: transparent !important; }
+.is-exporting [contenteditable]:empty::before,
+.is-exporting [data-placeholder]:empty::before,
+.is-exporting .ProseMirror p.is-editor-empty:first-child::before,
+.is-exporting .ProseMirror .is-empty::before { content: "" !important; display: none !important; color: transparent !important; }
 .cv-preview-page.is-exporting .cv-macro-section-block.has-empty-required [contenteditable="true"]:not(.ProseMirror), 
 .cv-preview-page.is-exporting .cv-macro-section-block.has-empty-required input, 
 .cv-preview-page.is-exporting .cv-macro-section-block.has-empty-required .ProseMirror { border: none !important; outline: none !important; background: transparent !important; }
 
-/* =========================================
-   3. THANH CUỘN CỦA TAB BỐ CỤC (MINI-MAP)
-   ========================================= */
 .cv-mini-col::-webkit-scrollbar { width: 5px; }
-.cv-mini-col::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
-.cv-mini-col::-webkit-scrollbar-thumb:hover { background: #00b14f; }
+.cv-mini-col::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+.cv-mini-col::-webkit-scrollbar-thumb:hover { background: #1890ff; }
 
 /* =========================================
-   4. BẢNG CẢNH BÁO ĐỔI MẪU (MODAL CONFIRM)
+   3. HIỆU ỨNG HOVER
    ========================================= */
-.dark-modal-confirm .ant-modal-content { background-color: #242424 !important; }
-.dark-modal-confirm .ant-modal-confirm-title { color: #ffffff !important; font-size: 18px !important; font-weight: 600; }
-.dark-modal-confirm .ant-modal-confirm-content { color: #d9d9d9 !important; font-size: 14px; margin-top: 12px !important; }
-.dark-modal-confirm .ant-btn-default:hover { color: #fff !important; border-color: #595959 !important; }
+.header-icon-btn { transition: all 0.2s ease-in-out !important; }
+.header-icon-btn:hover:not(:disabled) { background-color: rgba(24, 144, 255, 0.1) !important; color: #1890ff !important; transform: scale(1.1); }
+.header-btn-preview { transition: all 0.25s ease-in-out !important; }
+.header-btn-preview:hover { background-color: #f0f0f0 !important; border-color: #1890ff !important; color: #1890ff !important; transform: translateY(-1.5px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08) !important; }
+.header-btn-pdf { transition: all 0.25s ease-in-out !important; }
+.header-btn-pdf:hover { background-color: #e6f7ff !important; border-color: #1890ff !important; color: #096dd9 !important; transform: translateY(-1.5px); box-shadow: 0 4px 12px rgba(24, 144, 255, 0.25) !important; }
+.header-btn-save { transition: all 0.25s ease-in-out !important; }
+.header-btn-save:hover { background: linear-gradient(90deg, #40a9ff, #1890ff) !important; transform: translateY(-1.5px); box-shadow: 0 6px 16px rgba(24, 144, 255, 0.4) !important; }
+
+/* =========================================
+   4. CẤU HÌNH IN NATIVE PDF (CHUẨN ATS)
+   ========================================= */
+@media print {
+    @page { size: A4 portrait; margin: 0; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    body * { visibility: hidden; }
+    .cv-preview-page, .cv-preview-page * { visibility: visible; }
+    .cv-preview-page { position: absolute; left: 0; top: 0; margin: 0; padding: 0; box-shadow: none !important; border: none !important; transform: scale(1) !important; width: 210mm; min-height: 297mm; overflow: hidden; }
+    ::placeholder, ::-webkit-input-placeholder, [contenteditable]:empty::before, [data-placeholder]:empty::before, .ProseMirror p.is-editor-empty:first-child::before, .ProseMirror .is-empty::before { content: "" !important; display: none !important; color: transparent !important; }
+    .no-print, .cv-block-actions, .cv-drag-handle, .add-item-btn { display: none !important; }
+}

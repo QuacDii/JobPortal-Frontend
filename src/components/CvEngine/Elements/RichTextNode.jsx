@@ -11,26 +11,26 @@ const RichTextNode = ({ dataPath, placeholder, styles, dataScope }) => {
     finalPath = `${dataScope.parentPath}[${dataScope.index}].${dataPath}`;
   }
 
-  // 🚀 SỬA LỖI 1: Tối ưu hiệu suất & chặn re-render bừa bãi.
-  // Thay vì tải toàn bộ state.cvData, chỉ lắng nghe ĐÚNG giá trị của ô này.
   const rawContent = useCvStore((state) => get(state.cvData, finalPath, ''));
   const htmlContent = typeof rawContent === 'string' ? rawContent : '';
 
   const editorRef = useRef(null);
 
-  // Hàm kiểm tra rỗng dùng chung
   const checkIsEmpty = (html) => !html || html === '<br>' || html.trim() === '';
 
-  // 🚀 SỬA LỖI 2: Bảo vệ DOM không bị ghi đè khi đang gõ
+  // KIỂM TRA CHẾ ĐỘ XEM / XUẤT PDF (/xem-cv HOẶC .is-exporting)
+  const isExportMode = typeof window !== 'undefined' && (
+    document.querySelector('.is-exporting') !== null || 
+    window.location.pathname.includes('/xem-cv')
+  );
+
   useEffect(() => {
-    if (editorRef.current) {
-      // Chỉ kiểm tra và ghi đè nội dung từ Store -> DOM nếu user KHÔNG ĐANG focus vào ô này
+    if (editorRef.current && !isExportMode) {
       const isCurrentlyFocused = document.activeElement === editorRef.current;
       
       if (!isCurrentlyFocused && editorRef.current.innerHTML !== htmlContent) {
         editorRef.current.innerHTML = htmlContent;
         
-        // Cập nhật lại UI dựa trên dữ liệu thật
         if (checkIsEmpty(htmlContent)) {
            editorRef.current.classList.add('is-rich-empty');
         } else {
@@ -38,7 +38,7 @@ const RichTextNode = ({ dataPath, placeholder, styles, dataScope }) => {
         }
       }
     }
-  }, [htmlContent]);
+  }, [htmlContent, isExportMode]);
 
   const handleInput = (e) => {
     const text = e.target.innerHTML;
@@ -62,6 +62,17 @@ const RichTextNode = ({ dataPath, placeholder, styles, dataScope }) => {
     }
   };
 
+  // TRƯỜNG HỢP 1: Ở TRANG XEM / XUẤT PDF -> KHÔNG BẬT CLASS VIỀN ĐỎ & NẾU RỖNG THÌ ĐỂ TRẮNG
+  if (isExportMode) {
+    return (
+      <div 
+        style={{ ...styles, outline: 'none' }}
+        dangerouslySetInnerHTML={{ __html: checkIsEmpty(htmlContent) ? '' : htmlContent }}
+      />
+    );
+  }
+
+  // TRƯỜNG HỢP 2: Ở TRANG CV BUILDER -> GIỮ NGUYÊN TÍNH NĂNG NẮN CHỈNH
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <div
@@ -88,7 +99,6 @@ const RichTextNode = ({ dataPath, placeholder, styles, dataScope }) => {
           transition: all 0.2s ease;
         }
 
-        /* Xử lý viền đỏ báo rỗng hoàn toàn bằng CSS thay vì React Style */
         .rich-text-editor.is-rich-empty {
           border: 1px dashed #ff4d4f !important;
           min-height: 60px;
