@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-    Table, Tag, Button, Space, message, Input, Select, Card, Row, Col, Tooltip 
+    Table, Tag, Button, Space, message, Input, Select, Card, Row, Col, Tooltip, Switch, Modal 
 } from 'antd';
 import { 
     FilterOutlined, EyeOutlined, SearchOutlined, ReloadOutlined, 
     ClearOutlined, CalendarOutlined, EnvironmentOutlined,
     ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined,
-    UserOutlined, RocketOutlined, AppstoreOutlined
+    UserOutlined, RocketOutlined, AppstoreOutlined, FireOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../api/apiClient';
@@ -48,6 +48,45 @@ const EmployerJobs = () => {
         }
     };
 
+    // 🌟 HÀM 1: BẬT / TẮT TRẠNG THÁI TIN TUYỂN DỤNG
+    const handleToggleStatus = async (record) => {
+        const maTin = record.maTin || record.maViTri;
+        try {
+            const res = await apiClient.patch(`/Employer/jobs/${maTin}/toggle-status`);
+            const resPayload = res?.data || res;
+            if (resPayload?.success || res?.success) {
+                message.success(resPayload?.message || "Đã cập nhật trạng thái tin!");
+                fetchMyJobs();
+            }
+        } catch (error) {
+            message.error(error?.response?.data?.message || "Lỗi khi thay đổi trạng thái tin!");
+        }
+    };
+
+    // 🌟 HÀM 2: KÍCH HOẠT ĐẨY TIN VIP (CÓ XỬ LÝ CHECK ĐẶC QUYỀN)
+    const handlePromoteJob = async (record) => {
+        const maTin = record.maTin || record.maViTri;
+        try {
+            const res = await apiClient.patch(`/employer/jobs/${maTin}/promote`);
+            const resPayload = res?.data || res;
+            if (resPayload?.success || res?.success) {
+                message.success("Đã nâng cấp tin tuyển dụng thành tin VIP Nổi bật! 🔥");
+                fetchMyJobs();
+            }
+        } catch (error) {
+            const errorMsg = error?.response?.data?.message || "Tài khoản chưa có đặc quyền Đẩy tin VIP!";
+            Modal.confirm({
+                title: 'Đặc quyền Đẩy tin VIP',
+                icon: <RocketOutlined style={{ color: '#fa8c16' }} />,
+                content: `${errorMsg} Bạn có muốn chuyển đến cửa hàng để nâng cấp gói dịch vụ ngay không?`,
+                okText: 'Nâng cấp ngay 🚀',
+                cancelText: 'Để sau',
+                okButtonProps: { type: 'primary', style: { backgroundColor: '#fa8c16', borderColor: '#fa8c16' } },
+                onOk: () => navigate('/employer/service-package')
+            });
+        }
+    };
+
     // ✨ GỢI Ý NGÀNH NGHỀ ĐỘNG TỪ DỮ LIỆU TIN ĐÃ ĐĂNG
     const industryOptions = useMemo(() => {
         const map = new Map();
@@ -85,7 +124,6 @@ const EmployerJobs = () => {
         
         const diffTime = deadline.getTime() - now.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
         let statusTag;
         if (diffDays < 0) {
             statusTag = <Tag color="error" style={{ borderRadius: '10px', margin: 0, padding: '0 8px' }}>Đã hết hạn</Tag>;
@@ -96,7 +134,6 @@ const EmployerJobs = () => {
         } else {
             statusTag = <Tag color="success" style={{ borderRadius: '10px', margin: 0, padding: '0 8px' }}>Còn {diffDays} ngày</Tag>;
         }
-
         return (
             <Space direction="vertical" size={2} align="center" style={{ display: 'flex', alignItems: 'center' }}>
                 <span style={{ fontSize: '13px', color: '#262626', fontWeight: 500 }}>{formattedDate}</span>
@@ -111,16 +148,12 @@ const EmployerJobs = () => {
             const matchSearch = !searchText || 
                 (job.tieuDe && job.tieuDe.toLowerCase().includes(searchText.toLowerCase())) ||
                 (job.tenNganhNghe && job.tenNganhNghe.toLowerCase().includes(searchText.toLowerCase()));
-
             const matchIndustry = !selectedIndustry || 
                 (Array.isArray(job.danhSachMaNganh) && job.danhSachMaNganh.includes(selectedIndustry));
-
             const matchLocation = !selectedLocation || 
                 (Array.isArray(job.danhSachKhuVuc) && job.danhSachKhuVuc.includes(selectedLocation));
-
             const matchStatus = selectedStatus === null || selectedStatus === undefined || 
                 job.trangThai === selectedStatus;
-
             return matchSearch && matchIndustry && matchLocation && matchStatus;
         });
     }, [jobs, searchText, selectedIndustry, selectedLocation, selectedStatus]);
@@ -137,7 +170,7 @@ const EmployerJobs = () => {
             title: 'Chiến dịch / Vị trí',
             dataIndex: 'tieuDe',
             key: 'tieuDe',
-            width: 320,
+            width: 280,
             render: (text, record) => (
                 <Space direction="vertical" size={4} style={{ display: 'flex' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -164,7 +197,7 @@ const EmployerJobs = () => {
             title: 'Ngày đăng',
             dataIndex: 'ngayTao',
             key: 'ngayTao',
-            width: 130,
+            width: 120,
             align: 'center',
             render: (date) => (
                 <div style={{ fontSize: '13px', color: '#595959', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
@@ -176,7 +209,7 @@ const EmployerJobs = () => {
         {
             title: 'Hạn nộp / Thời hạn',
             key: 'hanNop',
-            width: 160,
+            width: 150,
             align: 'center',
             render: (_, record) => renderDeadlineStatus(record.hanNop || record.ngayHetHan)
         },
@@ -184,7 +217,7 @@ const EmployerJobs = () => {
             title: 'Trạng thái',
             dataIndex: 'trangThai',
             key: 'trangThai',
-            width: 150,
+            width: 140,
             align: 'center',
             render: (status) => {
                 if (status === 0) return (
@@ -199,7 +232,7 @@ const EmployerJobs = () => {
                 );
                 if (status === 2) return (
                     <Tag icon={<CloseCircleOutlined />} color="error" style={{ borderRadius: '12px', padding: '2px 10px', fontWeight: 500 }}>
-                        Đã đóng / Từ chối
+                        Đã đóng / Tạm dừng
                     </Tag>
                 );
                 return <Tag color="default" style={{ borderRadius: '12px', padding: '2px 10px' }}>Ẩn</Tag>;
@@ -209,7 +242,7 @@ const EmployerJobs = () => {
             title: 'Ứng viên',
             key: 'soLuong',
             align: 'center',
-            width: 100,
+            width: 90,
             render: (_, record) => (
                 <Tooltip title="Xem danh sách ứng viên đã nộp">
                     <Button 
@@ -220,11 +253,11 @@ const EmployerJobs = () => {
                             color: '#1890ff', 
                             borderRadius: '16px', 
                             fontWeight: 600,
-                            padding: '2px 14px',
-                            height: '32px',
+                            padding: '2px 12px',
+                            height: '30px',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '6px',
+                            gap: '4px',
                             border: '1px solid #91d5ff'
                         }}
                     >
@@ -238,31 +271,65 @@ const EmployerJobs = () => {
             title: 'Thao tác',
             key: 'action',
             align: 'center',
-            width: 190,
-            render: (_, record) => (
-                <Space size="small">
-                    <Button 
-                        type="default"
-                        size="middle"
-                        icon={<EyeOutlined />}
-                        onClick={() => window.open(`/employer/jobs/${record.maTin || record.maViTri}`, '_blank')}
-                        style={{ borderRadius: '6px' }}
-                    >
-                        Chi tiết
-                    </Button>
-                    {record.trangThai === 1 && (
-                        <Button 
-                            type="primary" 
-                            size="middle"
-                            icon={<FilterOutlined />} 
-                            onClick={() => navigate(`/employer/candidate-funnel/${record.maViTri || record.maTin}`)}
-                            style={{ borderRadius: '6px', backgroundColor: '#1890ff' }}
-                        >
-                            Phễu
-                        </Button>
-                    )}
-                </Space>
-            )
+            width: 280,
+            render: (_, record) => {
+                const maTin = record.maTin || record.maViTri;
+                return (
+                    <Space size="small" wrap align="center">
+                        <Tooltip title="Xem chi tiết tin tuyển dụng">
+                            <Button 
+                                type="default"
+                                size="small"
+                                icon={<EyeOutlined />}
+                                onClick={() => window.open(`/employer/jobs/${maTin}`, '_blank')}
+                                style={{ borderRadius: '4px' }}
+                            >
+                                Chi tiết
+                            </Button>
+                        </Tooltip>
+
+                        <Tooltip title="Xem phễu ứng viên">
+                            <Button 
+                                type="primary"
+                                ghost
+                                size="small"
+                                icon={<FilterOutlined />}
+                                onClick={() => navigate(`/employer/candidate-funnel/${record.maViTri || maTin}`)}
+                                style={{ borderRadius: '4px' }}
+                            >
+                                Xem phễu
+                            </Button>
+                        </Tooltip>
+
+                        {!record.isPromoted && record.trangThai === 1 && (
+                            <Tooltip title="Nâng cấp bài đăng thành VIP Nổi bật">
+                                <Button 
+                                    type="primary"
+                                    size="small"
+                                    icon={<FireOutlined />}
+                                    onClick={() => handlePromoteJob(record)}
+                                    style={{ 
+                                        backgroundColor: '#fa8c16', 
+                                        borderColor: '#fa8c16', 
+                                        fontWeight: 600, 
+                                        borderRadius: '4px' 
+                                    }}
+                                >
+                                    Đẩy VIP
+                                </Button>
+                            </Tooltip>
+                        )}
+
+                        <Tooltip title={record.trangThai === 1 ? "Tạm dừng nhận hồ sơ" : "Mở lại nhận hồ sơ"}>
+                            <Switch 
+                                checked={record.trangThai === 1}
+                                onChange={() => handleToggleStatus(record)}
+                                size="small"
+                            />
+                        </Tooltip>
+                    </Space>
+                );
+            }
         }
     ];
 
@@ -270,14 +337,13 @@ const EmployerJobs = () => {
         <Card style={{ borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                 <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 'bold', color: '#1f2937' }}>
-                    Danh sách Tin đã đăng
+                    Danh sách tin đã đăng
                 </h2>
                 <Button icon={<ReloadOutlined />} onClick={fetchMyJobs} loading={loading} style={{ borderRadius: '6px' }}>
                     Tải lại
                 </Button>
             </div>
 
-            {/* THANH BỘ LỌC TÍCH HỢP GÕ TÌM KIẾM TRỰC TIẾP */}
             <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
                 <Col xs={24} sm={12} md={6}>
                     <Input
@@ -289,7 +355,6 @@ const EmployerJobs = () => {
                     />
                 </Col>
 
-                {/* Combobox Ngành nghề: Hỗ trợ Gõ tìm kiếm theo tên ngành */}
                 <Col xs={24} sm={12} md={6}>
                     <Select
                         showSearch
@@ -312,7 +377,6 @@ const EmployerJobs = () => {
                     </Select>
                 </Col>
 
-                {/* Combobox Khu vực: Hỗ trợ Gõ tìm kiếm theo tên khu vực */}
                 <Col xs={24} sm={12} md={6}>
                     <Select
                         showSearch
@@ -345,7 +409,7 @@ const EmployerJobs = () => {
                     >
                         <Option value={0}>Chờ duyệt</Option>
                         <Option value={1}>Đang hiển thị</Option>
-                        <Option value={2}>Bị từ chối / Đóng</Option>
+                        <Option value={2}>Đã đóng / Tạm dừng</Option>
                     </Select>
                 </Col>
 

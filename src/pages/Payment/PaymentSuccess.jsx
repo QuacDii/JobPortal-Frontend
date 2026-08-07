@@ -4,20 +4,19 @@ import { Result, Button } from 'antd';
 
 const PaymentSuccess = () => {
     const [searchParams] = useSearchParams();
-    const orderId = searchParams.get('orderId');
+    const orderId = searchParams.get('orderId') || searchParams.get('vnp_TxnRef');
     
     const [returnUrl, setReturnUrl] = useState('/employer/wallet');
     const [btnText, setBtnText] = useState('Quay lại Ví');
 
     useEffect(() => {
-        // Đọc lại luồng đi để hiển thị nút điều hướng phù hợp
         const prevPath = localStorage.getItem('payment_redirect');
         if (prevPath) {
             setReturnUrl(prevPath);
             if (prevPath.includes('service-package')) {
                 setBtnText('Quay lại Cửa hàng gói');
             }
-            localStorage.removeItem('payment_redirect'); // Dọn dẹp bộ nhớ
+            localStorage.removeItem('payment_redirect');
         }
     }, []);
 
@@ -26,7 +25,7 @@ const PaymentSuccess = () => {
             <Result
                 status="success"
                 title="🎉 Giao Dịch Hoàn Tất Thành Công!"
-                subTitle={`Hệ thống đã ghi nhận mã đơn hàng MoMo: ${orderId}. Các quyền lợi dịch vụ của bạn đã được kích hoạt tự động an toàn.`}
+                subTitle={`Hệ thống đã ghi nhận mã đơn hàng: ${orderId || 'Thành công'}. Các quyền lợi dịch vụ của bạn đã được kích hoạt tự động an toàn.`}
                 extra={[
                     <Button type="primary" key="console" size="large">
                         <Link to={returnUrl}>{btnText}</Link>

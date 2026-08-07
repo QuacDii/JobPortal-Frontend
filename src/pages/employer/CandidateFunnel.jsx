@@ -167,25 +167,33 @@ const CandidateFunnel = () => {
         }
     };
 
-    const isPdfUrl = (url) => url && url.toLowerCase().endsWith('.pdf');
+    const isPdfUrl = (url) => {
+        if (!url) return false;
+        const cleanUrl = url.split('?')[0].toLowerCase();
+        return cleanUrl.endsWith('.pdf') || cleanUrl.includes('/pdf/') || cleanUrl.includes('application/pdf');
+    };
 
     const renderCvViewer = (cvUrl) => {
         if (!cvUrl) {
             return (
                 <div style={{ padding: 40, textAlign: 'center', background: '#f8fafc', borderRadius: 8 }}>
-                    <Text type="secondary">Ứng viên không có tệp CV đính kèm.</Text>
+                    <Text type="secondary">Ứng viên không có tệp CV đính kèm hoặc tạo trực tiếp từ CV Builder.</Text>
                 </div>
             );
         }
+
         if (isPdfUrl(cvUrl)) {
+            // Nhúng Google Docs Viewer giúp preview PDF chuẩn xác trên mọi trình duyệt
+            const pdfViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(cvUrl)}&embedded=true`;
             return (
                 <iframe 
-                    src={cvUrl} 
+                    src={pdfViewerUrl} 
                     title="CV Candidate PDF" 
-                    style={{ width: '100%', height: '500px', border: '1px solid #cbd5e1', borderRadius: 8 }}
+                    style={{ width: '100%', height: '550px', border: '1px solid #cbd5e1', borderRadius: 8 }}
                 />
             );
         }
+
         return (
             <div style={{ 
                 width: '100%', height: '500px', maxHeight: '500px', 
@@ -434,87 +442,71 @@ const CandidateFunnel = () => {
 
     return (
         <div style={{ padding: '24px', background: '#f8fafc', minHeight: '100vh' }}>
-            
-            {/* CHIA LUỒNG GIAO DIỆN DỰA TRÊN isPremium */}
-            {isPremium ? (
-                <>
-                    {/* GIAO DIỆN PREMIUM */}
-                    <Card style={{ marginBottom: 20, borderRadius: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                        <Row gutter={24} align="middle">
-                            <Col xs={24} md={8}>
-                                <Text strong style={{ color: '#0f172a' }}>
-                                    <CrownOutlined style={{ color: '#fa8c16', marginRight: 6 }} />
-                                    Khoảng điểm Matching AI:
-                                </Text>
-                                <Slider 
-                                    range 
-                                    value={matchRange} 
-                                    onChange={(val) => setMatchRange(val)}
-                                    tooltip={{ formatter: (v) => `${v}%` }}
-                                />
-                            </Col>
-                            <Col xs={24} md={10}>
-                                <Text strong style={{ marginRight: 8 }}>Phân loại phễu:</Text>
-                                <Space wrap>
-                                    <Button type={statusFilter === null ? "primary" : "default"} onClick={() => setStatusFilter(null)}>Tất cả</Button>
-                                    <Button type={statusFilter === 0 ? "primary" : "default"} onClick={() => setStatusFilter(0)}>Mới nộp</Button>
-                                    <Button type={statusFilter === 1 ? "primary" : "default"} onClick={() => setStatusFilter(1)}>Đã xem</Button>
-                                    <Button type={statusFilter === 2 ? "primary" : "default"} onClick={() => setStatusFilter(2)}>Hẹn phỏng vấn</Button>
-                                    <Button type={statusFilter === 3 ? "primary" : "default"} onClick={() => setStatusFilter(3)}>Từ chối</Button>
-                                </Space>
-                            </Col>
-                            
-                            {/* NÚT KÍCH HOẠT SO SÁNH */}
-                            <Col xs={24} md={6} style={{ textAlign: 'right' }}>
-                                <Button 
-                                    type="primary" 
-                                    icon={<SwapOutlined />}
-                                    onClick={() => {
-                                        if (selectedCandidates.length < 2) {
-                                            message.warning("Vui lòng tích chọn ít nhất 2 ứng viên để so sánh!");
-                                            return;
-                                        }
-                                        setIsCompareModalOpen(true);
-                                    }}
-                                    style={{ 
-                                        backgroundColor: '#722ed1', 
-                                        borderColor: '#722ed1',
-                                        color: '#ffffff',
-                                        fontWeight: '600',
-                                        opacity: selectedCandidates.length < 2 ? 0.50 : 1,
-                                        cursor: selectedCandidates.length < 2 ? 'not-allowed' : 'pointer',
-                                        transition: 'all 0.3s'
-                                    }}
-                                >
-                                    So sánh ứng viên ({selectedCandidates.length}/3)
-                                </Button>
-                            </Col>
-                        </Row>
-                    </Card>
+                
+                {/* 🌟 BỘ LỌC DÙNG CHUNG CHO TẤT CẢ NHÀ TUYỂN DỤNG */}
+                <Card style={{ marginBottom: 20, borderRadius: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                    <Row gutter={[24, 16]} align="middle">
+                        {/* Lọc Trạng thái phễu (Basic & Premium đều dùng được) */}
+                        <Col xs={24} md={isPremium ? 12 : 24}>
+                            <Text strong style={{ marginRight: 8, display: 'inline-block', marginBottom: 8 }}>
+                                Phân loại phễu ứng viên:
+                            </Text>
+                            <Space wrap style={{ marginTop: 4 }}>
+                                <Button type={statusFilter === null ? "primary" : "default"} onClick={() => setStatusFilter(null)}>Tất cả ({candidates.length})</Button>
+                                <Button type={statusFilter === 0 ? "primary" : "default"} onClick={() => setStatusFilter(0)}>Mới nộp</Button>
+                                <Button type={statusFilter === 1 ? "primary" : "default"} onClick={() => setStatusFilter(1)}>Đã xem</Button>
+                                <Button type={statusFilter === 2 ? "primary" : "default"} style={statusFilter === 2 ? { backgroundColor: '#16a34a', borderColor: '#16a34a' } : {}} onClick={() => setStatusFilter(2)}>Hẹn phỏng vấn</Button>
+                                <Button danger type={statusFilter === 3 ? "primary" : "default"} onClick={() => setStatusFilter(3)}>Từ chối</Button>
+                            </Space>
+                        </Col>
 
-                    <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                        <Title level={4} style={{ marginBottom: 16, color: '#0f172a' }}>
-                            <RobotOutlined style={{ color: '#1677ff', marginRight: 8 }} />
-                            Danh sách Ứng viên (Chế độ Phân tích AI)
-                        </Title>
-                        <Table 
-                            rowSelection={rowSelection}
-                            columns={premiumColumns} 
-                            dataSource={filteredCandidates}
-                            rowKey="maDon" 
-                            pagination={{ pageSize: 10 }}
-                        />
-                    </div>
-                </>
-            ) : (
-                <>
-                    {/* GIAO DIỆN THƯỜNG (BASIC FALLBACK) */}
+                        {/* Tính năng Nâng cao (Chỉ dành cho Premium) */}
+                        {isPremium && (
+                            <>
+                                <Col xs={24} md={7}>
+                                    <Text strong style={{ color: '#0f172a' }}>
+                                        <CrownOutlined style={{ color: '#fa8c16', marginRight: 6 }} />
+                                        Điểm Matching AI:
+                                    </Text>
+                                    <Slider 
+                                        range 
+                                        value={matchRange} 
+                                        onChange={(val) => setMatchRange(val)}
+                                        tooltip={{ formatter: (v) => `${v}%` }}
+                                    />
+                                </Col>
+                                <Col xs={24} md={5} style={{ textAlign: 'right' }}>
+                                    <Button 
+                                        type="primary" 
+                                        icon={<SwapOutlined />}
+                                        onClick={() => {
+                                            if (selectedCandidates.length < 2) {
+                                                message.warning("Vui lòng chọn ít nhất 2 ứng viên để so sánh!");
+                                                return;
+                                            }
+                                            setIsCompareModalOpen(true);
+                                        }}
+                                        style={{ 
+                                            backgroundColor: '#722ed1', borderColor: '#722ed1',
+                                            fontWeight: '600', opacity: selectedCandidates.length < 2 ? 0.5 : 1
+                                        }}
+                                    >
+                                        So sánh ({selectedCandidates.length}/3)
+                                    </Button>
+                                </Col>
+                            </>
+                        )}
+                    </Row>
+                </Card>
+
+                {/* THÔNG BÁO GỢI Ý NÂNG CẤP NẾU LÀ TÀI KHOẢN TIÊU CHUẨN */}
+                {!isPremium && (
                     <Alert
-                        message={<Text strong style={{ color: '#1e40af', fontSize: 15 }}><CrownOutlined /> Tài khoản Tiêu chuẩn</Text>}
+                        message={<Text strong style={{ color: '#1e40af', fontSize: 15 }}><CrownOutlined /> Nâng cấp tài khoản Doanh nghiệp Premium</Text>}
                         description={
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 4 }}>
-                                <span>Nâng cấp <b>Gói AI Recruitment</b> để kích hoạt tính năng tự động bóc tách kỹ năng, chấm % độ hợp CV và lọc ứng viên thông minh.</span>
-                                <Button type="primary" style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }} onClick={() => navigate('/employer/service-packages')}>
+                                <span>Kích hoạt tính năng AI tự động chấm % độ hợp CV, bóc tách kỹ năng và so sánh ứng viên thông minh.</span>
+                                <Button type="primary" style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }} onClick={() => navigate('/employer/service-package')}>
                                     Nâng cấp Premium
                                 </Button>
                             </div>
@@ -523,20 +515,22 @@ const CandidateFunnel = () => {
                         showIcon={false}
                         style={{ marginBottom: 20, borderRadius: 10, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}
                     />
-                    
-                    <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                        <Title level={4} style={{ marginBottom: 16, color: '#0f172a' }}>
-                            Danh sách Ứng viên Nộp đơn
-                        </Title>
-                        <Table 
-                            columns={basicColumns} 
-                            dataSource={filteredCandidates}
-                            rowKey="maDon" 
-                            pagination={{ pageSize: 10 }}
-                        />
-                    </div>
-                </>
-            )}
+                )}
+
+                {/* BẢNG HỒ SƠ ỨNG VIÊN */}
+                <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                    <Title level={4} style={{ marginBottom: 16, color: '#0f172a' }}>
+                        {isPremium ? <RobotOutlined style={{ color: '#1677ff', marginRight: 8 }} /> : null}
+                        Danh sách Ứng viên ({filteredCandidates.length})
+                    </Title>
+                    <Table 
+                        rowSelection={isPremium ? rowSelection : null}
+                        columns={isPremium ? premiumColumns : basicColumns} 
+                        dataSource={filteredCandidates}
+                        rowKey="maDon" 
+                        pagination={{ pageSize: 10 }}
+                    />
+                </div>
 
             {/* MODAL SO SÁNH SONG SONG 2 - 3 ỨNG VIÊN (PREMIUM) */}
             <Modal

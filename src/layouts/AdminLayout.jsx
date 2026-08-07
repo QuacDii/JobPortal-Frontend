@@ -82,7 +82,7 @@ const AdminLayout = ({ children, user }) => {
             key: 'sub-finance', icon: <WalletOutlined />, label: 'Tài chính & Dịch vụ',
             children: [
                 { key: '/employer/service-package', icon: <ShoppingCartOutlined />, label: 'Cửa hàng Dịch vụ' },
-                { key: '/employer/wallet', label: 'Ví điện tử MoMo' },
+                { key: '/employer/wallet', icon: <WalletOutlined />, label: 'Ví điện tử' },
             ]
         }
     ];

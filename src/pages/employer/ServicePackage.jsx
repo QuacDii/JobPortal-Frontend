@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Button, Table, Typography, Modal, InputNumber, Row, Col, Statistic, Space, Tag, Badge, Spin } from 'antd';
+import React, { useState, useEffect, useRef } from 'react';
+import { Card, Radio, Button, Table, Typography, Modal, InputNumber, Row, Col, Statistic, Space, Tag, Badge, Spin } from 'antd';
 import { 
     WalletOutlined, 
     ShoppingCartOutlined, 
@@ -10,7 +10,8 @@ import {
     PayCircleOutlined,
     CheckCircleOutlined,
     LoadingOutlined,
-    CloseCircleOutlined 
+    CloseCircleOutlined,
+    CreditCardOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import servicePackage from '../../services/servicePackage';
@@ -32,6 +33,7 @@ const ServicePackage = () => {
     const [ngayMua, setNgayMua] = useState(null);
     const [loading, setLoading] = useState(false);
     const [maUser, setMaUser] = useState(null);
+    const isProcessingRef = useRef(false);
 
     // State cho Modal Nạp tiền thiếu
     const [isTopupModalVisible, setIsTopupModalVisible] = useState(false);
@@ -45,6 +47,7 @@ const ServicePackage = () => {
     const [checkingOrderId, setCheckingOrderId] = useState(null);
     const [isChecking, setIsChecking] = useState(false);
     const [isConfirmingManual, setIsConfirmingManual] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState('vnpay');
 
     useEffect(() => {
         const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
@@ -60,22 +63,25 @@ const ServicePackage = () => {
         fetchData();
     }, []);
 
-    // POLLING TỰ ĐỘNG LẮNG NGHE KẾT QUẢ THANH TOÁN & MUA GÓI TỪ MOMO
+    // 3. Polling kiểm tra tự động
     useEffect(() => {
         let interval = null;
         if (isChecking && checkingOrderId && maUser) {
             interval = setInterval(async () => {
+                if (isProcessingRef.current) return; // Nếu đã bị khóa thì dừng ngay
+
                 try {
                     const res = await paymentService.checkStatus(checkingOrderId, maUser, selectedPkgId);
                     const isPaid = res?.data?.isPaid || res?.isPaid;
-                    if (isPaid) {
-                        toast.success(`Nạp tiền & Kích hoạt gói dịch vụ thành công!`);
+
+                    if (isPaid && !isProcessingRef.current) {
+                        isProcessingRef.current = true; // 🌟 Khóa tiến trình
+                        clearInterval(interval);
                         setIsChecking(false);
                         setIsPaymentModalOpen(false);
-                        setIsTopupModalVisible(false);
-                        setCheckingOrderId(null);
-                        
-                        fetchData();
+
+                        localStorage.setItem('payment_redirect', window.location.pathname);
+                        navigate(`/payment-success?orderId=${checkingOrderId}`);
                     }
                 } catch (err) {
                     console.error("Lỗi kiểm tra trạng thái giao dịch:", err);
@@ -85,15 +91,13 @@ const ServicePackage = () => {
         return () => {
             if (interval) clearInterval(interval);
         };
-    }, [isChecking, checkingOrderId, maUser, selectedPkgId]);
+    }, [isChecking, checkingOrderId, maUser, selectedPkgId, navigate]);
 
     const fetchData = async () => {
         try {
-            // 🌟 CẬP NHẬT: Gọi endpoint chuyên dụng cho Nhà tuyển dụng
             const pkgCall = servicePackage.getEmployerPackages 
                 ? servicePackage.getEmployerPackages() 
                 : servicePackage.getPackages();
-
             const [pkgRes, histRes, balRes] = await Promise.all([
                 pkgCall,
                 servicePackage.getHistory(),
@@ -103,7 +107,6 @@ const ServicePackage = () => {
             const actualPkg = pkgRes?.data ? pkgRes.data : pkgRes;
             const actualHist = histRes?.data ? histRes.data : histRes;
             const actualBal = balRes?.data ? balRes.data : balRes;
-
             setPackages(Array.isArray(actualPkg) ? actualPkg : []); 
             setHistory(Array.isArray(actualHist) ? actualHist : []);
             
@@ -138,13 +141,11 @@ const ServicePackage = () => {
         const giaKM = Number(pkg.giaKhuyenMai) || 0;
         const giaThucTe = (giaKM > 0) ? giaKM : giaGoc;
         const soDuHienTai = Number(balance) || 0;
-
         if (soDuHienTai >= giaThucTe) {
             const isVipActive = ngayHetHan && new Date(ngayHetHan) > new Date();
             const contentMsg = isVipActive 
                 ? `LƯU Ý: Bạn đang sử dụng [${tenGoiHienTai}]. Nếu tiếp tục, hệ thống sẽ trừ ${giaThucTe.toLocaleString()}đ để kích hoạt [${pkg.tenGoi}]. Quyền lợi sẽ được CỘNG DỒN và Hạn sử dụng sẽ được gia hạn. Bạn có chắc chắn?`
                 : `Hệ thống sẽ trừ ${giaThucTe.toLocaleString()} đ từ số dư ví để kích hoạt ${pkg.tenGoi}.`;
-
             confirm({
                 title: isVipActive ? 'Xác nhận Chuyển đổi / Gia hạn gói' : 'Xác nhận kích hoạt gói',
                 icon: <ShoppingCartOutlined style={{ color: isVipActive ? '#faad14' : '#1890ff' }} />,
@@ -174,40 +175,55 @@ const ServicePackage = () => {
         }
     };
 
+    // 1. Reset cờ khóa khi người dùng bắt đầu nạp tiền mới
     const handleTopupSubmit = async () => {
-        if (!maUser) {
-            toast.error("Không tìm thấy thông tin tài khoản, vui lòng đăng nhập lại!");
-            return;
-        }
+        if (!maUser) return toast.error("Không tìm thấy thông tin tài khoản!");
         const soTienNap = Number(topupAmount) || 0;
         if (soTienNap < 10000) return toast.warning("Tối thiểu 10.000đ");
 
         try {
             setLoading(true);
-            const response = await paymentService.createPaymentUrl(maUser, soTienNap, selectedPkgId);
-            const url = response?.url || response?.data?.url || response?.data;
-            if (url && typeof url === 'string' && url.startsWith('http')) {
-                const orderId = extractOrderId(url);
-                setPayUrl(url);
-                setCheckingOrderId(orderId);
-                
-                setIsTopupModalVisible(false);
-                setIsPaymentModalOpen(true);
-                setIsChecking(true);
+            isProcessingRef.current = false; // 🌟 Reset cờ khóa tại đây
+
+            if (paymentMethod === 'vnpay') {
+                const response = await paymentService.createVnPayUrl(maUser, soTienNap, selectedPkgId);
+                const url = response?.paymentUrl || response?.url || response?.data?.paymentUrl || response?.data?.url || response?.data;
+                if (url && typeof url === 'string' && url.startsWith('http')) {
+                    localStorage.setItem('payment_redirect', window.location.pathname);
+                    window.location.href = url;
+                }
             } else {
-                toast.error("Không nhận được URL thanh toán từ server!");
+                const response = await paymentService.createPaymentUrl(maUser, soTienNap, selectedPkgId);
+                const url = response?.paymentUrl || response?.url || response?.data?.paymentUrl || response?.data?.url || response?.data;
+                if (url && typeof url === 'string' && url.startsWith('http')) {
+                    const orderId = extractOrderId(url);
+                    localStorage.setItem('payment_redirect', window.location.pathname);
+                    setPayUrl(url);
+                    setCheckingOrderId(orderId);
+                    
+                    setIsTopupModalVisible(false);
+                    setIsPaymentModalOpen(true);
+                    setIsChecking(true);
+                }
             }
         } catch (error) {
-            console.error("Lỗi nạp tiền MoMo:", error);
-            toast.error(error.response?.data?.message || "Lỗi kết nối MoMo.");
+            toast.error("Lỗi kết nối cổng thanh toán.");
         } finally {
             setLoading(false);
         }
     };
 
+    // 2. Khóa Polling ngay lập tức khi người dùng bấm nút Giả lập
     const handleManualConfirm = async (resultCode = '0') => {
+        if (isProcessingRef.current) return;
+        
+        // 🌟 KHÓA NGAY LẬP TỨC TRƯỚC KHI GỌI API (Chống Polling can thiệp)
+        isProcessingRef.current = true; 
+        setIsChecking(false);
+
         setIsConfirmingManual(true);
         localStorage.setItem('payment_redirect', window.location.pathname);
+
         try {
             if (resultCode === '0') {
                 await paymentService.confirmFallback({
@@ -218,18 +234,17 @@ const ServicePackage = () => {
                     maGoi: selectedPkgId
                 });
                 setIsPaymentModalOpen(false);
-                setIsChecking(false);
                 setCheckingOrderId(null);
                 navigate(`/payment-success?orderId=${checkingOrderId}`);
             } else {
                 setIsPaymentModalOpen(false);
-                setIsChecking(false);
                 setCheckingOrderId(null);
                 navigate(`/payment-failed?orderId=${checkingOrderId}`);
             }
         } catch (err) {
             console.error("Lỗi xác nhận giả lập:", err);
             toast.error("Thao tác thất bại, vui lòng thử lại!");
+            isProcessingRef.current = false; // Mở lại cờ nếu API lỗi
         } finally {
             setIsConfirmingManual(false);
         }
@@ -248,7 +263,7 @@ const ServicePackage = () => {
             <Button type="link" icon={<ArrowLeftOutlined />} onClick={() => navigate('/employer/dashboard')} style={{ marginBottom: 20, padding: 0 }}>
                 Quay lại Bảng điều khiển
             </Button>
-
+            
             {/* THỐNG KÊ SỐ DƯ & GÓI HIỆN TẠI */}
             <Row gutter={24} style={{ marginBottom: 30 }}>
                 <Col span={12}>
@@ -293,7 +308,7 @@ const ServicePackage = () => {
             </Row>
 
             <Title level={3} style={{ textAlign: 'center', marginBottom: 30, color: '#0056b3' }}>CỬA HÀNG DỊCH VỤ</Title>
-
+            
             <Row gutter={[24, 24]} justify="center">
                 {packages.map(pkg => {
                     const isDiscount = pkg.giaKhuyenMai && pkg.giaKhuyenMai > 0 && pkg.giaKhuyenMai < pkg.giaTien;
@@ -330,21 +345,17 @@ const ServicePackage = () => {
                                 </Title>
                             </div>
 
-                            {/* 🌟 3. HIỂN THỊ ĐỘNG CÁC ĐẶC QUYỀN TỪ BACKEND TRẢ VỀ */}
                             <Space direction="vertical" style={{ width: '100%', textAlign: 'left', marginTop: 15, flex: 1 }}>
                                 <Text>
                                     ⏳ Chu kỳ: <b>
                                         {pkg.donViThoiGian} {pkg.loaiGoi === 3 ? 'năm' : pkg.loaiGoi === 2 ? 'tháng' : 'ngày'}
                                     </b>
                                 </Text>
-
                                 {pkg.soLuotXemCv > 0 && (
                                     <Text>
                                         👁️ Lượt xem CV bổ sung: <b>{pkg.soLuotXemCv} lượt</b>
                                     </Text>
                                 )}
-
-                                {/* Vòng lặp map qua mảng dacQuyens */}
                                 {pkg.dacQuyens && pkg.dacQuyens.length > 0 ? (
                                     pkg.dacQuyens.map((dq, idx) => (
                                         <Text key={dq.maDacQuyen || idx} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -358,7 +369,6 @@ const ServicePackage = () => {
                                 ) : (
                                     <Text type="secondary" italic>Gói cơ bản</Text>
                                 )}
-
                                 <Text type="secondary" style={{ fontSize: '12px', marginTop: 8 }}>
                                     ⭐ Cơ chế: <b>Cộng dồn quyền lợi & tự động kích hoạt</b>
                                 </Text>
@@ -393,28 +403,52 @@ const ServicePackage = () => {
             </Title>
             <Table dataSource={history} columns={columns} rowKey="maGd" pagination={{ pageSize: 5 }} style={{ marginTop: 20 }} />
 
-            {/* MODAL 1: BÁO SỐ DƯ THIẾU */}
+            {/* MODAL 1: BÁO SỐ DƯ THIẾU & CHỌN CỔNG THANH TOÁN */}
             <Modal
                 title={<span><ExclamationCircleOutlined style={{ color: '#faad14', marginRight: 8 }} /> Cần nạp thêm tiền</span>}
                 open={isTopupModalVisible}
                 onCancel={() => setIsTopupModalVisible(false)}
                 footer={[
                     <Button key="cancel" onClick={() => setIsTopupModalVisible(false)}>Hủy bỏ</Button>,
-                    <Button key="submit" type="primary" loading={loading} onClick={handleTopupSubmit} style={{ background: '#A50064', borderColor: '#A50064' }}>
-                        Nạp {topupAmount.toLocaleString()}đ qua MoMo
+                    <Button 
+                        key="submit" 
+                        type="primary" 
+                        loading={loading} 
+                        onClick={handleTopupSubmit} 
+                        style={{ 
+                            background: paymentMethod === 'vnpay' ? '#005baa' : '#A50064', 
+                            borderColor: paymentMethod === 'vnpay' ? '#005baa' : '#A50064' 
+                        }}
+                    >
+                        Nạp {topupAmount.toLocaleString()}đ qua {paymentMethod === 'vnpay' ? 'VNPay' : 'MoMo'}
                     </Button>,
                 ]}
             >
                 <div style={{ textAlign: 'center', padding: '15px 0' }}>
-                    <p style={{ fontSize: '16px', marginBottom: 20 }}>
+                    <p style={{ fontSize: '16px', marginBottom: 15 }}>
                         Giao dịch thất bại do số dư ví thiếu <Text type="danger" strong>{missingAmount.toLocaleString()} đ</Text>.
                     </p>
-                    <p>Nhập số tiền bạn muốn nạp (Tối thiểu 10.000đ):</p>
-                    <InputNumber min={10000} step={10000} value={topupAmount} onChange={setTopupAmount} style={{ width: '70%', fontSize: '18px' }} addonAfter="VNĐ" />
+
+                    <div style={{ marginBottom: 15, textAlign: 'left' }}>
+                        <label style={{ fontWeight: 'bold', display: 'block', marginBottom: 6 }}>Phương thức nạp tiền:</label>
+                        <Radio.Group value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} style={{ width: '100%' }}>
+                            <Space direction="vertical" style={{ width: '100%' }}>
+                                <Radio.Button value="vnpay" style={{ width: '100%', textAlign: 'center', fontWeight: 'bold' }}>
+                                    <CreditCardOutlined style={{ color: '#005baa', marginRight: 6 }} /> VNPay (ATM / QR Code)
+                                </Radio.Button>
+                                <Radio.Button value="momo" style={{ width: '100%', textAlign: 'center', fontWeight: 'bold' }}>
+                                    <PayCircleOutlined style={{ color: '#A50064', marginRight: 6 }} /> Ví MoMo
+                                </Radio.Button>
+                            </Space>
+                        </Radio.Group>
+                    </div>
+
+                    <p style={{ margin: '10px 0 5px 0' }}>Nhập số tiền bạn muốn nạp (Tối thiểu 10.000đ):</p>
+                    <InputNumber min={10000} step={10000} value={topupAmount} onChange={setTopupAmount} style={{ width: '100%', fontSize: '18px' }} addonAfter="VNĐ" />
                 </div>
             </Modal>
 
-            {/* MODAL 2: MỞ TRANG THANH TOÁN MOMO */}
+            {/* MODAL 2: MỞ TRANG THANH TOÁN MOMO & GIẢ LẬP */}
             <Modal
                 title={<span style={{ color: '#A50064', fontSize: '18px' }}><PayCircleOutlined /> Kích hoạt thanh toán MoMo (Sandbox)</span>}
                 open={isPaymentModalOpen}

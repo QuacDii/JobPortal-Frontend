@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Modal, Spin } from 'antd';
+import { Button, Modal, Spin, Radio, Space } from 'antd';
 import { 
     ArrowLeftOutlined, 
     LoadingOutlined, 
     PayCircleOutlined, 
     CheckCircleOutlined, 
-    CloseCircleOutlined 
+    CloseCircleOutlined,
+    CreditCardOutlined
 } from '@ant-design/icons';
 import paymentService from '../../services/paymentService';
 import { toast } from 'react-toastify';
@@ -14,10 +15,11 @@ import { jwtDecode } from 'jwt-decode';
 
 const Wallet = () => {
     const [soTien, setSoTien] = useState(50000);
+    const [paymentMethod, setPaymentMethod] = useState('vnpay'); // 'vnpay' hoặc 'momo'
     const [isLoading, setIsLoading] = useState(false);
     const [isConfirmingManual, setIsConfirmingManual] = useState(false);
     const [maUser, setMaUser] = useState(null);
-    
+    const isProcessingRef = useRef(false);
     const [payUrl, setPayUrl] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [checkingOrderId, setCheckingOrderId] = useState(null);
@@ -25,7 +27,6 @@ const Wallet = () => {
     
     const navigate = useNavigate();
 
-    // 1. Xác thực và trích xuất maUser từ Token
     useEffect(() => {
         const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
         if (!token) {
@@ -45,21 +46,28 @@ const Wallet = () => {
         }
     }, [navigate]);
 
-    // 2. Polling tự động kiểm tra trạng thái thanh toán từ MoMo Real
+    // Polling kiểm tra trạng thái thanh toán
     useEffect(() => {
         let interval = null;
         if (isChecking && checkingOrderId && maUser) {
+            isProcessingRef.current = false;
+
             interval = setInterval(async () => {
+                if (isProcessingRef.current) return;
+
                 try {
                     const res = await paymentService.checkStatus(checkingOrderId, maUser);
-                    if (res?.data?.isPaid || res?.isPaid) {
+                    const isPaid = res?.data?.isPaid || res?.isPaid;
+
+                    if (isPaid && !isProcessingRef.current) {
+                        isProcessingRef.current = true;
+                        clearInterval(interval);
+
                         setIsChecking(false);
                         setIsModalOpen(false);
-
-                        // 🌟 Lưu vị trí trang hiện tại để nút "Quay lại" ở trang Success hoạt động đúng
+                        
+                        // 🌟 BỎ TOAST TẠI ĐÂY -> Chỉ điều hướng duy nhất
                         localStorage.setItem('payment_redirect', window.location.pathname);
-
-                        // 🌟 Chuyển hướng sang trang PaymentSuccess
                         navigate(`/payment-success?orderId=${checkingOrderId}`);
                     }
                 } catch (err) {
@@ -70,10 +78,12 @@ const Wallet = () => {
         return () => { if (interval) clearInterval(interval); };
     }, [isChecking, checkingOrderId, maUser, navigate]);
 
-    // Hàm phụ: Bóc tách mã orderId từ MoMo Pay URL
     const extractOrderId = (url) => {
         try {
             const urlObj = new URL(url);
+            const vnpTxnRef = urlObj.searchParams.get('vnp_TxnRef');
+            if (vnpTxnRef) return vnpTxnRef;
+
             const tParam = urlObj.searchParams.get('t');
             if (tParam) {
                 const decoded = atob(tParam);
@@ -86,29 +96,33 @@ const Wallet = () => {
         return Date.now().toString();
     };
 
-    // 3. Khởi tạo giao dịch Nạp tiền
     const handleNapTien = async (e) => {
         e.preventDefault();
         if (!maUser) return toast.error("Đang tải thông tin người dùng!");
         if (Number(soTien) < 10000) return toast.warning("Tối thiểu 10.000đ");
 
         setIsLoading(true);
+        isProcessingRef.current = false; // 🌟 Reset cờ khóa
+
         try {
-            const response = await paymentService.createPaymentUrl(maUser, Number(soTien));
-            const url = response?.url || response?.data?.url || response?.data;
-
-            if (url && typeof url === 'string' && url.startsWith('http')) {
-                const orderId = extractOrderId(url);
-                
-                // 🌟 Lưu trước đường dẫn hiện tại vào localStorage
-                localStorage.setItem('payment_redirect', window.location.pathname);
-
-                setPayUrl(url);
-                setCheckingOrderId(orderId);
-                setIsModalOpen(true);
-                setIsChecking(true);
+            if (paymentMethod === 'vnpay') {
+                const response = await paymentService.createVnPayUrl(maUser, Number(soTien));
+                const url = response?.paymentUrl || response?.url || response?.data?.paymentUrl || response?.data?.url || response?.data;
+                if (url && typeof url === 'string' && url.startsWith('http')) {
+                    localStorage.setItem('payment_redirect', window.location.pathname);
+                    window.location.href = url;
+                }
             } else {
-                toast.error("Không nhận được liên kết thanh toán từ MoMo!");
+                const response = await paymentService.createPaymentUrl(maUser, Number(soTien));
+                const url = response?.paymentUrl || response?.url || response?.data?.paymentUrl || response?.data?.url || response?.data;
+                if (url && typeof url === 'string' && url.startsWith('http')) {
+                    const orderId = extractOrderId(url);
+                    localStorage.setItem('payment_redirect', window.location.pathname);
+                    setPayUrl(url);
+                    setCheckingOrderId(orderId);
+                    setIsModalOpen(true);
+                    setIsChecking(true);
+                }
             }
         } catch (error) {
             toast.error("Có lỗi xảy ra khi tạo giao dịch!");
@@ -117,59 +131,75 @@ const Wallet = () => {
         }
     };
 
-    // 4. Xử lý Nút bấm Giả lập Kết quả (Thành công / Thất bại)
     const handleManualConfirm = async (resultCode = '0') => {
-        setIsConfirmingManual(true);
+        if (isProcessingRef.current) return;
         
-        // 🌟 Lưu vị trí trang hiện tại
+        // 🌟 KHÓA LẬP TỨC & DỪNG POLLING
+        isProcessingRef.current = true;
+        setIsChecking(false);
+
+        setIsConfirmingManual(true);
         localStorage.setItem('payment_redirect', window.location.pathname);
 
         try {
             if (resultCode === '0') {
-                // Xử lý nạp tiền thành công
                 await paymentService.confirmFallback({
                     maUser: maUser,
                     amount: Number(soTien),
                     orderId: checkingOrderId,
                     resultCode: '0'
                 });
-
                 setIsModalOpen(false);
-                setIsChecking(false);
-
-                // 🌟 Chuyển hướng tới trang PaymentSuccess
                 navigate(`/payment-success?orderId=${checkingOrderId}`);
             } else {
                 setIsModalOpen(false);
-                setIsChecking(false);
-
-                // 🌟 Chuyển hướng tới trang PaymentFailed
                 navigate(`/payment-failed?orderId=${checkingOrderId}`);
             }
         } catch (err) {
             console.error("Lỗi xác nhận giả lập:", err);
             toast.error("Thao tác thất bại, vui lòng thử lại!");
+            isProcessingRef.current = false;
         } finally {
             setIsConfirmingManual(false);
         }
     };
-
     if (maUser === null) {
         return <div style={{ textAlign: 'center', marginTop: '50px' }}>Đang xác thực thông tin...</div>;
     }
 
+    const isVnPay = paymentMethod === 'vnpay';
+    const primaryColor = isVnPay ? '#005baa' : '#A50064';
+
     return (
-        <div style={{ maxWidth: '400px', margin: '50px auto', padding: '25px', border: '1px solid #e0e0e0', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', backgroundColor: '#fff' }}>
+        <div style={{ maxWidth: '440px', margin: '50px auto', padding: '25px', border: '1px solid #e0e0e0', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', backgroundColor: '#fff' }}>
             <Button type="link" icon={<ArrowLeftOutlined />} onClick={() => navigate('/employer/dashboard')} style={{ marginBottom: '15px', padding: 0 }}>
                 Quay lại Bảng điều khiển
             </Button>
-
+            
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                <h2 style={{ color: '#D82D8B', margin: '0 0 10px 0' }}>Ví Điện Tử TKVL</h2>
-                <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>Hệ thống thanh toán qua MoMo Sandbox</p>
+                <h2 style={{ color: primaryColor, margin: '0 0 10px 0' }}>Ví Điện Tử TKVL</h2>
+                <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>Hỗ trợ thanh toán qua VNPay & MoMo</p>
             </div>
             
             <form onSubmit={handleNapTien}>
+                <div style={{ marginBottom: '20px' }}>
+                    <label style={{ fontWeight: '600', display: 'block', marginBottom: '8px', color: '#333' }}>Chọn cổng thanh toán:</label>
+                    <Radio.Group 
+                        value={paymentMethod} 
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        style={{ width: '100%' }}
+                    >
+                        <Space direction="vertical" style={{ width: '100%' }}>
+                            <Radio.Button value="vnpay" style={{ width: '100%', height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                <CreditCardOutlined style={{ color: '#005baa', marginRight: 8 }} /> Thanh toán qua VNPay (ATM / QR)
+                            </Radio.Button>
+                            <Radio.Button value="momo" style={{ width: '100%', height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                <PayCircleOutlined style={{ color: '#A50064', marginRight: 8 }} /> Thanh toán qua Ví MoMo
+                            </Radio.Button>
+                        </Space>
+                    </Radio.Group>
+                </div>
+
                 <div style={{ marginBottom: '20px' }}>
                     <label style={{ fontWeight: '600', display: 'block', marginBottom: '8px', color: '#333' }}>Số tiền cần nạp (VNĐ):</label>
                     <input 
@@ -188,18 +218,17 @@ const Wallet = () => {
                     disabled={isLoading || isChecking}
                     style={{ 
                         width: '100%', padding: '14px', 
-                        background: (isLoading || isChecking) ? '#ccc' : '#A50064', 
+                        background: (isLoading || isChecking) ? '#ccc' : primaryColor, 
                         color: 'white', border: 'none', borderRadius: '6px', 
                         cursor: (isLoading || isChecking) ? 'not-allowed' : 'pointer', 
                         fontWeight: 'bold', fontSize: '16px'
                     }}>
-                    {isLoading ? 'Đang tạo giao dịch...' : 'NẠP TIỀN BẰNG MOMO'}
+                    {isLoading ? 'Đang tạo giao dịch...' : `NẠP TIỀN BẰNG ${isVnPay ? 'VNPAY' : 'MOMO'}`}
                 </button>
             </form>
 
-            {/* MODAL HƯỚNG DẪN THANH TOÁN MOMO & NÚT GIẢ LẬP */}
             <Modal
-                title={<span style={{ color: '#A50064', fontSize: '18px' }}><PayCircleOutlined /> Kích hoạt thanh toán MoMo (Sandbox)</span>}
+                title={<span style={{ color: primaryColor, fontSize: '18px' }}><PayCircleOutlined /> Thanh toán qua {isVnPay ? 'VNPay' : 'MoMo'} (Sandbox)</span>}
                 open={isModalOpen}
                 onCancel={() => { setIsModalOpen(false); setIsChecking(false); }}
                 footer={null}
@@ -207,7 +236,7 @@ const Wallet = () => {
             >
                 <div style={{ textAlign: 'center', padding: '15px 0' }}>
                     <p style={{ fontSize: '15px', color: '#333' }}>
-                        Đơn nạp tiền <b>#{checkingOrderId}</b> đã sẵn sàng. Vui lòng nhấn mở cổng MoMo hoặc chọn kết quả giả lập bên dưới:
+                        Đơn nạp tiền <b>#{checkingOrderId}</b> đã sẵn sàng. Vui lòng nhấn mở trang thanh toán hoặc chọn kết quả giả lập bên dưới:
                     </p>
                     
                     <a 
@@ -216,22 +245,21 @@ const Wallet = () => {
                         rel="noopener noreferrer"
                         style={{
                             display: 'inline-block', width: '100%', padding: '12px 0',
-                            backgroundColor: '#A50064', color: '#fff', fontWeight: 'bold',
+                            backgroundColor: primaryColor, color: '#fff', fontWeight: 'bold',
                             fontSize: '15px', borderRadius: '6px', textAlign: 'center',
                             textDecoration: 'none', margin: '5px 0 15px 0'
                         }}
                     >
-                        MỞ TRANG THANH TOÁN MOMO
+                        MỞ TRANG THANH TOÁN {isVnPay ? 'VNPAY' : 'MOMO'}
                     </a>
 
                     <div style={{ padding: '10px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '6px', marginBottom: '15px' }}>
                         <Spin indicator={<LoadingOutlined style={{ fontSize: 16, color: '#d48806', marginRight: '8px' }} spin />} />
                         <span style={{ color: '#d48806', fontWeight: '500', fontSize: '13px' }}>
-                            Đang tự động lắng nghe kết quả từ MoMo...
+                            Đang tự động lắng nghe kết quả giao dịch...
                         </span>
                     </div>
 
-                    {/* CỤM NÚT GIẢ LẬP KẾT QUẢ THANH TOÁN */}
                     <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                         <Button 
                             danger
@@ -239,13 +267,10 @@ const Wallet = () => {
                             icon={<CloseCircleOutlined />}
                             loading={isConfirmingManual}
                             onClick={() => handleManualConfirm('1006')}
-                            style={{ 
-                                flex: 1, height: '42px', fontWeight: 'bold', fontSize: '14px' 
-                            }}
+                            style={{ flex: 1, height: '42px', fontWeight: 'bold', fontSize: '14px' }}
                         >
                             ❌ Giả lập Thất bại
                         </Button>
-
                         <Button 
                             type="primary"
                             icon={<CheckCircleOutlined />}

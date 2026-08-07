@@ -215,8 +215,26 @@ const PostJob = () => {
                                             </Form.Item>
                                         </Col>
                                         <Col span={12}>
-                                            <Form.Item {...restField} label="Số lượng tuyển" name={[name, 'soLuongTuyen']}>
-                                                <InputNumber min={1} style={{ width: '100%' }} placeholder="VD: 2" />
+                                            <Form.Item 
+                                                {...restField} 
+                                                label="Số lượng tuyển" 
+                                                name={[name, 'soLuongTuyen']}
+                                                rules={[
+                                                    { required: true, message: 'Bắt buộc nhập!' },
+                                                    {                                                        
+                                                        validator: (_, value) => {
+                                                            if (!value) return Promise.resolve();
+                                                            const strVal = String(value).trim();
+                                                            // Bắt trường hợp nhập số âm (-15, -10 triệu...)
+                                                            if (strVal.startsWith('-') || parseFloat(strVal) < 0) {
+                                                                return Promise.reject(new Error('Số lượng tuyển không được là số âm!'));
+                                                            }
+                                                            return Promise.resolve();
+                                                        }
+                                                    }
+                                                    ]}
+                                                >
+                                                 <Input placeholder="VD: 2" />
                                             </Form.Item>
                                         </Col>
                                     </Row>

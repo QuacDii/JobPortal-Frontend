@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react'; 
 import { 
     Table, Button, message, Input, Card, Alert, Tag, Space, 
-    Row, Col, Select, Switch, Popover, Tooltip 
+    Row, Col, Select, Switch, Popover, Tooltip, Modal
 } from 'antd'; 
 import { 
     UnlockOutlined, EyeOutlined, SearchOutlined, TrophyOutlined, 
-    ClearOutlined, StarOutlined, StarFilled, EditOutlined 
+    ClearOutlined, StarOutlined, StarFilled, EditOutlined, ShoppingCartOutlined
 } from '@ant-design/icons'; 
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/apiClient'; 
 
 const { Option } = Select; 
@@ -42,9 +43,12 @@ const NotePopoverContent = ({ record, onSave }) => {
 };
 
 const CvHunter = () => {
+    const navigate = useNavigate();
     const [cvs, setCvs] = useState([]); 
     const [loading, setLoading] = useState(false); 
+    const [unlockingId, setUnlockingId] = useState(null);
     const [luotXemConLai, setLuotXemConLai] = useState(0); 
+    const [isExpired, setIsExpired] = useState(false);
     const [danhMucNganh, setDanhMucNganh] = useState([]);
     
     // 🌟 State quản lý Popover nào đang mở (null = đóng tất cả)
@@ -118,17 +122,44 @@ const CvHunter = () => {
         fetchCvs(cleared);
     };
 
-    const handleUnlock = async (maCv) => { 
-        try {
-            await apiClient.post(`/employer/unlock-cv/${maCv}`); 
-            message.success("Mở khóa hồ sơ thành công!"); 
-            fetchCvCredits(); 
-            fetchCvs();       
-        } catch (err) {
-            const errorMsg = err.response?.data?.message || err.response?.data || "Lỗi hệ thống khi mở khóa"; 
-            message.error(errorMsg); 
+    const handleUnlock = (record) => { 
+        // 1. Nếu hết lượt hoặc hết hạn gói -> Hiện Modal gợi ý mua gói ngay lập tức
+        if (luotXemConLai <= 0 || isExpired) {
+            Modal.confirm({
+                title: 'Hết lượt mở khóa / Gói hết hạn',
+                icon: <ShoppingCartOutlined style={{ color: '#ff4d4f' }} />,
+                content: 'Tài khoản của bạn đã hết lượt mở khóa hoặc gói dịch vụ đã quá hạn. Bạn có muốn chuyển đến cửa hàng để nâng cấp gói không?',
+                okText: 'Mua thêm lượt ngay',
+                cancelText: 'Hủy',
+                okButtonProps: { danger: true },
+                onOk: () => navigate('/employer/service-package')
+            });
+            return;
         }
-    }; 
+
+        // 2. Nếu còn lượt -> Hỏi xác nhận trước khi trừ lượt
+        Modal.confirm({
+            title: 'Xác nhận mở khóa CV',
+            content: `Hệ thống sẽ trừ 1 lượt để mở khóa thông tin liên hệ của ứng viên "${record.hoTen}". Bạn có chắc chắn?`,
+            okText: 'Mở khóa',
+            cancelText: 'Đóng',
+            onOk: async () => {
+                setUnlockingId(record.maCv);
+                try {
+                    const res = await apiClient.post(`/employer/unlock-cv/${record.maCv}`); 
+                    const payload = res?.data || res;
+                    message.success(payload.message || "Mở khóa hồ sơ thành công!"); 
+                    fetchCvCredits(); 
+                    fetchCvs();       
+                } catch (err) {
+                    const errorMsg = err.response?.data?.message || "Không thể mở khóa hồ sơ!"; 
+                    message.error(errorMsg); 
+                } finally {
+                    setUnlockingId(null);
+                }
+            }
+        });
+    };
 
     const handleToggleSave = async (record) => {
         if (!record.isUnlocked) {
@@ -262,11 +293,13 @@ const CvHunter = () => {
                 <Space>
                     {!record.isUnlocked ? ( 
                         <Button 
-                            type="primary" 
-                            icon={<UnlockOutlined />} 
-                            onClick={() => handleUnlock(record.maCv)} 
+                            type={luotXemConLai > 0 && !isExpired ? "primary" : "default"} 
+                            danger={luotXemConLai <= 0 || isExpired} // Đổi sang màu đỏ cảnh báo nếu hết lượt
+                            icon={luotXemConLai > 0 && !isExpired ? <UnlockOutlined /> : <ShoppingCartOutlined />} 
+                            loading={unlockingId === record.maCv}
+                            onClick={() => handleUnlock(record)} 
                         >
-                            Mở khóa liên hệ (1 lượt)
+                            {luotXemConLai > 0 && !isExpired ? "Mở khóa liên hệ (1 lượt)" : "Mua thêm lượt xem"}
                         </Button> 
                     ) : ( 
                         <Button 
@@ -295,11 +328,6 @@ const CvHunter = () => {
                             <TrophyOutlined style={{ marginRight: 8, color: '#eab308' }} /> 
                             Tài khoản doanh nghiệp của bạn đang sở hữu: <strong>{luotXemConLai} lượt</strong> mở khóa hồ sơ CV ứng viên tiềm năng. 
                         </span>
-                        {luotXemConLai === 0 && ( 
-                            <Tag color="red" style={{ fontSize: '13px', padding: '2px 10px', cursor: 'pointer' }}> 
-                                Mua thêm lượt xem CV ngay 🚀
-                            </Tag> 
-                        )}
                     </div> 
                 }
                 type={luotXemConLai > 0 ? "info" : "error"} 

@@ -44,6 +44,8 @@ import CandidateAiDetail from './pages/Employer/CandidateAiDetail';
 import CvHunter from './pages/Employer/CvHunter';
 import ServicePackage from './pages/Employer/ServicePackage';
 
+import VnPayReturn from './pages/Payment/VnPayReturn';
+
 const App = () => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -193,6 +195,7 @@ const App = () => {
         {/* CALLBACK THANH TOÁN */}
         <Route path="/payment-success" element={<PaymentSuccess />} />
         <Route path="/payment-failed" element={<PaymentFailed />} />
+        <Route path="/vnpay-return" element={<VnPayReturn />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
