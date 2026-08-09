@@ -1,55 +1,84 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, Space, Popconfirm, message, Card, Typography } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { 
+    Table, Button, Modal, Form, Input, Space, Popconfirm, 
+    message, Card, Typography, Tag, Switch, Select, Radio, Tooltip 
+} from 'antd';
+import { 
+    PlusOutlined, EditOutlined, DeleteOutlined, 
+    AppstoreOutlined, MergeOutlined, CheckCircleOutlined, ClockCircleOutlined 
+} from '@ant-design/icons';
 import apiClient from '../../api/apiClient';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
+const { Option } = Select;
 
-const CategoryCrudTemplate = ({ title, apiUrl, idKey, nameKey }) => {
+const KyNangAdmin = () => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
-    const [searchText, setSearchText] = useState(''); 
+    
+    const [searchText, setSearchText] = useState('');
+    const [statusFilter, setStatusFilter] = useState(null);
+    const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+    const [selectedRows, setSelectedRows] = useState([]);
+
+    const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
+    const [targetSkillId, setTargetSkillId] = useState(null);
+
     const [form] = Form.useForm();
+
+    useEffect(() => {
+        fetchData();
+    }, [statusFilter]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const response = await apiClient.get(apiUrl);
+            let url = '/KyNang';
+            if (statusFilter !== null) {
+                url += `?status=${statusFilter}`;
+            }
+            const response = await apiClient.get(url);
             const items = response.data !== undefined ? response.data : response;
             setData(items || []);
         } catch (error) {
-            message.error(`Lỗi khi tải danh sách ${title.toLowerCase()}`);
+            message.error('Lỗi khi tải danh sách kỹ năng!');
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => {
-        fetchData();
-    }, [apiUrl]);
+    const handleToggleStatus = async (record) => {
+        try {
+            const res = await apiClient.patch(`/KyNang/${record.maKyNang}/toggle-status`);
+            if (res?.data?.success || res?.success) {
+                message.success('Cập nhật trạng thái thành công!');
+                fetchData();
+            }
+        } catch (error) {
+            message.error('Lỗi khi thay đổi trạng thái!');
+        }
+    };
 
     const showModal = (record = null) => {
         setEditingItem(record);
         if (record) {
-            form.setFieldsValue({ name: record[nameKey] });
+            form.setFieldsValue({ tenKyNang: record.tenKyNang, trangThai: record.trangThai ?? true });
         } else {
             form.resetFields();
+            form.setFieldsValue({ trangThai: true });
         }
         setIsModalVisible(true);
     };
 
     const handleSave = async (values) => {
         try {
-            const payload = { [nameKey]: values.name };
-
             if (editingItem) {
-                payload[idKey] = editingItem[idKey];
-                await apiClient.put(`${apiUrl}/${editingItem[idKey]}`, payload);
+                await apiClient.put(`/KyNang/${editingItem.maKyNang}`, values);
                 message.success('Cập nhật thành công!');
             } else {
-                await apiClient.post(apiUrl, payload);
+                await apiClient.post('/KyNang', values);
                 message.success('Thêm mới thành công!');
             }
             setIsModalVisible(false);
@@ -61,49 +90,111 @@ const CategoryCrudTemplate = ({ title, apiUrl, idKey, nameKey }) => {
 
     const handleDelete = async (id) => {
         try {
-            await apiClient.delete(`${apiUrl}/${id}`);
+            await apiClient.delete(`/KyNang/${id}`);
             message.success('Xóa thành công!');
             fetchData();
         } catch (error) {
-            message.error('Không thể xóa mục này (có thể do đang được sử dụng ở bảng khác)!');
+            message.error('Không thể xóa mục này!');
         }
     };
 
-    const filteredData = data.filter((item) => {
-        if (!item[nameKey]) return false;
-        return item[nameKey].toString().toLowerCase().includes(searchText.toLowerCase());
+    // 🌟 XỬ LÝ XÓA HÀNG LOẠT (DỌN RÁC NGANH CHÓNG)
+    const handleBulkDelete = async () => {
+        try {
+            const res = await apiClient.post('/KyNang/bulk-delete', selectedRowKeys);
+            const payload = res?.data || res;
+            if (payload?.success || res?.success) {
+                message.success(payload?.message || 'Đã dọn dẹp kỹ năng rác thành công!');
+                setSelectedRowKeys([]);
+                setSelectedRows([]);
+                fetchData();
+            }
+        } catch (error) {
+            message.error(error?.response?.data?.message || 'Xóa hàng loạt thất bại!');
+        }
+    };
+
+    const handleConfirmMerge = async () => {
+        if (!targetSkillId) {
+            return message.warning('Vui lòng chọn kỹ năng chuẩn làm gốc!');
+        }
+        try {
+            const res = await apiClient.post('/KyNang/merge', {
+                targetId: targetSkillId,
+                sourceIds: selectedRowKeys
+            });
+            const payload = res?.data || res;
+            if (payload?.success || res?.success) {
+                message.success(payload?.message || 'Gộp kỹ năng thành công!');
+                setIsMergeModalOpen(false);
+                setSelectedRowKeys([]);
+                setSelectedRows([]);
+                setTargetSkillId(null);
+                fetchData();
+            }
+        } catch (error) {
+            message.error(error?.response?.data?.message || 'Gộp kỹ năng thất bại!');
+        }
+    };
+
+    const filteredData = data.filter(item => {
+        if (!item.tenKyNang) return false;
+        return item.tenKyNang.toLowerCase().includes(searchText.toLowerCase());
     });
 
     const columns = [
         {
             title: 'ID',
-            dataIndex: idKey,
-            key: 'id',
+            dataIndex: 'maKyNang',
+            key: 'maKyNang',
             width: 80,
             align: 'center',
         },
         {
-            title: `Tên ${title}`,
-            dataIndex: nameKey,
-            key: 'name',
-            fontWeight: 'bold'
+            title: 'Tên Kỹ năng',
+            dataIndex: 'tenKyNang',
+            key: 'tenKyNang',
+            render: (text) => <Text strong style={{ fontSize: '15px' }}>{text}</Text>
+        },
+        {
+            title: 'Trạng thái gợi ý',
+            dataIndex: 'trangThai',
+            key: 'trangThai',
+            width: 180,
+            align: 'center',
+            render: (status, record) => (
+                <Space>
+                    {status ? (
+                        <Tag color="success" icon={<CheckCircleOutlined />}>Đã duyệt</Tag>
+                    ) : (
+                        <Tag color="warning" icon={<ClockCircleOutlined />}>Chờ duyệt</Tag>
+                    )}
+                    <Tooltip title={status ? "Tắt gợi ý kỹ năng này" : "Duyệt kỹ năng để gợi ý"}>
+                        <Switch 
+                            checked={status} 
+                            onChange={() => handleToggleStatus(record)} 
+                            size="small" 
+                        />
+                    </Tooltip>
+                </Space>
+            )
         },
         {
             title: 'Thao tác',
             key: 'action',
-            width: 120,
+            width: 140,
             align: 'center',
             render: (_, record) => (
                 <Space size="middle">
                     <Button 
                         type="primary" 
-                        ghost
+                        ghost 
                         icon={<EditOutlined />} 
                         onClick={() => showModal(record)} 
                     />
                     <Popconfirm
                         title="Bạn có chắc chắn muốn xóa?"
-                        onConfirm={() => handleDelete(record[idKey])}
+                        onConfirm={() => handleDelete(record.maKyNang)}
                         okText="Xóa"
                         cancelText="Hủy"
                     >
@@ -114,32 +205,88 @@ const CategoryCrudTemplate = ({ title, apiUrl, idKey, nameKey }) => {
         },
     ];
 
+    const rowSelection = {
+        selectedRowKeys,
+        onChange: (keys, rows) => {
+            setSelectedRowKeys(keys);
+            setSelectedRows(rows);
+        }
+    };
+
     return (
         <div style={{ padding: '24px' }}>
-            {/* 👉 ĐỒNG BỘ HEADER (TIÊU ĐỀ + TÌM KIẾM + NÚT THÊM) */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
-                <Title level={3} style={{ margin: 0 }}><AppstoreOutlined /> Quản lý {title}</Title>
+                <Title level={3} style={{ margin: 0 }}><AppstoreOutlined /> Quản lý Kỹ năng</Title>
                 
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <Space wrap>
                     <Input.Search
-                        placeholder={`Tìm kiếm ${title.toLowerCase()}...`}
+                        placeholder="Tìm kiếm kỹ năng..."
                         allowClear
                         size="large"
                         onChange={(e) => setSearchText(e.target.value)}
-                        style={{ width: 300 }}
+                        style={{ width: 240 }}
                     />
+                    
+                    <Select 
+                        value={statusFilter} 
+                        onChange={setStatusFilter} 
+                        size="large" 
+                        style={{ width: 160 }}
+                    >
+                        <Option value={null}>Tất cả trạng thái</Option>
+                        <Option value={true}>🟢 Đã duyệt</Option>
+                        <Option value={false}>🟠 Chờ duyệt</Option>
+                    </Select>
+
+                    {/* 🌟 NÚT XÓA HÀNG LOẠT */}
+                    {selectedRowKeys.length > 0 && (
+                        <Popconfirm
+                            title={`Xóa ${selectedRowKeys.length} kỹ năng đã chọn?`}
+                            description="Thao tác này sẽ dọn dẹp các kỹ năng rác khỏi hệ thống."
+                            onConfirm={handleBulkDelete}
+                            okText="Xóa luôn"
+                            cancelText="Hủy"
+                            okButtonProps={{ danger: true }}
+                        >
+                            <Button 
+                                danger 
+                                type="primary" 
+                                icon={<DeleteOutlined />} 
+                                size="large"
+                            >
+                                Xóa chọn ({selectedRowKeys.length})
+                            </Button>
+                        </Popconfirm>
+                    )}
+
+                    {/* NÚT GỘP KỸ NĂNG */}
+                    {selectedRowKeys.length >= 2 && (
+                        <Button 
+                            type="primary" 
+                            style={{ backgroundColor: '#722ed1', borderColor: '#722ed1' }} 
+                            icon={<MergeOutlined />} 
+                            size="large"
+                            onClick={() => {
+                                setTargetSkillId(selectedRowKeys[0]);
+                                setIsMergeModalOpen(true);
+                            }}
+                        >
+                            Gộp ({selectedRowKeys.length}) kỹ năng
+                        </Button>
+                    )}
+
                     <Button type="primary" icon={<PlusOutlined />} size="large" onClick={() => showModal()}>
                         Thêm mới
                     </Button>
-                </div>
+                </Space>
             </div>
 
-            {/* 👉 ĐỒNG BỘ GIAO DIỆN CARD BỌC BẢNG */}
             <Card bordered={false} style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                 <Table 
+                    rowSelection={rowSelection}
                     columns={columns} 
                     dataSource={filteredData} 
-                    rowKey={idKey} 
+                    rowKey="maKyNang" 
                     loading={loading}
                     pagination={{ pageSize: 10 }}
                     bordered
@@ -147,7 +294,7 @@ const CategoryCrudTemplate = ({ title, apiUrl, idKey, nameKey }) => {
             </Card>
 
             <Modal
-                title={editingItem ? `Sửa ${title}` : `Thêm mới ${title}`}
+                title={editingItem ? "Sửa kỹ năng" : "Thêm kỹ năng mới"}
                 open={isModalVisible}
                 onCancel={() => setIsModalVisible(false)}
                 onOk={() => form.submit()}
@@ -156,16 +303,43 @@ const CategoryCrudTemplate = ({ title, apiUrl, idKey, nameKey }) => {
             >
                 <Form form={form} layout="vertical" onFinish={handleSave}>
                     <Form.Item
-                        name="name"
-                        label={`Tên ${title}`}
-                        rules={[{ required: true, message: 'Vui lòng nhập thông tin này!' }]}
+                        name="tenKyNang"
+                        label="Tên kỹ năng"
+                        rules={[{ required: true, message: 'Vui lòng nhập tên kỹ năng!' }]}
                     >
-                        <Input placeholder={`Nhập tên ${title.toLowerCase()}...`} />
+                        <Input placeholder="VD: ReactJS, ASP.NET Core..." />
+                    </Form.Item>
+                    <Form.Item name="trangThai" label="Trạng thái duyệt" valuePropName="checked">
+                        <Switch checkedChildren="Đã duyệt (Gợi ý)" unCheckedChildren="Chờ duyệt" />
                     </Form.Item>
                 </Form>
+            </Modal>
+
+            <Modal
+                title={<span><MergeOutlined style={{ color: '#722ed1' }} /> Gộp các kỹ năng bị trùng</span>}
+                open={isMergeModalOpen}
+                onCancel={() => setIsMergeModalOpen(false)}
+                onOk={handleConfirmMerge}
+                okText="Xác nhận Gộp"
+                cancelText="Hủy"
+            >
+                <p>Chọn 1 kỹ năng chuẩn duy nhất làm tên hiển thị chính. Tất cả bài đăng dùng các kỹ năng còn lại sẽ được chuyển về kỹ năng này:</p>
+                <Radio.Group 
+                    value={targetSkillId} 
+                    onChange={(e) => setTargetSkillId(e.target.value)} 
+                    style={{ width: '100%' }}
+                >
+                    <Space direction="vertical" style={{ width: '100%', marginTop: 10 }}>
+                        {selectedRows.map(item => (
+                            <Radio key={item.maKyNang} value={item.maKyNang}>
+                                <Text strong>{item.tenKyNang}</Text> <Text type="secondary">(ID: #{item.maKyNang})</Text>
+                            </Radio>
+                        ))}
+                    </Space>
+                </Radio.Group>
             </Modal>
         </div>
     );
 };
 
-export default CategoryCrudTemplate;
+export default KyNangAdmin;
