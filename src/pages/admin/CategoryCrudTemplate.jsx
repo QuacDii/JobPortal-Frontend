@@ -8,7 +8,6 @@ import {
     AppstoreOutlined, MergeOutlined, CheckCircleOutlined, ClockCircleOutlined 
 } from '@ant-design/icons';
 import apiClient from '../../api/apiClient';
-import '../css/CategoryCrudTemplate.css';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -99,7 +98,21 @@ const KyNangAdmin = () => {
         }
     };
 
-    // 🌟 XỬ LÝ XÓA HÀNG LOẠT (DỌN RÁC NGANH CHÓNG)
+    const handleBulkApprove = async () => {
+        try {
+            const res = await apiClient.post('/KyNang/bulk-approve', selectedRowKeys);
+            const payload = res?.data || res;
+            if (payload?.success || res?.success) {
+                message.success(payload?.message || 'Đã duyệt các kỹ năng được chọn!');
+                setSelectedRowKeys([]);
+                setSelectedRows([]);
+                fetchData();
+            }
+        } catch (error) {
+            message.error(error?.response?.data?.message || 'Duyệt hàng loạt thất bại!');
+        }
+    };
+
     const handleBulkDelete = async () => {
         try {
             const res = await apiClient.post('/KyNang/bulk-delete', selectedRowKeys);
@@ -150,19 +163,62 @@ const KyNangAdmin = () => {
             key: 'maKyNang',
             width: 80,
             align: 'center',
-            render: (text) => <span className="id-badge">#{text}</span>
         },
         {
             title: 'Tên Kỹ năng',
             dataIndex: 'tenKyNang',
             key: 'tenKyNang',
+            width: 200,
             render: (text) => <Text strong style={{ fontSize: '15px' }}>{text}</Text>
+        },
+        {
+            title: 'Thuộc Ngành nghề',
+            dataIndex: 'danhSachNganh',
+            key: 'danhSachNganh',
+            render: (nganhList) => {
+                if (!nganhList || nganhList.length === 0) {
+                    return <Text type="secondary" italic style={{ fontSize: '12px' }}>Chưa có bài đăng</Text>;
+                }
+
+                const maxVisible = 2;
+                const isOverflow = nganhList.length > maxVisible;
+                const visibleList = isOverflow ? nganhList.slice(0, maxVisible) : nganhList;
+                const remainingList = isOverflow ? nganhList.slice(maxVisible) : [];
+
+                const tooltipContent = (
+                    <div style={{ maxHeight: 220, overflowY: 'auto', padding: '4px 0' }}>
+                        <Text strong style={{ color: '#fff', fontSize: '12px', display: 'block', marginBottom: 4 }}>
+                            Các ngành nghề khác:
+                        </Text>
+                        {remainingList.map((item, idx) => (
+                            <div key={idx} style={{ fontSize: '11px', padding: '2px 0' }}>• {item}</div>
+                        ))}
+                    </div>
+                );
+
+                return (
+                    <Space wrap size={[0, 4]}>
+                        {visibleList.map((item, idx) => (
+                            <Tag key={idx} color="blue" style={{ fontSize: '11px', borderRadius: '4px' }}>
+                                {item}
+                            </Tag>
+                        ))}
+                        {isOverflow && (
+                            <Tooltip title={tooltipContent} placement="top">
+                                <Tag color="purple" style={{ fontSize: '11px', borderRadius: '4px', cursor: 'pointer' }}>
+                                    +{remainingList.length} ngành khác
+                                </Tag>
+                            </Tooltip>
+                        )}
+                    </Space>
+                );
+            }
         },
         {
             title: 'Trạng thái gợi ý',
             dataIndex: 'trangThai',
             key: 'trangThai',
-            width: 180,
+            width: 170,
             align: 'center',
             render: (status, record) => (
                 <Space>
@@ -184,7 +240,7 @@ const KyNangAdmin = () => {
         {
             title: 'Thao tác',
             key: 'action',
-            width: 140,
+            width: 130,
             align: 'center',
             render: (_, record) => (
                 <Space size="middle">
@@ -226,7 +282,7 @@ const KyNangAdmin = () => {
                         allowClear
                         size="large"
                         onChange={(e) => setSearchText(e.target.value)}
-                        style={{ width: 240 }}
+                        style={{ width: 220 }}
                     />
                     
                     <Select 
@@ -240,7 +296,18 @@ const KyNangAdmin = () => {
                         <Option value={false}>🟠 Chờ duyệt</Option>
                     </Select>
 
-                    {/* 🌟 NÚT XÓA HÀNG LOẠT */}
+                    {selectedRowKeys.length > 0 && (
+                        <Button 
+                            type="primary" 
+                            style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }} 
+                            icon={<CheckCircleOutlined />} 
+                            size="large"
+                            onClick={handleBulkApprove}
+                        >
+                            Duyệt chọn ({selectedRowKeys.length})
+                        </Button>
+                    )}
+
                     {selectedRowKeys.length > 0 && (
                         <Popconfirm
                             title={`Xóa ${selectedRowKeys.length} kỹ năng đã chọn?`}
@@ -261,7 +328,6 @@ const KyNangAdmin = () => {
                         </Popconfirm>
                     )}
 
-                    {/* NÚT GỘP KỸ NĂNG */}
                     {selectedRowKeys.length >= 2 && (
                         <Button 
                             type="primary" 
@@ -292,7 +358,6 @@ const KyNangAdmin = () => {
                     loading={loading}
                     pagination={{ pageSize: 10 }}
                     bordered
-                    rowClassName="hoverable-row"
                 />
             </Card>
 

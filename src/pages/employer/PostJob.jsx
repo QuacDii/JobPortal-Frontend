@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Input, Button, Card, Select, DatePicker, Typography, Row, Col, Divider, message, InputNumber, Cascader, Alert, TreeSelect, Radio } from 'antd';
-import { PlusOutlined, DeleteOutlined, SendOutlined, RocketOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Card, Select, DatePicker, Typography, Row, Col, Divider, message, InputNumber, Cascader, Alert, TreeSelect, Radio, Tag, Space } from 'antd';
+import { PlusOutlined, DeleteOutlined, SendOutlined, RocketOutlined, BulbOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import apiClient from '../../api/apiClient';
 
@@ -13,6 +13,9 @@ const PostJob = () => {
     const [standardSkills, setStandardSkills] = useState([]);
     const [industries, setIndustries] = useState([]);
     const [locations, setLocations] = useState([]);
+    
+    // State lưu danh sách Tag gợi ý theo từng vị trí [positionIndex]
+    const [recommendedSkillsMap, setRecommendedSkillsMap] = useState({});
 
     const CAP_BAC_OPTIONS = [
         { value: 'Thực tập sinh', label: 'Thực tập sinh' },
@@ -28,28 +31,27 @@ const PostJob = () => {
     useEffect(() => {
         const fetchMasterData = async () => {
             try {
-                const resSkills = await apiClient.get('/recruitment/skills').catch(() => []);
-                setStandardSkills(Array.isArray(resSkills) ? resSkills.map(item => ({ label: item.tenKyNang || item.label, value: item.maKyNang || item.value })) : []);
+                const resSkills = await apiClient.get('/recruitment/skills').catch(() => null);
+                const skillPayload = resSkills?.data || resSkills;
+                const rawSkills = skillPayload?.all || skillPayload || [];
+                setStandardSkills(Array.isArray(rawSkills) ? rawSkills.map(item => ({ label: item.label || item.tenKyNang, value: item.value || item.tenKyNang })) : []);
             } catch (error) { console.error("Lỗi Kỹ năng:", error); }
 
-            // 🌟 1. KHẮC PHỤC LỖI CHỌN NGÀNH NGHỀ: Bọc fallback tên trường đa dạng từ Backend
             try {
                 const resInd = await apiClient.get('/NganhNghe/tree').catch(() => []);
                 const rawTree = Array.isArray(resInd) ? resInd : (resInd?.data?.data || resInd?.data || []);
-
                 const formattedTree = rawTree.map(parent => {
                     const childrenList = parent.danhSachCon || parent.nganhNgheCons || parent.children || [];
                     return {
                         title: parent.tenNganh || parent.tenNganhCha || 'Ngành nghề',
                         value: `cha_${parent.maNganh || parent.maNganhCha}`,
-                        selectable: false, // 🔒 Khóa ngành cha, bắt buộc chọn ngành con
+                        selectable: false,
                         children: childrenList.map(child => ({
                             title: child.tenNganh || child.tenNganhCon,
                             value: child.maNganh || child.maNganhCon
                         }))
                     };
                 });
-
                 setIndustries(formattedTree);
             } catch (error) { console.error("Lỗi Ngành nghề:", error); }
 
@@ -68,6 +70,21 @@ const PostJob = () => {
         fetchMasterData();
     }, []);
 
+    const handleIndustryChange = async (maNganhConVal, posIndex) => {
+        if (!maNganhConVal) return;
+        try {
+            const res = await apiClient.get(`/recruitment/skills?maNganhCon=${maNganhConVal}`);
+            const payload = res?.data || res;
+            const recList = payload?.recommended || [];
+            setRecommendedSkillsMap(prev => ({
+                ...prev,
+                [posIndex]: recList
+            }));
+        } catch (error) {
+            console.error("Lỗi tải gợi ý kỹ năng theo ngành:", error);
+        }
+    };
+
     const onFinish = async (values) => {
         setLoading(true);
         try {
@@ -75,7 +92,6 @@ const PostJob = () => {
                 tieuDeChienDich: values.tieuDeChienDich,
                 ngayHetHan: values.ngayHetHan.format('YYYY-MM-DD'),
                 danhSachViTri: values.danhSachViTri.map(pos => {
-                    // 🌟 2. QUY ĐỔI MỨC LƯƠNG SANG CHUỖI TƯƠNG THÍCH BACKEND
                     let luongText = 'Thỏa thuận';
                     if (pos.loaiLuong === 'khoang') {
                         if (pos.luongTu && pos.luongDen) {
@@ -86,7 +102,6 @@ const PostJob = () => {
                             luongText = `Đến ${pos.luongDen} Triệu`;
                         }
                     }
-
                     return {
                         tenViTri: pos.tenViTri,
                         capBac: pos.capBac,
@@ -106,6 +121,7 @@ const PostJob = () => {
             if (response.success || response.data?.success) {
                 message.success(response.message || 'Đăng tin thành công!');
                 form.resetFields();
+                setRecommendedSkillsMap({});
             }
         } catch (error) {
             const errorMsg = error.response?.data?.message || 'Có lỗi xảy ra khi đăng tin!';
@@ -121,20 +137,21 @@ const PostJob = () => {
                 <RocketOutlined style={{ fontSize: '28px', color: '#1890ff', marginRight: 15 }} />
                 <Title level={3} style={{ margin: 0 }}>Tạo Chiến dịch Tuyển dụng mới</Title>
             </div>
+            
             <Alert
                 message="Lưu ý về tính năng Phân tích hồ sơ bằng AI (HR Tech):"
-                description="Vui lòng mô tả thông tin vị trí việc làm, yêu cầu ứng viên và quyền lợi đầy đủ để hệ thống AI có thể đối chiếu chéo và chấm điểm matching chính xác nhất. Tính năng chỉ hoạt động khi kích hoạt gói dịch vụ tương ứng."
+                description="Vui lòng mô tả thông tin vị trí việc làm, yêu cầu ứng viên và quyền lợi đầy đủ để hệ thống AI có thể đối chiếu chéo và chấm điểm matching chính xác nhất."
                 type="info"
                 showIcon
                 style={{ marginBottom: 24, borderRadius: 6 }}
             />
+
             <Form
                 layout="vertical"
                 form={form}
                 onFinish={onFinish}
                 initialValues={{ danhSachViTri: [{ loaiLuong: 'khoang', soLuongTuyen: 1 }] }}
             >
-                {/* --- PHẦN MASTER: THÔNG TIN CHIẾN DỊCH --- */}
                 <Card title="Thông tin chung" style={{ marginBottom: 24, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                     <Row gutter={24}>
                         <Col span={16}>
@@ -173,7 +190,6 @@ const PostJob = () => {
                     </Row>
                 </Card>
 
-                {/* --- PHẦN DETAIL: DANH SÁCH VỊ TRÍ CÔNG VIỆC --- */}
                 <Form.List name="danhSachViTri">
                     {(fields, { add, remove }) => (
                         <>
@@ -217,7 +233,6 @@ const PostJob = () => {
                                         </Col>
                                     </Row>
 
-                                    {/* 🌟 3. BỘ CHỌN MỨC LƯƠNG TÙY CHỈNH (RANGE HOẶC THỎA THUẬN) */}
                                     <Row gutter={24}>
                                         <Col span={14}>
                                             <Form.Item
@@ -232,7 +247,6 @@ const PostJob = () => {
                                                     <Radio.Button value="thoa-thuan">Thỏa thuận</Radio.Button>
                                                 </Radio.Group>
                                             </Form.Item>
-
                                             <Form.Item
                                                 noStyle
                                                 shouldUpdate={(prevValues, currentValues) =>
@@ -281,7 +295,6 @@ const PostJob = () => {
                                                 }}
                                             </Form.Item>
                                         </Col>
-
                                         <Col span={10}>
                                             <Form.Item
                                                 {...restField}
@@ -311,42 +324,11 @@ const PostJob = () => {
                                                     style={{ width: '100%' }}
                                                     dropdownStyle={{ maxHeight: 350, overflow: 'auto' }}
                                                     treeDefaultExpandAll={false}
+                                                    onChange={(val) => handleIndustryChange(val, name)}
                                                 />
                                             </Form.Item>
-
-                                            <Form.Item
-                                                noStyle
-                                                shouldUpdate={(prevValues, currentValues) =>
-                                                    prevValues.danhSachViTri?.[name]?.maNganh !== currentValues.danhSachViTri?.[name]?.maNganh
-                                                }
-                                            >
-                                                {({ getFieldValue }) => {
-                                                    const selectedId = getFieldValue(['danhSachViTri', name, 'maNganh']);
-                                                    if (!selectedId) return null;
-
-                                                    let isKhac = false;
-                                                    industries.forEach(parent => {
-                                                        parent.children?.forEach(child => {
-                                                            if (child.value === selectedId && (child.title === 'Khác' || child.title?.toLowerCase() === 'khác')) {
-                                                                isKhac = true;
-                                                            }
-                                                        });
-                                                    });
-
-                                                    return isKhac ? (
-                                                        <Form.Item
-                                                            {...restField}
-                                                            label={<span style={{ color: '#ff4d4f', fontWeight: 'bold' }}>Tên ngành nghề cụ thể của bạn</span>}
-                                                            name={[name, 'nganhNgheKhac']}
-                                                            rules={[{ required: true, message: 'Vui lòng điền tên ngành nghề khác!' }]}
-                                                            style={{ marginTop: 10 }}
-                                                        >
-                                                            <Input placeholder="VD: Kỹ sư Trí tuệ nhân tạo (AI Engineer)..." />
-                                                        </Form.Item>
-                                                    ) : null;
-                                                }}
-                                            </Form.Item>
                                         </Col>
+
                                         <Col span={12}>
                                             <Form.Item {...restField} label="Khu vực làm việc" name={[name, 'maPhuong']} rules={[{ required: true, message: 'Bắt buộc chọn!' }]}>
                                                 <Cascader
@@ -361,9 +343,34 @@ const PostJob = () => {
                                         </Col>
                                     </Row>
 
+                                    {recommendedSkillsMap[name] && recommendedSkillsMap[name].length > 0 && (
+                                        <div style={{ marginBottom: 12, background: '#f6ffed', border: '1px solid #b7eb8f', padding: '10px 14px', borderRadius: 6 }}>
+                                            <Text style={{ color: '#389e0d', display: 'block', marginBottom: 6, fontWeight: 600, fontSize: '13px' }}>
+                                                <BulbOutlined style={{ marginRight: 6 }} /> Gợi ý kỹ năng phổ biến cho ngành này (Click để chọn nhanh):
+                                            </Text>
+                                            <Space wrap size={[0, 8]}>
+                                                {recommendedSkillsMap[name].map((skillName, idx) => (
+                                                    <Tag 
+                                                        key={idx} 
+                                                        color="green" 
+                                                        style={{ cursor: 'pointer', borderRadius: 12, padding: '2px 10px', fontSize: '13px' }}
+                                                        onClick={() => {
+                                                            const currentSkills = form.getFieldValue(['danhSachViTri', name, 'danhSachKyNang']) || [];
+                                                            if (!currentSkills.includes(skillName)) {
+                                                                form.setFieldValue(['danhSachViTri', name, 'danhSachKyNang'], [...currentSkills, skillName]);
+                                                            }
+                                                        }}
+                                                    >
+                                                        + {skillName}
+                                                    </Tag>
+                                                ))}
+                                            </Space>
+                                        </div>
+                                    )}
+
                                     <Form.Item
                                         {...restField}
-                                        label="Kỹ năng yêu cầu (Nhập hoặc dán danh sách ngăn cách bởi dấu phẩy)"
+                                        label="Kỹ năng yêu cầu (Chọn từ danh sách hoặc tự gõ)"
                                         name={[name, 'danhSachKyNang']}
                                         rules={[{ required: true, message: 'Vui lòng chọn ít nhất 1 kỹ năng!' }]}
                                     >
@@ -377,24 +384,45 @@ const PostJob = () => {
                                         />
                                     </Form.Item>
 
-                                    <Row gutter={24}>
-                                        <Col span={12}>
-                                            <Form.Item {...restField} label="Mô tả công việc" name={[name, 'moTaCongViec']} rules={[{ required: true, message: 'Bắt buộc nhập!' }]}>
-                                                <TextArea rows={4} placeholder="- Phát triển tính năng mới...&#10;- Bảo trì hệ thống..." />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col span={12}>
-                                            <Form.Item {...restField} label="Yêu cầu ứng viên" name={[name, 'yeuCauUngVien']} rules={[{ required: true, message: 'Bắt buộc nhập!' }]}>
-                                                <TextArea rows={4} placeholder="- Tối thiểu 1 năm kinh nghiệm...&#10;- Tốt nghiệp chuyên ngành CNTT..." />
-                                            </Form.Item>
-                                        </Col>
-                                    </Row>
+                                    {/* 🌟 CẬP NHẬT: CẢ 3 Ố NHẬP XẾP HÀNG DỌC FULL-WIDTH KÈM AUTOSIZE CO GIÃN TỰ ĐỘNG */}
+                                    <Form.Item 
+                                        {...restField} 
+                                        label="Mô tả công việc" 
+                                        name={[name, 'moTaCongViec']} 
+                                        rules={[{ required: true, message: 'Bắt buộc nhập!' }]}
+                                    >
+                                        <TextArea 
+                                            autoSize={{ minRows: 4, maxRows: 10 }} 
+                                            placeholder="- Phát triển tính năng mới...&#10;- Bảo trì hệ thống..." 
+                                        />
+                                    </Form.Item>
 
-                                    <Form.Item {...restField} label="Quyền lợi được hưởng" name={[name, 'quyenLoi']} rules={[{ required: true, message: 'Bắt buộc nhập!' }]}>
-                                        <TextArea rows={2} placeholder="BHXH đầy đủ, Lương tháng 13, Du lịch hằng năm..." />
+                                    <Form.Item 
+                                        {...restField} 
+                                        label="Yêu cầu ứng viên" 
+                                        name={[name, 'yeuCauUngVien']} 
+                                        rules={[{ required: true, message: 'Bắt buộc nhập!' }]}
+                                    >
+                                        <TextArea 
+                                            autoSize={{ minRows: 4, maxRows: 10 }} 
+                                            placeholder="- Tối thiểu 1 năm kinh nghiệm...&#10;- Tốt nghiệp chuyên ngành CNTT..." 
+                                        />
+                                    </Form.Item>
+
+                                    <Form.Item 
+                                        {...restField} 
+                                        label="Quyền lợi được hưởng" 
+                                        name={[name, 'quyenLoi']} 
+                                        rules={[{ required: true, message: 'Bắt buộc nhập!' }]}
+                                    >
+                                        <TextArea 
+                                            autoSize={{ minRows: 3, maxRows: 8 }} 
+                                            placeholder="BHXH đầy đủ, Lương tháng 13, Du lịch hằng năm..." 
+                                        />
                                     </Form.Item>
                                 </Card>
                             ))}
+
                             <Form.Item>
                                 <Button type="dashed" onClick={() => add({ loaiLuong: 'khoang', soLuongTuyen: 1 })} block icon={<PlusOutlined />} style={{ height: 50, borderColor: '#1890ff', color: '#1890ff', fontSize: 16 }}>
                                     Thêm vị trí công việc
