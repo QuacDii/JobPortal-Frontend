@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, Modal, Form, Input, Space, Popconfirm, message, Card, Typography } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined } from '@ant-design/icons';
 import apiClient from '../../api/apiClient';
+import '../css/CategoryCrudTemplate.css';
 
 const { Title } = Typography;
 
-const CategoryCrudTemplate = ({ title, apiUrl, idKey, nameKey }) => {
+const CategoryCrudTemplate = ({ title, apiUrl, idKey = 'id', nameKey = 'name' }) => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [isModalVisible, setIsModalVisible] = useState(false);
@@ -17,8 +18,8 @@ const CategoryCrudTemplate = ({ title, apiUrl, idKey, nameKey }) => {
         setLoading(true);
         try {
             const response = await apiClient.get(apiUrl);
-            const items = response.data !== undefined ? response.data : response;
-            setData(items || []);
+            const items = response?.data !== undefined ? response.data : response;
+            setData(Array.isArray(items) ? items : []);
         } catch (error) {
             message.error(`Lỗi khi tải danh sách ${title.toLowerCase()}`);
         } finally {
@@ -76,22 +77,23 @@ const CategoryCrudTemplate = ({ title, apiUrl, idKey, nameKey }) => {
 
     const columns = [
         {
-            title: 'ID',
+            title: 'Mã ID',
             dataIndex: idKey,
             key: 'id',
-            width: 80,
+            width: 100,
             align: 'center',
+            render: (text) => <span className="id-badge">#{text}</span>
         },
         {
             title: `Tên ${title}`,
             dataIndex: nameKey,
             key: 'name',
-            fontWeight: 'bold'
+            render: (text) => <span className="item-name-text">{text}</span>
         },
         {
             title: 'Thao tác',
             key: 'action',
-            width: 120,
+            width: 140,
             align: 'center',
             render: (_, record) => (
                 <Space size="middle">
@@ -115,11 +117,12 @@ const CategoryCrudTemplate = ({ title, apiUrl, idKey, nameKey }) => {
     ];
 
     return (
-        <div style={{ padding: '24px' }}>
-            {/* 👉 ĐỒNG BỘ HEADER (TIÊU ĐỀ + TÌM KIẾM + NÚT THÊM) */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
-                <Title level={3} style={{ margin: 0 }}><AppstoreOutlined /> Quản lý {title}</Title>
-                
+        <div className="crud-template-container">
+            <div className="crud-header-bar">
+                <Title level={3} style={{ margin: 0 }}>
+                    <AppstoreOutlined style={{ color: '#1677ff' }} /> Quản lý {title}
+                </Title>
+
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                     <Input.Search
                         placeholder={`Tìm kiếm ${title.toLowerCase()}...`}
@@ -134,8 +137,7 @@ const CategoryCrudTemplate = ({ title, apiUrl, idKey, nameKey }) => {
                 </div>
             </div>
 
-            {/* 👉 ĐỒNG BỘ GIAO DIỆN CARD BỌC BẢNG */}
-            <Card bordered={false} style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+            <Card bordered={false} className="crud-card-wrapper">
                 <Table 
                     columns={columns} 
                     dataSource={filteredData} 
@@ -143,6 +145,7 @@ const CategoryCrudTemplate = ({ title, apiUrl, idKey, nameKey }) => {
                     loading={loading}
                     pagination={{ pageSize: 10 }}
                     bordered
+                    rowClassName="hoverable-row"
                 />
             </Card>
 

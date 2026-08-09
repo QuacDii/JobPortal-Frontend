@@ -1,0 +1,40 @@
+.crud-template-container {
+    padding: 24px;
+}
+
+.crud-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.crud-card-wrapper {
+    border-radius: 12px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04) !important;
+    overflow: hidden;
+}
+
+/* 🌟 HIỆU ỨNG HOVER CHO HÀNG TRONG BẢNG */
+.hoverable-row {
+    transition: all 0.25s ease !important;
+}
+
+.hoverable-row:hover > td {
+    background-color: rgba(22, 119, 255, 0.06) !important;
+}
+
+.id-badge {
+    font-weight: 600;
+    color: #64748b;
+    background-color: #f1f5f9;
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+
+.item-name-text {
+    font-weight: 600;
+    color: #1e293b;
+}

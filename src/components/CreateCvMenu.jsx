@@ -1,28 +1,43 @@
-import React from 'react';
-import { Dropdown, Row, Col } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Dropdown, Row, Col, Spin } from 'antd';
 import { 
     DownOutlined, 
     AppstoreOutlined, 
-    StarOutlined, 
-    CrownOutlined, 
-    BankOutlined, 
     SolutionOutlined, 
-    CodeOutlined, 
-    CalculatorOutlined, 
-    LineChartOutlined, 
-    ProfileOutlined, 
-    UploadOutlined 
+    ProfileOutlined,
+    PlusCircleOutlined
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
+import apiClient from '../api/apiClient';
 import './css/CreateCvMenu.css';
 
 const CreateCvMenu = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const handleGoToTemplates = (category = '') => {
-        if (category) {
-            navigate(`/thu-vien-cv?category=${encodeURIComponent(category)}`);
+    const [styles, setStyles] = useState([]);
+    const [industries, setIndustries] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        setLoading(true);
+        apiClient.get('/MauCv/menu-data')
+            .then(res => {
+                const data = res?.data || res;
+                if (data?.success) {
+                    setStyles(data.styles || []);
+                    setIndustries(data.popularIndustries || []);
+                }
+            })
+            .catch(err => console.error("Lỗi lấy danh mục CV Menu:", err))
+            .finally(() => setLoading(false));
+    }, []);
+
+    const handleGoToTemplates = (type, val) => {
+        if (type === 'category') {
+            navigate(`/thu-vien-cv?categoryId=${val}`);
+        } else if (type === 'industry') {
+            navigate(`/thu-vien-cv?industryId=${val}`);
         } else {
             navigate('/thu-vien-cv');
         }
@@ -30,61 +45,69 @@ const CreateCvMenu = () => {
 
     const customDropdownMenu = (
         <div className="cv-mega-menu">
-            <Row gutter={32}>
-                {/* ================= CỘT TRÁI ================= */}
-                <Col span={14} className="menu-left-col">
-                    {/* Nhóm 1: Mẫu CV theo style */}
-                    <div className="menu-group">
-                        <div className="menu-group-title" onClick={() => handleGoToTemplates()}>
-                            Mẫu CV theo style &rarr;
+            {loading ? (
+                <div style={{ textAlign: 'center', padding: '20px' }}>
+                    <Spin size="small" tip="Đang tải..." />
+                </div>
+            ) : (
+                /* 🌟 ĐẢM BẢO TỔNG SPAN CỦA 3 CỘT BẰNG ĐÚNG 24 (9 + 9 + 6 = 24) */
+                <Row gutter={[16, 0]}>
+                    {/* CỘT 1: THEO STYLE (SPAN 9) */}
+                    <Col span={9}>
+                        <div className="menu-group">
+                            <div className="menu-group-title" onClick={() => handleGoToTemplates()}>
+                                Theo Style &rarr;
+                            </div>
+                            {styles.map(item => (
+                                <div 
+                                    key={item.id} 
+                                    className="menu-item" 
+                                    onClick={() => handleGoToTemplates('category', item.id)}
+                                >
+                                    <AppstoreOutlined className="menu-icon" />
+                                    <span className="menu-item-text">
+                                        {item.name.replace(/^Mẫu CV\s*/i, '')}
+                                    </span>
+                                </div>
+                            ))}
                         </div>
-                        <div className="menu-item" onClick={() => handleGoToTemplates('Đơn giản')}>
-                            <AppstoreOutlined className="menu-icon" /> Mẫu CV Đơn giản
-                        </div>
-                        <div className="menu-item" onClick={() => handleGoToTemplates('Ấn tượng')}>
-                            <StarOutlined className="menu-icon" /> Mẫu CV Ấn tượng
-                        </div>
-                        <div className="menu-item" onClick={() => handleGoToTemplates('Chuyên nghiệp')}>
-                            <CrownOutlined className="menu-icon" /> Mẫu CV Chuyên nghiệp
-                        </div>
-                        <div className="menu-item" onClick={() => handleGoToTemplates('Harvard')}>
-                            <BankOutlined className="menu-icon" /> Mẫu CV Harvard
-                        </div>
-                    </div>
+                    </Col>
 
-                    {/* Nhóm 2: Mẫu CV theo vị trí */}
-                    <div className="menu-group" style={{ marginTop: '20px' }}>
-                        <div className="menu-group-title" onClick={() => handleGoToTemplates()}>
-                            Mẫu CV theo vị trí ứng tuyển &rarr;
+                    {/* CỘT 2: THEO NGÀNH NGHỀ (SPAN 9) */}
+                    <Col span={9}>
+                        <div className="menu-group">
+                            <div className="menu-group-title" onClick={() => handleGoToTemplates()}>
+                                Theo Ngành nghề &rarr;
+                            </div>
+                            {industries.map(item => (
+                                <div 
+                                    key={item.id} 
+                                    className="menu-item" 
+                                    onClick={() => handleGoToTemplates('industry', item.id)}
+                                >
+                                    <SolutionOutlined className="menu-icon" />
+                                    <span className="menu-item-text">{item.name}</span>
+                                </div>
+                            ))}
                         </div>
-                        <div className="menu-item" onClick={() => handleGoToTemplates('Nhân viên kinh doanh')}>
-                            <SolutionOutlined className="menu-icon" /> Nhân viên kinh doanh
-                        </div>
-                        <div className="menu-item" onClick={() => handleGoToTemplates('Lập trình viên')}>
-                            <CodeOutlined className="menu-icon" /> Lập trình viên
-                        </div>
-                        <div className="menu-item" onClick={() => handleGoToTemplates('Nhân viên kế toán')}>
-                            <CalculatorOutlined className="menu-icon" /> Nhân viên kế toán
-                        </div>
-                        <div className="menu-item" onClick={() => handleGoToTemplates('Chuyên viên marketing')}>
-                            <LineChartOutlined className="menu-icon" /> Chuyên viên marketing
-                        </div>
-                    </div>
-                </Col>
+                    </Col>
 
-                {/* ================= CỘT PHẢI ================= */}
-                <Col span={10} className="menu-right-col">
-                    <div className="menu-group">
-                        <div className="menu-item right-item" onClick={() => navigate('/manage-cv')}>
-                            <ProfileOutlined className="menu-icon" /> Quản lý CV
+                    {/* CỘT 3: LỐI TẮT (SPAN 6) */}
+                    <Col span={6} className="menu-right-col">
+                        <div className="menu-group">
+                            <div className="menu-group-title">Lối tắt</div>
+                            <div className="menu-item right-item" onClick={() => navigate('/manage-cv')}>
+                                <ProfileOutlined className="menu-icon" />
+                                <span>Quản lý CV</span>
+                            </div>
+                            <div className="menu-item right-item" onClick={() => navigate('/thu-vien-cv')}>
+                                <PlusCircleOutlined className="menu-icon" />
+                                <span>Tạo CV mới</span>
+                            </div>
                         </div>
-                        <div className="menu-item right-item" onClick={() => navigate('/manage-cv')}>
-                            <UploadOutlined className="menu-icon" /> Tải CV lên
-                        </div>
-                        <div style={{ height: '1px', backgroundColor: '#333', margin: '16px 0' }}></div>
-                    </div>
-                </Col>
-            </Row>
+                    </Col>
+                </Row>
+            )}
         </div>
     );
 
@@ -92,8 +115,8 @@ const CreateCvMenu = () => {
 
     return (
         <Dropdown dropdownRender={() => customDropdownMenu} placement="bottomLeft" trigger={['hover']}>
-            <div className={`topcv-nav-link ${isActive ? 'active' : ''}`}>
-                Tạo CV <DownOutlined style={{ fontSize: '10px' }} />
+            <div className={`candidate-nav-item ${isActive ? 'active' : ''}`}>
+                Tạo CV <DownOutlined style={{ fontSize: '10px', marginLeft: '2px' }} />
             </div>
         </Dropdown>
     );

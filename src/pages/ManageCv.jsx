@@ -504,10 +504,10 @@ const ManageCv = () => {
                                     checked={isSearchingJob}
                                     loading={isSearchingJobLoading}
                                     onChange={handleToggleJobSearch}
-                                    style={{ background: isSearchingJob ? '#00b14f' : '#bfbfbf' }}
+                                    style={{ background: isSearchingJob ? '#1890ff' : '#bfbfbf' }}
                                 />
                                 <div>
-                                    <Title level={5} style={{ color: isSearchingJob ? '#00b14f' : '#262626', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+                                    <Title level={5} style={{ color: isSearchingJob ? '#1890ff' : '#262626', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
                                         {isSearchingJob ? <><RadarChartOutlined spin style={{ fontSize: '18px' }} /> Đang bật tìm việc</> : 'Đang tắt tìm việc'}
                                     </Title>
                                     <Text style={{ color: '#8c8c8c', fontSize: '13px' }}>

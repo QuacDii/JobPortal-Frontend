@@ -1,28 +1,62 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, Popconfirm, Typography, Row, Col, Radio, Switch, Tag } from 'antd';
-import { PlusOutlined, DeleteOutlined, ShoppingOutlined, UndoOutlined } from '@ant-design/icons';
+import { 
+    Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, 
+    Popconfirm, Typography, Row, Col, Radio, Switch, Tag, Space 
+} from 'antd';
+import { 
+    PlusOutlined, DeleteOutlined, ShoppingOutlined, UndoOutlined, 
+    EditOutlined, CrownOutlined 
+} from '@ant-design/icons';
 import apiClient from '../../api/apiClient';
 
 const { Title } = Typography;
 const { Option } = Select;
 
+// 🌟 DANH SÁCH ĐẶC QUYỀN MẶC ĐỊNH CHUẨN DỮ LIỆU TỪ BẢNG [dbo].[DacQuyen]
+const DEFAULT_PRIVILEGES = [
+    // 1: Nhà tuyển dụng (NTD)
+    { maDacQuyen: 1, maCode: 'NTD_VIP_JOB', tenDacQuyen: 'Tự động đẩy tin / Nổi bật', doiTuongSuDung: 1 },
+    { maDacQuyen: 2, maCode: 'NTD_UNLOCK_CV', tenDacQuyen: 'Mở khóa xem Email CV ứng viên', doiTuongSuDung: 1 },
+    { maDacQuyen: 3, maCode: 'NTD_AI_MATCHING', tenDacQuyen: 'Sử dụng AI Phân tích & Gợi ý ứng viên', doiTuongSuDung: 1 },
+
+    // 2: Ứng viên (UV)
+    { maDacQuyen: 4, maCode: 'UV_PREMIUM_TEMPLATE', tenDacQuyen: 'Mở khóa mẫu CV Cao cấp / VIP', doiTuongSuDung: 2 },
+    { maDacQuyen: 5, maCode: 'UV_AI_REVIEW', tenDacQuyen: 'AI Đánh giá & Gợi ý tối ưu CV', doiTuongSuDung: 2 },
+    { maDacQuyen: 6, maCode: 'UV_UNLIMITED_CV', tenDacQuyen: 'Tạo & Quản lý CV không giới hạn', doiTuongSuDung: 2 },
+    { maDacQuyen: 13, maCode: 'UV_REMOVE_WATERMARK', tenDacQuyen: 'Tải CV dạng PDF không dính Watermark', doiTuongSuDung: 2 },
+    { maDacQuyen: 14, maCode: 'UV_AI_WRITE_GOAL', tenDacQuyen: 'Trợ lý AI Gemini viết mục tiêu / nội dung CV', doiTuongSuDung: 2 }
+];
+
 const PackageManager = () => {
     const [packages, setPackages] = useState([]);
+    const [allPrivileges, setAllPrivileges] = useState(DEFAULT_PRIVILEGES);
     const [loading, setLoading] = useState(false);
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [editingPackage, setEditingPackage] = useState(null);
     const [form] = Form.useForm();
 
-    // 👉 THÊM STATE ĐỂ LƯU TỪ KHÓA TÌM KIẾM
     const [searchText, setSearchText] = useState('');
-    
     const [isCandidate, setIsCandidate] = useState(false);
     const [hasDiscount, setHasDiscount] = useState(false);
 
-    const fetchPackages = async () => {
+    // TẢI DỮ LIỆU GÓI DỊCH VỤ VÀ ĐẶC QUYỀN
+    const fetchInitialData = async () => {
         setLoading(true);
         try {
-            const res = await apiClient.get('/Service');
-            setPackages(res.data || res);
+            const [pkgRes, dacQuyenRes] = await Promise.all([
+                apiClient.get('/Service'),
+                apiClient.get('/Service/privileges').catch(() => null)
+            ]);
+
+            const pkgData = pkgRes?.data !== undefined ? pkgRes.data : pkgRes;
+            setPackages(Array.isArray(pkgData) ? pkgData : []);
+
+            if (dacQuyenRes) {
+                const dqData = dacQuyenRes?.data !== undefined ? dacQuyenRes.data : dacQuyenRes;
+                if (Array.isArray(dqData) && dqData.length > 0) {
+                    setAllPrivileges(dqData);
+                }
+            }
         } catch (error) {
             message.error('Lỗi khi tải danh sách gói dịch vụ!');
         } finally {
@@ -31,31 +65,60 @@ const PackageManager = () => {
     };
 
     useEffect(() => {
-        fetchPackages();
+        fetchInitialData();
     }, []);
 
     const openAddModal = () => {
+        setEditingPackage(null);
         form.resetFields();
         form.setFieldsValue({
             doiTuong: 'employer',
             loaiGoi: 2,
             hasDiscount: false,
-            soLuotXemCv: 1
+            soLuotXemCv: 1,
+            donViThoiGian: 1,
+            dacQuyenIds: []
         });
         setIsCandidate(false);
         setHasDiscount(false);
         setIsModalVisible(true);
     };
 
-    const handleValuesChange = (changedValues, allValues) => {
+    const openEditModal = (record) => {
+        setEditingPackage(record);
+        
+        const target = record.doiTuongSuDung ?? record.DoiTuongSuDung;
+        const isCand = target === 2 || record.soLuotXemCv === 0;
+        const discountExist = record.giaKhuyenMai && record.giaKhuyenMai > 0;
+
+        const selectedDacQuyens = (record.dacQuyens || record.DacQuyens || []).map(dq => dq.maDacQuyen || dq.MaDacQuyen);
+
+        setIsCandidate(isCand);
+        setHasDiscount(discountExist);
+
+        form.setFieldsValue({
+            tenGoi: record.tenGoi || record.TenGoi,
+            doiTuong: isCand ? 'candidate' : 'employer',
+            loaiGoi: record.loaiGoi || record.LoaiGoi || 2,
+            giaTien: record.giaTien || record.GiaTien,
+            hasDiscount: discountExist,
+            giaKhuyenMai: discountExist ? (record.giaKhuyenMai || record.GiaKhuyenMai) : null,
+            soLuotXemCv: record.soLuotXemCv ?? record.SoLuotXemCv ?? 0,
+            donViThoiGian: record.donViThoiGian || record.DonViThoiGian || 1,
+            dacQuyenIds: selectedDacQuyens
+        });
+
+        setIsModalVisible(true);
+    };
+
+    const handleValuesChange = (changedValues) => {
         if (changedValues.doiTuong) {
             const isCand = changedValues.doiTuong === 'candidate';
             setIsCandidate(isCand);
-            if (isCand) {
-                form.setFieldsValue({ soLuotXemCv: 0 }); 
-            } else {
-                form.setFieldsValue({ soLuotXemCv: 1 }); 
-            }
+            form.setFieldsValue({ 
+                soLuotXemCv: isCand ? 0 : 1,
+                dacQuyenIds: []
+            });
         }
         
         if (changedValues.hasDiscount !== undefined) {
@@ -69,8 +132,8 @@ const PackageManager = () => {
     const handleDelete = async (id) => {
         try {
             const res = await apiClient.delete(`/Service/${id}`);
-            message.success(res.data?.message || 'Đã xử lý thành công!');
-            fetchPackages();
+            message.success(res?.data?.message || 'Đã ngưng bán thành công!');
+            fetchInitialData();
         } catch (error) {
             message.error('Không thể thao tác lúc này!');
         }
@@ -79,8 +142,8 @@ const PackageManager = () => {
     const handleRestore = async (id) => {
         try {
             const res = await apiClient.put(`/Service/${id}/restore`);
-            message.success(res.data?.message || 'Đã mở bán lại thành công!');
-            fetchPackages();
+            message.success(res?.data?.message || 'Đã mở bán lại thành công!');
+            fetchInitialData();
         } catch (error) {
             message.error('Không thể mở bán lại lúc này!');
         }
@@ -94,88 +157,139 @@ const PackageManager = () => {
                 giaTien: values.giaTien,
                 giaKhuyenMai: values.hasDiscount ? values.giaKhuyenMai : null,
                 soLuotXemCv: isCandidate ? 0 : (values.soLuotXemCv || 0),
-                donViThoiGian: values.donViThoiGian
+                donViThoiGian: values.donViThoiGian,
+                doiTuongSuDung: values.doiTuong === 'candidate' ? 2 : 1, // 1 = NTD, 2 = Ứng viên
+                dacQuyenIds: values.dacQuyenIds || []
             };
 
-            await apiClient.post('/Service', payload);
-            message.success('Thêm gói dịch vụ mới thành công!');
+            if (editingPackage) {
+                const id = editingPackage.maGoi || editingPackage.MaGoi;
+                await apiClient.put(`/Service/${id}`, payload);
+                message.success('Cập nhật gói dịch vụ thành công!');
+            } else {
+                await apiClient.post('/Service', payload);
+                message.success('Thêm gói dịch vụ mới thành công!');
+            }
+
             setIsModalVisible(false);
-            fetchPackages();
+            fetchInitialData();
         } catch (error) {
             message.error('Có lỗi xảy ra khi lưu dữ liệu!');
         }
     };
 
-    // 👉 LOGIC LỌC DANH SÁCH GÓI DỊCH VỤ THEO TỪ KHÓA TÌM KIẾM
     const filteredPackages = packages.filter((pkg) => {
-        const matchName = pkg.tenGoi?.toLowerCase().includes(searchText.toLowerCase());
-        const matchId = pkg.maGoi?.toString().includes(searchText);
-        return matchName || matchId;
+        const name = pkg.tenGoi || pkg.TenGoi || '';
+        const id = pkg.maGoi || pkg.MaGoi || '';
+        return name.toLowerCase().includes(searchText.toLowerCase()) || id.toString().includes(searchText);
+    });
+
+    // 🌟 ĐỐI CHIẾU CHÍNH XÁC VỚI DB: 1 = NTD, 2 = ỨNG VIÊN
+    const currentTargetType = isCandidate ? 2 : 1;
+    const filteredPrivileges = allPrivileges.filter(dq => {
+        const target = dq.doiTuongSuDung ?? dq.DoiTuongSuDung;
+        return target === currentTargetType;
     });
 
     const columns = [
-        { title: 'ID', dataIndex: 'maGoi', key: 'maGoi', width: 60, align: 'center' },
-        { title: 'Tên Gói', dataIndex: 'tenGoi', key: 'tenGoi', fontWeight: 'bold' },
+        { title: 'ID', dataIndex: 'maGoi', key: 'maGoi', width: 60, align: 'center', render: (val, r) => val || r.MaGoi },
+        { 
+            title: 'Tên Gói', 
+            dataIndex: 'tenGoi', 
+            key: 'tenGoi', 
+            render: (text, r) => (
+                <div>
+                    <b style={{ fontSize: 14 }}>{text || r.TenGoi}</b>
+                    <div style={{ marginTop: 4 }}>
+                        {(r.dacQuyens || r.DacQuyens || []).map((dq, idx) => (
+                            <Tag key={idx} color="cyan" style={{ fontSize: 11, marginBottom: 2 }}>
+                                ✓ {dq.tenDacQuyen || dq.TenDacQuyen}
+                            </Tag>
+                        ))}
+                    </div>
+                </div>
+            ) 
+        },
         {
             title: 'Dành cho',
             key: 'doiTuong',
             align: 'center',
+            width: 110,
             render: (_, record) => {
-                if (record.soLuotXemCv === 0) {
-                    return <Tag color="blue">Ứng viên</Tag>;
-                }
-                return <Tag color="orange">Nhà tuyển dụng</Tag>;
+                const target = record.doiTuongSuDung ?? record.DoiTuongSuDung;
+                const isCand = target === 2 || record.soLuotXemCv === 0;
+                return isCand ? <Tag color="green">Ứng viên</Tag> : <Tag color="blue">Nhà tuyển dụng</Tag>;
             }
         },
         { 
-            title: 'Loại Gói', 
+            title: 'Chu kỳ', 
             dataIndex: 'loaiGoi', 
             key: 'loaiGoi',
-            render: (val) => val === 1 ? 'Tuần' : val === 2 ? 'Tháng' : 'Năm'
+            width: 90,
+            render: (val, r) => {
+                const type = val ?? r.LoaiGoi;
+                return type === 1 ? 'Tuần' : type === 2 ? 'Tháng' : 'Năm';
+            }
         },
         { 
             title: 'Giá Tiền', 
             dataIndex: 'giaTien', 
             key: 'giaTien',
-            render: (val) => <span style={{ color: '#f5222d', fontWeight: 'bold' }}>{new Intl.NumberFormat('vi-VN').format(val)} đ</span>
+            width: 120,
+            render: (val, r) => {
+                const price = val ?? r.GiaTien ?? 0;
+                return <span style={{ color: '#1677ff', fontWeight: 'bold' }}>{new Intl.NumberFormat('vi-VN').format(price)} đ</span>;
+            }
         },
         { 
             title: 'Khuyến Mãi', 
             dataIndex: 'giaKhuyenMai', 
             key: 'giaKhuyenMai',
-            render: (val) => val ? `${new Intl.NumberFormat('vi-VN').format(val)} đ` : '-'
+            width: 120,
+            render: (val, r) => {
+                const discount = val ?? r.GiaKhuyenMai;
+                return discount ? <span style={{ color: '#f5222d', fontWeight: 'bold' }}>{new Intl.NumberFormat('vi-VN').format(discount)} đ</span> : '-';
+            }
         },
-        { title: 'Lượt Xem CV', dataIndex: 'soLuotXemCv', key: 'soLuotXemCv', align: 'center' },
-        { title: 'Thời Hạn', dataIndex: 'donViThoiGian', key: 'donViThoiGian', align: 'center' },
         {
             title: 'Trạng thái',
             dataIndex: 'trangThai',
             key: 'trangThai',
+            width: 100,
             align: 'center',
-            render: (val) => val ? <span style={{ color: '#52c41a' }}>Đang bán</span> : <span style={{ color: '#ff4d4f' }}>Đã ngưng</span>
+            render: (val, r) => (val ?? r.TrangThai) ? <Tag color="success">Đang bán</Tag> : <Tag color="error">Đã ngưng</Tag>
         },
         {
             title: 'Thao tác',
             key: 'action',
+            width: 100,
             align: 'center',
-            render: (_, record) => (
-                record.trangThai ? (
-                    <Popconfirm title="Xóa hoặc Ngưng bán gói này?" onConfirm={() => handleDelete(record.maGoi)} okText="Đồng ý" cancelText="Hủy">
-                        <Button danger icon={<DeleteOutlined />} title="Xóa hoặc Ngưng bán" />
-                    </Popconfirm>
-                ) : (
-                    <Popconfirm title="Bạn muốn mở bán lại gói này?" onConfirm={() => handleRestore(record.maGoi)} okText="Mở bán" cancelText="Hủy">
-                        <Button type="primary" ghost icon={<UndoOutlined />} title="Mở bán lại" />
-                    </Popconfirm>
-                )
-            ),
+            render: (_, record) => {
+                const active = record.trangThai ?? record.TrangThai;
+                const id = record.maGoi || record.MaGoi;
+
+                return (
+                    <Space size="small">
+                        <Button type="primary" ghost icon={<EditOutlined />} onClick={() => openEditModal(record)} />
+                        {active ? (
+                            <Popconfirm title="Ngưng bán gói dịch vụ này?" onConfirm={() => handleDelete(id)} okText="Đồng ý" cancelText="Hủy">
+                                <Button danger icon={<DeleteOutlined />} />
+                            </Popconfirm>
+                        ) : (
+                            <Popconfirm title="Mở bán lại gói này?" onConfirm={() => handleRestore(id)} okText="Mở bán" cancelText="Hủy">
+                                <Button type="primary" icon={<UndoOutlined />} />
+                            </Popconfirm>
+                        )}
+                    </Space>
+                );
+            },
         },
     ];
 
     return (
         <div style={{ padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <Title level={3} style={{ margin: 0 }}><ShoppingOutlined /> Quản lý Gói Dịch Vụ</Title>
+                <Title level={3} style={{ margin: 0 }}><ShoppingOutlined /> Quản lý Gói Dịch Vụ & Đặc Quyền</Title>
                 
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                     <Input.Search
@@ -192,24 +306,20 @@ const PackageManager = () => {
             </div>
 
             <Card bordered={false} style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-                <Table columns={columns} dataSource={filteredPackages} rowKey="maGoi" loading={loading} bordered />
+                <Table columns={columns} dataSource={filteredPackages} rowKey={(r) => r.maGoi || r.MaGoi} loading={loading} bordered />
             </Card>
 
+            {/* MODAL CẤU HÌNH GÓI & ĐẶC QUYỀN */}
             <Modal
-                title="Thêm Gói Dịch Vụ Mới"
+                title={editingPackage ? `Chỉnh sửa Gói #${editingPackage.maGoi || editingPackage.MaGoi}` : "Thêm Gói Dịch Vụ Mới"}
                 open={isModalVisible}
                 onCancel={() => setIsModalVisible(false)}
                 onOk={() => form.submit()}
-                okText="Thêm mới"
+                okText="Lưu Gói Dịch Vụ"
                 cancelText="Hủy"
-                width={650}
+                width={700}
             >
-                <Form 
-                    form={form} 
-                    layout="vertical" 
-                    onFinish={handleSubmit}
-                    onValuesChange={handleValuesChange}
-                >
+                <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={handleValuesChange}>
                     <Form.Item name="doiTuong" label="Gói dịch vụ này dành cho:">
                         <Radio.Group optionType="button" buttonStyle="solid">
                             <Radio value="employer">Nhà tuyển dụng</Radio>
@@ -235,53 +345,71 @@ const PackageManager = () => {
                     </Row>
 
                     <Row gutter={16}>
+                        {/* 🌟 GIÁ GỐC: KHÔNG DÙNG MIN=1 ĐỂ BÁO LỖI KHI NHẬP SỐ ÂM HOẶC 0 */}
                         <Col span={8}>
                             <Form.Item 
                                 name="giaTien" 
                                 label="Giá gốc (VNĐ)" 
                                 rules={[
-                                    { required: true, message: 'Nhập giá tiền!' },
-                                    { type: 'number', min: 1, message: 'Giá tiền phải lớn hơn 0!' }
+                                    { required: true, message: 'Vui lòng nhập giá gốc!' },
+                                    {
+                                        validator(_, value) {
+                                            if (value !== null && value !== undefined && value <= 0) {
+                                                return Promise.reject(new Error('Giá gốc phải lớn hơn 0 VNĐ!'));
+                                            }
+                                            return Promise.resolve();
+                                        }
+                                    }
                                 ]}
                             >
-                                <InputNumber style={{ width: '100%' }} min={1} formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value.replace(/\$\s?|(,*)/g, '')} />
+                                <InputNumber 
+                                    style={{ width: '100%' }} 
+                                    placeholder="Nhập giá gốc..."
+                                    formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} 
+                                    parser={v => v.replace(/\$\s?|(,*)/g, '')} 
+                                />
                             </Form.Item>
                         </Col>
                         
                         <Col span={6} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <Form.Item name="hasDiscount" label="Có khuyến mãi?" valuePropName="checked">
+                            <Form.Item name="hasDiscount" label="Khuyến mãi?" valuePropName="checked">
                                 <Switch checkedChildren="Có" unCheckedChildren="Không" />
                             </Form.Item>
                         </Col>
 
+                        {/* 🌟 GIÁ KHUYẾN MÃI: KHÔNG DÙNG MIN=1 ĐỂ BÁO LỖI KHI NHẬP SỐ ÂM */}
                         <Col span={10}>
-                            {hasDiscount ? (
+                            {hasDiscount && (
                                 <Form.Item 
                                     name="giaKhuyenMai" 
                                     label="Giá khuyến mãi (VNĐ)" 
                                     dependencies={['giaTien']}
                                     rules={[
-                                        { required: true, message: 'Nhập giá khuyến mãi!' },
+                                        { required: true, message: 'Vui lòng nhập giá khuyến mãi!' },
                                         ({ getFieldValue }) => ({
                                             validator(_, value) {
                                                 const giaGoc = getFieldValue('giaTien');
-                                                if (value === null || value === undefined) return Promise.resolve();
-                                                if (giaGoc === null || giaGoc === undefined) return Promise.resolve();
-                                                
-                                                if (value < giaGoc) {
+                                                if (value === null || value === undefined) {
                                                     return Promise.resolve();
                                                 }
-                                                return Promise.reject(new Error('Khuyến mãi phải RẺ HƠN giá gốc!'));
+                                                if (value <= 0) {
+                                                    return Promise.reject(new Error('Giá khuyến mãi phải lớn hơn 0 VNĐ!'));
+                                                }
+                                                if (giaGoc !== undefined && giaGoc !== null && value >= giaGoc) {
+                                                    return Promise.reject(new Error('Giá khuyến mãi phải RẺ HƠN giá gốc!'));
+                                                }
+                                                return Promise.resolve();
                                             },
                                         }),
                                     ]}
                                 >
-                                    <InputNumber style={{ width: '100%' }} min={0} formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value.replace(/\$\s?|(,*)/g, '')} />
+                                    <InputNumber 
+                                        style={{ width: '100%' }} 
+                                        placeholder="Nhập giáKM..."
+                                        formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} 
+                                        parser={v => v.replace(/\$\s?|(,*)/g, '')} 
+                                    />
                                 </Form.Item>
-                            ) : (
-                                <div style={{ height: '75px', display: 'flex', alignItems: 'center', color: '#bfbfbf', fontStyle: 'italic' }}>
-                                    (Không áp dụng khuyến mãi)
-                                </div>
                             )}
                         </Col>
                     </Row>
@@ -291,23 +419,64 @@ const PackageManager = () => {
                             <Col span={12}>
                                 <Form.Item 
                                     name="soLuotXemCv" 
-                                    label="Số lượt mở khóa CV" 
+                                    label="Số lượt mở khóa CV NTD" 
                                     rules={[
-                                        { required: true, message: 'Nhập số lượt mở CV!' },
-                                        { type: 'number', min: 1, message: 'Số lượt phải lớn hơn 0!' }
+                                        { required: true, message: 'Vui lòng nhập số lượt xem CV!' },
+                                        {
+                                            validator(_, value) {
+                                                if (value !== null && value !== undefined && value <= 0) {
+                                                    return Promise.reject(new Error('Số lượt mở CV phải lớn hơn 0!'));
+                                                }
+                                                return Promise.resolve();
+                                            }
+                                        }
                                     ]}
                                 >
-                                    <InputNumber style={{ width: '100%' }} min={1} />
+                                    <InputNumber style={{ width: '100%' }} placeholder="Nhập số lượt..." />
                                 </Form.Item>
                             </Col>
                         )}
                         
                         <Col span={isCandidate ? 24 : 12}>
-                            <Form.Item name="donViThoiGian" label="Độ dài chu kỳ (Số Tuần/Tháng/Năm)" rules={[{ required: true, message: 'Nhập độ dài chu kỳ!' }]}>
-                                <InputNumber style={{ width: '100%' }} min={1} placeholder="VD: 1 hoặc 30" />
+                            <Form.Item 
+                                name="donViThoiGian" 
+                                label="Số lượng chu kỳ (Số Tuần/Tháng/Năm)" 
+                                rules={[
+                                    { required: true, message: 'Vui lòng nhập độ dài chu kỳ!' },
+                                    {
+                                        validator(_, value) {
+                                            if (value !== null && value !== undefined && value <= 0) {
+                                                return Promise.reject(new Error('Chu kỳ phải lớn hơn 0!'));
+                                            }
+                                            return Promise.resolve();
+                                        }
+                                    }
+                                ]}
+                            >
+                                <InputNumber style={{ width: '100%' }} placeholder="Nhập số chu kỳ..." />
                             </Form.Item>
                         </Col>
                     </Row>
+
+                    {/* 🌟 CÁC ĐẶC QUYỀN ĐI KÈM CHUẨN XÁC DỮ LIỆU BẢNG DACQUYEN */}
+                    <Form.Item 
+                        name="dacQuyenIds" 
+                        label={<><CrownOutlined style={{ color: '#faad14' }} /> Danh sách Đặc quyền đính kèm gói</>}
+                    >
+                        <Select
+                            mode="multiple"
+                            allowClear
+                            placeholder={`Chọn đặc quyền cho ${isCandidate ? 'Ứng viên' : 'Nhà tuyển dụng'}...`}
+                            style={{ width: '100%' }}
+                            optionFilterProp="children"
+                        >
+                            {filteredPrivileges.map(dq => (
+                                <Option key={dq.maDacQuyen || dq.MaDacQuyen} value={dq.maDacQuyen || dq.MaDacQuyen}>
+                                    {dq.tenDacQuyen || dq.TenDacQuyen} ({dq.maCode || dq.MaCode})
+                                </Option>
+                            ))}
+                        </Select>
+                    </Form.Item>
                 </Form>
             </Modal>
         </div>

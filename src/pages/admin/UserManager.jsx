@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Input, Tag, Switch, message, Space, Typography } from 'antd';
-import { UserOutlined } from '@ant-design/icons';
+import { Card, Table, Input, Tag, Switch, message, Space, Typography, Button, Popconfirm } from 'antd';
+import { UserOutlined, DeleteOutlined } from '@ant-design/icons';
 import apiClient from '../../api/apiClient'; 
 
 const { Title, Text } = Typography;
@@ -10,7 +10,6 @@ const UserManager = () => {
     const [loading, setLoading] = useState(false);
     const [searchText, setSearchText] = useState('');
 
-    // 1. GỌI API LẤY DANH SÁCH USER
     const fetchUsers = async () => {
         setLoading(true);
         try {
@@ -28,14 +27,11 @@ const UserManager = () => {
         fetchUsers();
     }, []);
 
-    // 2. HÀM KHÓA / MỞ KHÓA TÀI KHOẢN (BAN / UNBAN)
+    // 1. KHÓA / MỞ KHÓA TÀI KHOẢN
     const handleToggleStatus = async (userId, currentStatus) => {
         try {
-            // Đảo ngược trạng thái hiện tại gửi xuống API
             const newStatus = !currentStatus; 
             await apiClient.put(`/User/toggle-status/${userId}`, { trangThai: newStatus });
-            
-            // Cập nhật giao diện ngay lập tức
             setUsers(users.map(u => u.maUser === userId ? { ...u, trangThai: newStatus } : u));
             message.success(newStatus ? 'Đã mở khóa tài khoản!' : 'Đã khóa tài khoản này!');
         } catch (error) {
@@ -43,7 +39,20 @@ const UserManager = () => {
         }
     };
 
-    // 3. BỘ LỌC TÌM KIẾM THEO TÊN HOẶC EMAIL
+    // 2. XÓA VĨNH VIỄN TÀI KHOẢN
+    const handleDeleteUser = async (userId) => {
+        try {
+            const res = await apiClient.delete(`/User/${userId}`);
+            if (res.success || res.status === 200) {
+                message.success(res.message || 'Đã xóa vĩnh viễn tài khoản!');
+                setUsers(users.filter(u => u.maUser !== userId));
+            }
+        } catch (error) {
+            const errorMsg = error.response?.data?.message || 'Không thể xóa tài khoản này!';
+            message.error(errorMsg);
+        }
+    };
+
     const filteredUsers = users.filter((user) => {
         const keyword = searchText.toLowerCase();
         const matchName = user.hoTen?.toLowerCase().includes(keyword);
@@ -51,13 +60,12 @@ const UserManager = () => {
         return matchName || matchEmail;
     });
 
-    // 4. CẤU HÌNH CỘT CHO BẢNG
     const columns = [
         {
             title: 'ID',
             dataIndex: 'maUser',
             key: 'maUser',
-            width: 80,
+            width: 70,
             align: 'center',
         },
         {
@@ -74,9 +82,8 @@ const UserManager = () => {
             title: 'Vai trò',
             dataIndex: 'vaiTro',
             key: 'vaiTro',
-            width: 180,
+            width: 150,
             render: (role) => {
-                // Phân loại màu sắc theo bảng User (0: Admin, 1: NTD, 2: Ứng viên)
                 if (role === 0 || role === "0") return <Tag color="red">Admin</Tag>;
                 if (role === 1 || role === "1") return <Tag color="orange">Nhà tuyển dụng</Tag>;
                 return <Tag color="blue">Ứng viên</Tag>;
@@ -92,28 +99,49 @@ const UserManager = () => {
             title: 'Ngày tham gia',
             dataIndex: 'ngayTao',
             key: 'ngayTao',
-            width: 150,
+            width: 130,
             align: 'center',
             render: (date) => new Date(date).toLocaleDateString('vi-VN'),
             sorter: (a, b) => new Date(a.ngayTao) - new Date(b.ngayTao),
         },
         {
-            title: 'Khóa / Mở khóa',
-            key: 'action',
-            width: 150,
+            title: 'Trạng thái',
+            key: 'status',
+            width: 130,
             align: 'center',
             render: (_, record) => (
-                // Nếu là Admin (vaiTro === 0) thì không cho phép tự khóa chính mình
                 <Switch 
                     checked={record.trangThai} 
                     onChange={() => handleToggleStatus(record.maUser, record.trangThai)}
                     disabled={record.vaiTro === 0 || record.vaiTro === "0"} 
-                    checkedChildren="Hoạt động"
-                    unCheckedChildren="Bị khóa"
+                    checkedChildren="Mở"
+                    unCheckedChildren="Khóa"
                     style={{ backgroundColor: record.trangThai ? '#52c41a' : '#ff4d4f' }}
                 />
             ),
         },
+        {
+            title: 'Thao tác',
+            key: 'action',
+            width: 110,
+            align: 'center',
+            render: (_, record) => (
+                record.vaiTro === 0 || record.vaiTro === "0" ? null : (
+                    <Popconfirm
+                        title="Xóa vĩnh viễn tài khoản?"
+                        description="Tài khoản và toàn bộ dữ liệu liên quan sẽ bị xóa hoàn toàn khỏi hệ thống."
+                        onConfirm={() => handleDeleteUser(record.maUser)}
+                        okText="Xóa ngay"
+                        cancelText="Hủy"
+                        okButtonProps={{ danger: true }}
+                    >
+                        <Button danger type="text" icon={<DeleteOutlined />}>
+                            Xóa
+                        </Button>
+                    </Popconfirm>
+                )
+            )
+        }
     ];
 
     return (

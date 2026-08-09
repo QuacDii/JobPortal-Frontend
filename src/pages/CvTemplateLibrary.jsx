@@ -5,10 +5,6 @@ import { Row, Col, Card, Typography, Space, Select, Tag, Spin, Modal, Form, Inpu
 import {
     AppstoreOutlined,
     StarOutlined,
-    FireOutlined,
-    RocketOutlined,
-    BankOutlined,
-    SafetyCertificateOutlined,
     LoadingOutlined,
     MailOutlined,
     LockOutlined,
@@ -27,30 +23,18 @@ const FacebookLogin = FacebookLoginRaw.default || FacebookLoginRaw;
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-function CheckCircleIcon({ color }) {
-    return (
-        <svg viewBox="64 64 896 896" focusable="false" width="1em" height="1em" fill={color} aria-hidden="true">
-            <path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm193.5 301.7l-210.6 292a31.8 31.8 0 01-51.7 0L318.5 484.9c-3.8-5.3 0-12.7 6.5-12.7h46.9c10.2 0 19.9 4.9 25.9 13.3l71.2 98.8 157.2-218c6-8.3 15.6-13.3 25.9-13.3H699c6.5 0 10.3 7.4 6.5 12.7z"></path>
-        </svg>
-    );
-}
-
-const filterOptions = [
-    { key: 'Tất cả', icon: <AppstoreOutlined /> },
-    { key: 'Đơn giản', icon: <CheckCircleIcon color="currentColor" /> },
-    { key: 'Chuyên nghiệp', icon: <StarOutlined /> },
-    { key: 'Hiện đại', icon: <FireOutlined /> },
-    { key: 'Ấn tượng', icon: <RocketOutlined /> },
-    { key: 'Harvard', icon: <BankOutlined /> },
-    { key: 'ATS', icon: <SafetyCertificateOutlined /> }
-];
-
 const CvTemplateLibrary = () => {
     const navigate = useNavigate();
     const [loginForm] = Form.useForm();
     const [searchParams] = useSearchParams();
-    const categoryFromUrl = searchParams.get('category');
 
+    // 1. ĐỌC THAM SỐ TỪ URL
+    const categoryFromUrl = searchParams.get('category');
+    const categoryId = searchParams.get('categoryId');
+    const industryId = searchParams.get('industryId');
+
+    // 2. KHAI BÁO TẤT CẢ STATE (ĐÃ KHAI BÁO DBCATEGORIES TẠI ĐÂY)
+    const [dbCategories, setDbCategories] = useState([]); // 🌟 Biến lưu danh mục từ DB
     const [activeFilter, setActiveFilter] = useState(categoryFromUrl || 'Tất cả');
     const [cvTemplates, setCvTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -61,14 +45,11 @@ const CvTemplateLibrary = () => {
     const [loginLoading, setLoginLoading] = useState(false);
     const [isUserVip, setIsUserVip] = useState(false);
 
-    // 🌟 STATE QUẢN LÝ CHI TIẾT TRẠNG THÁI GÓI VÀ ĐẶC QUYỀN
     const [userDacQuyenStatus, setUserDacQuyenStatus] = useState({
         hasActivePackage: false,
         hasCvVipPrivilege: false,
         tenGoiHienTai: 'Miễn phí'
     });
-
-    const isDarkMode = false;
 
     const themeColors = {
         bgColor: '#f4f5f5',
@@ -94,15 +75,16 @@ const CvTemplateLibrary = () => {
             if (String(role) === "0") {
                 window.location.href = '/admin/dashboard';
             } else if (String(role) === "1") {
-                window.location.href = '/employer/dashboard'; // Chuyển sang giao diện Nhà tuyển dụng
+                window.location.href = '/employer/dashboard';
             } else {
-                window.location.reload(); // Ứng viên thì ở lại trang hiện tại
+                window.location.reload();
             }
         } catch (e) {
             window.location.reload();
         }
     };
-    // 🌟 HÀM KIỂM TRA TRẠNG THÁI VIP & ĐẶC QUYỀN REAL-TIME
+
+    // KIỂM TRA TRẠNG THÁI VIP
     const checkVipStatus = () => {
         const token = localStorage.getItem('token');
         if (token) {
@@ -122,11 +104,6 @@ const CvTemplateLibrary = () => {
                 })
                 .catch(() => {
                     setIsUserVip(false);
-                    setUserDacQuyenStatus({
-                        hasActivePackage: false,
-                        hasCvVipPrivilege: false,
-                        tenGoiHienTai: 'Miễn phí'
-                    });
                 });
         }
     };
@@ -137,16 +114,41 @@ const CvTemplateLibrary = () => {
         return () => window.removeEventListener('update_vip_status', checkVipStatus);
     }, []);
 
+    // 3. TẢI DANH SÁCH DANH MỤC TỪ DATABASE
     useEffect(() => {
-        if (categoryFromUrl) {
+        apiClient.get('/MauCv/categories')
+            .then(res => {
+                const data = res.data !== undefined ? res.data : res;
+                if (Array.isArray(data)) {
+                    setDbCategories(data);
+                }
+            })
+            .catch(err => console.error("Lỗi lấy danh mục CV từ DB:", err));
+    }, []);
+
+    // 4. ĐỒNG BỘ NÚT ACTIVE FILTER THEO URL VÀ DBCATEGORIES
+    useEffect(() => {
+        if (categoryId && dbCategories.length > 0) {
+            const foundCat = dbCategories.find(c => String(c.maDanhMuc || c.MaDanhMuc || c.id) === String(categoryId));
+            if (foundCat) {
+                setActiveFilter(foundCat.tenDanhMuc || foundCat.TenDanhMuc || foundCat.name);
+            }
+        } else if (categoryFromUrl) {
             setActiveFilter(categoryFromUrl);
-        } else {
+        } else if (!categoryId && !industryId) {
             setActiveFilter('Tất cả');
         }
-    }, [categoryFromUrl]);
+    }, [categoryId, dbCategories, categoryFromUrl, industryId]);
 
+    // 5. TẢI DANH SÁCH MẪU CV CÓ LỌC THEO CATEGORYID / INDUSTRYID
     useEffect(() => {
-        apiClient.get('/MauCv')
+        setLoading(true);
+        apiClient.get('/MauCv', {
+            params: {
+                categoryId: categoryId || undefined,
+                industryId: industryId || undefined
+            }
+        })
             .then(response => {
                 let data = response.data !== undefined ? response.data : response;
                 if (Array.isArray(data)) {
@@ -163,14 +165,14 @@ const CvTemplateLibrary = () => {
                 console.error("Lỗi khi tải mẫu CV:", error);
                 setLoading(false);
             });
-    }, []);
+    }, [categoryId, industryId]);
 
     const filteredCVs = cvTemplates.filter(cv => {
         const cvLangUpper = cv.ngonNgu ? cv.ngonNgu.toUpperCase() : '';
         const matchLang = language === 'ALL' || cvLangUpper === language.toUpperCase();
 
         let matchCategory = false;
-        if (activeFilter === 'Tất cả') {
+        if (activeFilter === 'Tất cả' || categoryId || industryId) {
             matchCategory = true;
         } else {
             const hasCategory = cv.categories && cv.categories.includes(activeFilter);
@@ -202,6 +204,7 @@ const CvTemplateLibrary = () => {
             navigate(`/xem-truoc-cv/${currentId}`);
         }
     };
+
     const handlePopupLogin = async (values) => {
         try {
             setLoginLoading(true);
@@ -218,8 +221,6 @@ const CvTemplateLibrary = () => {
                 message.success('Đăng nhập thành công!');
                 localStorage.setItem('token', token);
                 setIsModalOpen(false);
-
-                // 🚀 Điều hướng tự động theo Role
                 handleRoleNavigation(token);
             } else {
                 message.error(result?.message || 'Tài khoản hoặc mật khẩu không chính xác!');
@@ -242,8 +243,6 @@ const CvTemplateLibrary = () => {
                     message.success('Đăng nhập Google thành công!');
                     localStorage.setItem('token', token);
                     setIsModalOpen(false);
-
-                    // 🚀 Điều hướng tự động theo Role
                     handleRoleNavigation(token);
                 }
             } catch (error) { message.error('Đăng nhập Google thất bại!'); }
@@ -260,22 +259,53 @@ const CvTemplateLibrary = () => {
                     Mẫu CV xin việc tiếng Việt <span style={{ color: '#1890ff' }}>{activeFilter}</span> chuẩn 2026
                 </Title>
                 <Text style={{ color: themeColors.subTextColor, fontSize: '15px', lineHeight: '1.6', display: 'block', marginTop: '16px' }}>
-                    Tuyển chọn các mẫu CV tiếng Việt có thiết kế {activeFilter.toLowerCase()}, ưu tiên tính dễ đọc và dễ sử dụng. Dành cho ứng viên muốn tập trung vào khả năng truyền tải thông tin một cách đầy đủ và rõ ràng - hơn là những chi tiết trang trí cầu kỳ.
+                    Tuyển chọn các mẫu CV tiếng Việt chất lượng cao, ưu tiên tính dễ đọc và chuẩn tuyển dụng.
                 </Text>
             </div>
 
-            {/* THANH LỌC DANH MỤC & NGÔN NGỮ */}
+            {/* THANH LỌC DANH MỤC ĐỘNG TỪ DATABASE */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', flexWrap: 'wrap', gap: '16px' }}>
                 <div className="filter-scroll-container" style={{ display: 'flex', gap: '12px', overflowX: 'auto', padding: '4px 4px 12px 4px', flex: 1 }}>
-                    {filterOptions.map(filter => {
-                        const isActive = activeFilter === filter.key;
+
+                    {/* Nút "Tất cả" mặc định */}
+                    <div
+                        className={`filter-pill ${(!categoryId && !industryId && activeFilter === 'Tất cả') ? 'active' : ''}`}
+                        onClick={() => {
+                            navigate('/thu-vien-cv');
+                            setActiveFilter('Tất cả');
+                        }}
+                        style={{
+                            padding: '8px 20px',
+                            borderRadius: '24px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontWeight: (!categoryId && !industryId && activeFilter === 'Tất cả') ? '600' : '500',
+                            backgroundColor: (!categoryId && !industryId && activeFilter === 'Tất cả') ? themeColors.activeFilterBg : themeColors.filterBg,
+                            color: (!categoryId && !industryId && activeFilter === 'Tất cả') ? '#fff' : themeColors.subTextColor,
+                            border: `1px solid ${(!categoryId && !industryId && activeFilter === 'Tất cả') ? themeColors.activeFilterBg : themeColors.cardBorder}`,
+                            boxShadow: (!categoryId && !industryId && activeFilter === 'Tất cả') ? '0 4px 10px rgba(24, 144, 255, 0.3)' : 'none',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        <AppstoreOutlined />
+                        Tất cả
+                    </div>
+
+                    {/* Vòng lặp render các danh mục từ Database */}
+                    {(dbCategories || []).map(cat => {
+                        const catId = String(cat.maDanhMuc || cat.MaDanhMuc || cat.id);
+                        const catName = cat.tenDanhMuc || cat.TenDanhMuc || cat.name;
+                        const isActive = String(categoryId) === catId;
+
                         return (
                             <div
-                                key={filter.key}
+                                key={catId}
                                 className={`filter-pill ${isActive ? 'active' : ''}`}
                                 onClick={() => {
-                                    navigate('/thu-vien-cv');
-                                    setActiveFilter(filter.key);
+                                    navigate(`/thu-vien-cv?categoryId=${catId}`);
+                                    setActiveFilter(catName);
                                 }}
                                 style={{
                                     padding: '8px 20px',
@@ -292,8 +322,8 @@ const CvTemplateLibrary = () => {
                                     whiteSpace: 'nowrap'
                                 }}
                             >
-                                {filter.icon}
-                                {filter.key}
+                                <StarOutlined />
+                                {catName}
                             </div>
                         );
                     })}
@@ -347,14 +377,12 @@ const CvTemplateLibrary = () => {
                                             <div style={{ padding: '0', backgroundColor: '#e8e8e8', position: 'relative' }}>
                                                 <img alt={currentTitle} src={currentImage} style={{ width: '100%', height: '360px', objectFit: 'cover', objectPosition: 'top' }} />
 
-                                                {/* TAG CHUẨN ATS (Xanh lá) */}
                                                 {cv.isATS && (
                                                     <div style={{ position: 'absolute', top: 12, left: 12, backgroundColor: '#00b14f', color: '#fff', padding: '4px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}>
                                                         <CheckCircleFilled style={{ marginRight: '4px' }} /> Chuẩn ATS
                                                     </div>
                                                 )}
 
-                                                {/* TAG PRO / VIP (Vàng) */}
                                                 {isVipTemplate && (
                                                     <div style={{ position: 'absolute', top: 12, right: 12, background: 'linear-gradient(90deg, #faad14, #ffc53d)', color: '#000', padding: '4px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
                                                         <CrownFilled style={{ marginRight: '4px' }} /> VIP
@@ -363,7 +391,6 @@ const CvTemplateLibrary = () => {
                                             </div>
                                         }
                                     >
-                                        {/* Bảng chọn màu CV */}
                                         {colorArray.length > 0 && (
                                             <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
                                                 {colorArray.map((color, index) => (
@@ -393,11 +420,32 @@ const CvTemplateLibrary = () => {
                                                 <GlobalOutlined style={{ marginRight: '4px' }} />
                                                 {cv.ngonNgu && cv.ngonNgu.toUpperCase() === 'VI' ? 'Tiếng Việt' : 'Tiếng Anh'}
                                             </Tag>
-                                            {cv.tags && cv.tags.split(',').map((tag, idx) => (
-                                                <Tag key={idx} style={{ color: themeColors.subTextColor, background: themeColors.tagBg, border: 'none', borderRadius: '4px' }}>
-                                                    {tag.trim()}
-                                                </Tag>
-                                            ))}
+                                            {(() => {
+                                                const styleList = cv.categories || cv.Categories;
+
+                                                // 1. Ưu tiên lấy trực tiếp danh mục Style từ DB
+                                                if (styleList && styleList.length > 0) {
+                                                    return styleList.map((catName, idx) => (
+                                                        <Tag key={idx} style={{ color: themeColors.subTextColor, background: themeColors.tagBg, border: 'none', borderRadius: '4px' }}>
+                                                            {catName}
+                                                        </Tag>
+                                                    ));
+                                                }
+                                                if (cv.tags && dbCategories.length > 0) {
+                                                    const dbStyleNames = dbCategories.map(c => (c.tenDanhMuc || c.TenDanhMuc || c.name || '').toLowerCase());
+                                                    return cv.tags
+                                                        .split(',')
+                                                        .map(t => t.trim())
+                                                        .filter(t => dbStyleNames.includes(t.toLowerCase()))
+                                                        .map((tag, idx) => (
+                                                            <Tag key={idx} style={{ color: themeColors.subTextColor, background: themeColors.tagBg, border: 'none', borderRadius: '4px' }}>
+                                                                {tag}
+                                                            </Tag>
+                                                        ));
+                                                }
+
+                                                return null;
+                                            })()}
                                         </Space>
                                     </Card>
                                 </Col>
@@ -413,7 +461,7 @@ const CvTemplateLibrary = () => {
                 </>
             )}
 
-            {/* POPUP 1: ĐĂNG NHẬP SÁNG/TỐI (Light Mode) */}
+            {/* POPUP 1: ĐĂNG NHẬP */}
             <Modal
                 title={<span style={{ color: themeColors.textColor, fontSize: '20px' }}>Đăng nhập để xem mẫu CV</span>}
                 open={isModalOpen}
@@ -460,8 +508,6 @@ const CvTemplateLibrary = () => {
                                                 message.success('Đăng nhập Facebook thành công!');
                                                 localStorage.setItem('token', token);
                                                 setIsModalOpen(false);
-
-                                                // 🚀 Điều hướng tự động theo Role
                                                 handleRoleNavigation(token);
                                             }
                                         } catch (error) { message.error('Đăng nhập Facebook thất bại!'); }
@@ -481,7 +527,7 @@ const CvTemplateLibrary = () => {
                 </Form>
             </Modal>
 
-            {/* 🌟 POPUP 2: THÔNG BÁO YÊU CẦU NÂNG CẤP ĐỘNG DỰA THEO TRẠNG THÁI TÀI KHOẢN */}
+            {/* POPUP 2: VIP PROMPT */}
             <Modal
                 open={isVipPromptModalOpen}
                 onCancel={() => setIsVipPromptModalOpen(false)}

@@ -1,123 +1,62 @@
-  .my-custom-menu.ant-menu-dark .ant-menu-item,
-  .my-custom-menu.ant-menu-dark .ant-menu-submenu-title,
-  .my-custom-menu.ant-menu-dark .ant-menu-item .anticon,
-  .my-custom-menu.ant-menu-dark .ant-menu-item span,
-  .my-custom-menu.ant-menu-dark .ant-menu-submenu-title span {
-      color: #a6a6a6 !important;
-  }
+/* CreateCvMenu.css - Ép buộc giao diện Sáng 100% */
 
-  .my-custom-menu.ant-menu-dark .ant-menu-sub {
-      background-color: transparent !important;
-  }
+.cv-mega-menu {
+    background-color: #ffffff !important;
+    border-radius: 12px !important;
+    padding: 20px 24px !important;
+    width: 520px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1) !important;
+    border: 1px solid #e2e8f0 !important;
+}
 
-  .my-custom-menu.ant-menu-dark .ant-menu-item:not(.logout-item):hover,
-  .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover {
-      background-color: transparent !important;
-  }
+.menu-group-title {
+    color: #1677ff !important;
+    font-weight: 700 !important;
+    font-size: 14.5px !important;
+    margin-bottom: 12px !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
 
-  .my-custom-menu.ant-menu-dark .ant-menu-item:not(.logout-item):hover span,
-  .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover span,
-  .my-custom-menu.ant-menu-dark .ant-menu-item:not(.logout-item):hover .anticon,
-  .my-custom-menu.ant-menu-dark .ant-menu-submenu-title:hover .anticon {
-      color: #1890ff !important;
-  }
+.menu-group-title:hover {
+    color: #0958d9 !important;
+    text-decoration: underline;
+}
 
-  .my-custom-menu.ant-menu-dark .logout-item,
-  .my-custom-menu.ant-menu-dark .logout-item span,
-  .my-custom-menu.ant-menu-dark .logout-item .anticon {
-      color: #ff4d4f !important;
-  }
+.menu-item {
+    color: #334155 !important;
+    padding: 9px 12px !important;
+    border-radius: 8px !important;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-bottom: 4px;
+    white-space: nowrap;
+}
 
-  .my-custom-menu.ant-menu-dark .logout-item:hover {
-      background-color: rgba(255, 77, 79, 0.08) !important;
-      border-radius: 6px !important;
-  }
+.menu-item:hover {
+    background-color: rgba(22, 119, 255, 0.08) !important;
+    color: #1677ff !important;
+    transform: translateX(4px);
+}
 
-  .my-custom-menu.ant-menu-dark .logout-item:hover span,
-  .my-custom-menu.ant-menu-dark .logout-item:hover .anticon {
-      background-color: transparent !important;
-      color: #ff7875 !important;
-  }
+.menu-icon {
+    margin-right: 12px !important;
+    font-size: 16px !important;
+    color: #64748b !important;
+}
 
-  .user-dropdown-trigger {
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      background: transparent;
-  }
+.menu-item:hover .menu-icon {
+    color: #1677ff !important;
+}
 
-  .user-dropdown-trigger:hover {
-      background: rgba(255, 255, 255, 0.08);
-      transform: translateY(-1px);
-  }
+.menu-left-col {
+    border-right: 1px solid #f1f5f9 !important;
+}
 
-  .vip-avatar-glow {
-      box-shadow: 0 0 12px rgba(250, 173, 20, 0.4);
-      animation: vip-pulse 2s infinite ease-in-out;
-  }
-
-  @keyframes vip-pulse {
-      0% {
-          box-shadow: 0 0 8px rgba(250, 173, 20, 0.3);
-      }
-
-      50% {
-          box-shadow: 0 0 18px rgba(250, 173, 20, 0.7);
-      }
-
-      100% {
-          box-shadow: 0 0 8px rgba(250, 173, 20, 0.3);
-      }
-  }
-
-  .vip-badge-premium {
-      background: linear-gradient(135deg, #faad14 0%, #ffe58f 50%, #faad14 100%);
-      background-size: 200% 200%;
-      animation: gradient-shift 3s ease infinite;
-      box-shadow: 0 2px 6px rgba(250, 173, 20, 0.4);
-  }
-
-  @keyframes gradient-shift {
-      0% {
-          background-position: 100% 50%;
-      }
-
-      50% {
-          background-position: 0% 50%;
-      }
-
-      100% {
-          background-position: 100% 50%;
-      }
-  }
-
-  .premium-menu .ant-menu-item {
-      border-radius: 8px !important;
-      margin-bottom: 4px !important;
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  }
-
-  .premium-menu .ant-menu-item:hover {
-      background-color: rgba(255, 255, 255, 0.06) !important;
-      transform: translateX(6px);
-  }
-
-  .premium-menu .logout-item {
-      transition: all 0.25s ease !important;
-  }
-
-  .premium-menu .logout-item:hover {
-      background-color: rgba(255, 77, 79, 0.1) !important;
-      color: #ff4d4f !important;
-  }
-
-  .premium-menu .logout-item:hover .ant-menu-item-icon {
-      color: #ff4d4f !important;
-  }
-
-  .btn-3d-hover {
-      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  }
-
-  .btn-3d-hover:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(250, 173, 20, 0.35);
-  }
+.right-item {
+    padding: 10px 12px !important;
+}

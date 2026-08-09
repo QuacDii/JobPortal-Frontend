@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
 import './css/JobAlertManager.css';
-import { Typography, Select, Input, Button, Switch, Popconfirm, Spin, message, Row, Col, Empty } from 'antd';
+import { Typography, Select, Input, Button, Switch, Popconfirm, Spin, message, Row, Col, Empty, Modal } from 'antd';
 import { BellFilled, PlusOutlined, DeleteOutlined, CheckCircleFilled } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
@@ -22,7 +22,7 @@ const getUserInfoFromToken = (token) => {
     }
 };
 
-const JobAlertManager = () => {
+const JobAlertManager = ({ currentUser }) => {
     const [alertsList, setAlertsList] = useState([]);
     const [categoriesList, setCategoriesList] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -30,14 +30,17 @@ const JobAlertManager = () => {
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [keyword, setKeyword] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [newEmailInput, setNewEmailInput] = useState('');
 
     const token = localStorage.getItem('token');
     const userInfo = getUserInfoFromToken(token);
     const userId = userInfo?.userId;
 
+    // 1. Lấy danh sách Ngành nghề con
     const fetchCategories = async () => {
         try {
-            const res = await apiClient.get('/NganhNghe');
+            // 🌟 Đã sửa Route -> /NganhNghe/danh-sach
+            const res = await apiClient.get('/NganhNghe/danh-sach');
             const data = res.data !== undefined ? res.data : res;
             setCategoriesList(Array.isArray(data) ? data : []);
         } catch (err) {
@@ -45,11 +48,11 @@ const JobAlertManager = () => {
         }
     };
 
+    // 2. Lấy danh sách Job Alerts của User
     const fetchMyAlerts = async () => {
         if (!userId) return setLoading(false);
         setLoading(true);
         try {
-            // Sửa Route lấy danh sách
             const res = await apiClient.get(`/JobAlerts/user/${userId}`);
             const data = res.data !== undefined ? res.data : res;
             setAlertsList(Array.isArray(data) ? data : []);
@@ -66,35 +69,63 @@ const JobAlertManager = () => {
         fetchMyAlerts();
     }, []);
 
-   const handleAddAlert = async () => {
-    // 1. Kiểm tra xem Email của User có phải Email thật không
-    const userEmail = currentUser?.email || '';
-    if (userEmail.includes('@facebook.com') || !userEmail) {
-        Modal.confirm({
-            title: 'Cần có Email chính thức',
-            content: 'Email hiện tại của bạn là email tạm thời từ Facebook nên không thể nhận thư. Vui lòng nhập Email chính thức để bật Job Alerts:',
-            okText: 'Lưu Email & Tiếp tục',
-            cancelText: 'Hủy',
-            content: (
-                <Input 
-                    placeholder="Nhập email thực tế của bạn (VD: nguyenvana@gmail.com)" 
-                    onChange={(e) => setNewEmailInput(e.target.value)}
-                    style={{ marginTop: 12 }}
-                />
-            ),
-            onOk: async () => {
-                // Gọi API cập nhật Email thật vào CSDL
-                await apiClient.put('/User/update-email', { newEmail: newEmailInput });
-                message.success('Cập nhật Email thành công!');
-                // Tiếp tục thực hiện lưu Job Alert
-                executeAddAlert();
-            }
-        });
-        return;
-    }
+    // 3. Thực thi lưu Job Alert gửi sang Backend
+    const executeAddAlert = async () => {
+        if (!selectedCategory) {
+            message.warning("Vui lòng chọn ngành nghề!");
+            return;
+        }
 
-    executeAddAlert();
-};
+        try {
+            setSubmitting(true);
+            // 🌟 Đã sửa: Gửi maNganhCon thay cho maNganh
+            await apiClient.post('/JobAlerts', {
+                maUser: parseInt(userId),
+                maNganhCon: selectedCategory,
+                tuKhoaKyNang: keyword,
+                trangThai: true
+            });
+
+            message.success('Thêm thông báo việc làm thành công!');
+            setSelectedCategory(null);
+            setKeyword('');
+            fetchMyAlerts();
+        } catch (err) {
+            message.error(err.response?.data?.message || 'Thêm thông báo thất bại!');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleAddAlert = async () => {
+        const userEmail = currentUser?.email || '';
+        if (userEmail.includes('@facebook.com') || !userEmail) {
+            Modal.confirm({
+                title: 'Cần có Email chính thức',
+                content: (
+                    <div>
+                        <p>Email hiện tại của bạn là email tạm thời từ Facebook nên không thể nhận thư. Vui lòng nhập Email chính thức để bật Job Alerts:</p>
+                        <Input 
+                            placeholder="Nhập email thực tế của bạn (VD: nguyenvana@gmail.com)" 
+                            onChange={(e) => setNewEmailInput(e.target.value)}
+                            style={{ marginTop: 12 }}
+                        />
+                    </div>
+                ),
+                okText: 'Lưu Email & Tiếp tục',
+                cancelText: 'Hủy',
+                onOk: async () => {
+                    await apiClient.put('/User/update-email', { newEmail: newEmailInput });
+                    message.success('Cập nhật Email thành công!');
+                    executeAddAlert();
+                }
+            });
+            return;
+        }
+
+        executeAddAlert();
+    };
+
     const handleToggleAlert = async (id, currentStatus) => {
         try {
             await apiClient.put(`/JobAlerts/toggle/${id}`, { trangThai: !currentStatus });
@@ -185,7 +216,8 @@ const JobAlertManager = () => {
                     {alertsList.map((item) => {
                         const alertId = item.maAlert || item.id;
                         const isEnabled = item.trangThai !== undefined ? item.trangThai : item.isEnabled;
-                        const categoryName = categoriesList.find(c => c.maNganh === item.maNganh)?.tenNganh || item.tenNganh || 'Ngành nghề';
+                        // 🌟 Hiển thị tenNganhCon trả về trực tiếp từ API hoặc tra cứu theo maNganhCon
+                        const categoryName = item.tenNganhCon || categoriesList.find(c => c.maNganh === item.maNganhCon)?.tenNganh || 'Ngành nghề';
                         const keywordText = item.tuKhoaKyNang || item.tuKhoa;
 
                         return (

@@ -1,54 +1,77 @@
- .cv-mega-menu {
-     background-color: #1f1f1f;
-     border-radius: 8px;
-     padding: 24px;
-     width: 500px;
-     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-     border: 1px solid #333;
- }
 
- .menu-group-title {
-     color: #1890ff;
-     font-weight: 600;
-     font-size: 14px;
-     margin-bottom: 12px;
-     cursor: pointer;
-     transition: all 0.2s;
- }
+.cv-mega-menu {
+    background-color: #ffffff !important;
+    border-radius: 12px !important;
+    padding: 16px 20px !important;
+    width: 760px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1) !important;
+    border: 1px solid #e2e8f0 !important;
+}
 
- .menu-group-title:hover {
-     color: #40a9ff;
-     text-decoration: underline;
- }
+.menu-group-title {
+    color: #1677ff !important;
+    font-weight: 700 !important;
+    font-size: 13.5px !important;
+    margin-bottom: 10px !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
 
- .menu-item {
-     color: #d9d9d9;
-     padding: 8px 12px;
-     border-radius: 4px;
-     cursor: pointer;
-     display: flex;
-     align-items: center;
-     font-size: 14px;
-     transition: all 0.2s;
-     margin-bottom: 4px;
-     white-space: nowrap;
- }
+.menu-group-title:hover {
+    color: #0958d9 !important;
+}
 
- .menu-item:hover {
-     background-color: rgba(24, 144, 255, 0.1);
-     color: #1890ff;
- }
+.menu-item {
+    color: #334155 !important;
+    padding: 7px 10px !important;
+    border-radius: 6px !important;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-bottom: 3px;
+}
 
- .menu-icon {
-     margin-right: 12px;
-     font-size: 16px;
-     opacity: 0.8;
- }
+.menu-item-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 
- .menu-left-col {
-     border-right: 1px solid #333;
- }
+.menu-item:hover {
+    background-color: rgba(22, 119, 255, 0.08) !important;
+    color: #1677ff !important;
+    transform: translateX(3px);
+}
 
- .right-item {
-     padding: 10px 12px;
- }
+.menu-icon {
+    margin-right: 8px !important;
+    font-size: 15px !important;
+    color: #64748b !important;
+    flex-shrink: 0;
+}
+
+.menu-item:hover .menu-icon {
+    color: #1677ff !important;
+}
+
+/* Cột phải Lối tắt */
+.menu-right-col {
+    border-left: 1px solid #f1f5f9 !important;
+    padding-left: 16px !important;
+}
+
+.menu-item.highlight {
+    color: #1677ff !important;
+    font-weight: 600 !important;
+    background-color: #f0f7ff !important;
+    margin-top: 6px;
+}
+
+.menu-item.highlight:hover {
+    background-color: #e6f4ff !important;
+}

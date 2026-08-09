@@ -5,8 +5,8 @@ import {
 } from 'antd';
 import {
     PlusOutlined, EditOutlined, DeleteOutlined, FileTextOutlined,
-    EyeOutlined, EyeInvisibleOutlined, CodeOutlined, AppstoreOutlined,
-    BgColorsOutlined, SettingOutlined, UploadOutlined, SafetyCertificateOutlined, GlobalOutlined
+    EyeOutlined, EyeInvisibleOutlined, AppstoreOutlined,
+    BgColorsOutlined, SettingOutlined, UploadOutlined, GlobalOutlined, TagsOutlined
 } from '@ant-design/icons';
 import apiClient from '../../api/apiClient';
 
@@ -17,6 +17,7 @@ const { Option } = Select;
 const CvTemplateManager = () => {
     const [templates, setTemplates] = useState([]);
     const [categories, setCategories] = useState([]);
+    const [industries, setIndustries] = useState([]); // State danh sách Ngành nghề
     const [loading, setLoading] = useState(false);
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
@@ -36,16 +37,19 @@ const CvTemplateManager = () => {
     const fetchInitialData = async () => {
         setLoading(true);
         try {
-            const [tempRes, catRes] = await Promise.all([
+            const [tempRes, catRes, nganhRes] = await Promise.all([
                 apiClient.get('/MauCv?activeOnly=false'),
-                apiClient.get('/DanhMucMau')
+                apiClient.get('/DanhMucMau'),
+                apiClient.get('/NganhNghe/danh-sach').catch(() => []) // Tải danh sách Ngành nghề
             ]);
 
             const tempPayload = tempRes.data !== undefined ? tempRes.data : tempRes;
             const catPayload = catRes.data !== undefined ? catRes.data : catRes;
+            const nganhPayload = nganhRes.data !== undefined ? nganhRes.data : nganhRes;
 
             setTemplates(Array.isArray(tempPayload) ? tempPayload : []);
             setCategories(Array.isArray(catPayload) ? catPayload : []);
+            setIndustries(Array.isArray(nganhPayload) ? nganhPayload : []);
         } catch (error) {
             message.error('Lỗi khi tải dữ liệu từ máy chủ!');
         } finally {
@@ -92,13 +96,14 @@ const CvTemplateManager = () => {
     // ================= XỬ LÝ MẪU CV =================
     const openModal = (record = null) => {
         setEditingItem(record);
-        setFileList([]); // Reset file upload
+        setFileList([]);
 
         if (record) {
             const cleanJson = (val) => (val && val !== 'null' ? (typeof val === 'object' ? JSON.stringify(val, null, 2) : val) : '{}');
 
             const img = record.anhThumbnail || record.anhMoPhong || record.image || '';
             const colorsArray = record.danhSachMau ? record.danhSachMau.split(',').filter(c => c.trim() !== '') : [];
+            const tagsArray = record.tags ? record.tags.split(',').filter(t => t.trim() !== '') : [];
 
             form.setFieldsValue({
                 tenMau: record.tenMau || record.title || '',
@@ -109,7 +114,8 @@ const CvTemplateManager = () => {
                 cauTrucJson: cleanJson(record.layoutJson || record.cauTrucJson),
                 duLieuMau: cleanJson(record.duLieuMau),
                 categoryIds: record.categoryIds || [],
-                danhSachMau: colorsArray
+                danhSachMau: colorsArray,
+                tags: tagsArray // Tag Ngành nghề
             });
             setPreviewImage(img);
         } else {
@@ -121,7 +127,8 @@ const CvTemplateManager = () => {
                 cauTrucJson: '{\n  "layout": "modern",\n  "themeColor": "#1890ff"\n}',
                 duLieuMau: '{\n  "personalInfo": { "name": "Nguyễn Văn A" }\n}',
                 categoryIds: [],
-                danhSachMau: []
+                danhSachMau: [],
+                tags: []
             });
             setPreviewImage('');
         }
@@ -145,7 +152,6 @@ const CvTemplateManager = () => {
 
     const handleSave = async (values) => {
         try {
-            // 1. Gói toàn bộ dữ liệu vào FormData
             const formData = new FormData();
 
             formData.append('TenMau', values.tenMau);
@@ -163,12 +169,14 @@ const CvTemplateManager = () => {
             const colorsString = values.danhSachMau?.length > 0 ? values.danhSachMau.join(',') : '';
             formData.append('DanhSachMau', colorsString);
 
-            // Gắn danh sách ID danh mục
+            // Gắn Tag Ngành nghề dưới dạng chuỗi "CNTT,Kinh doanh,Marketing"
+            const tagsString = values.tags?.length > 0 ? values.tags.join(',') : '';
+            formData.append('Tags', tagsString);
+
             if (values.categoryIds) {
                 values.categoryIds.forEach(id => formData.append('CategoryIds', id));
             }
 
-            // 2. Gắn File ảnh nếu quản trị viên có tải ảnh mới lên
             if (fileList.length > 0 && fileList[0].originFileObj) {
                 formData.append('FileThumbnail', fileList[0].originFileObj);
             } else if (previewImage) {
@@ -182,7 +190,6 @@ const CvTemplateManager = () => {
                 }
             };
 
-            // 3. Gửi Request kèm theo config Header
             if (id) {
                 await apiClient.put(`/MauCv/${id}`, formData, config);
                 message.success('Cập nhật mẫu CV thành công!');
@@ -213,33 +220,31 @@ const CvTemplateManager = () => {
         const name = item.tenMau || item.title || '';
         return name.toLowerCase().includes(searchText.toLowerCase());
     });
+
     const handleCategoryChange = (selectedIds) => {
         const hasATS = selectedIds.some(id => {
             const category = categories.find(c => c.maDanhMuc === id);
             return category && category.tenDanhMuc.trim().toUpperCase() === 'ATS';
         });
-        // Nếu có chọn ATS -> Tự động bật công tắc. Nếu bỏ chọn ATS -> Tự động tắt công tắc.
         form.setFieldsValue({ isATS: hasATS });
     };
 
     const handleAtsSwitchChange = (checked) => {
-        // Tim mã Danh mục của "ATS"
         const atsCategory = categories.find(c => c.tenDanhMuc?.trim().toUpperCase() === 'ATS');
         if (!atsCategory) return;
 
         const currentCategoryIds = form.getFieldValue('categoryIds') || [];
 
         if (checked) {
-            // Nếu gạt BẬT -> Thêm ID danh mục ATS vào danh sách (nếu chưa có)
             if (!currentCategoryIds.includes(atsCategory.maDanhMuc)) {
                 form.setFieldsValue({ categoryIds: [...currentCategoryIds, atsCategory.maDanhMuc] });
             }
         } else {
-            // Nếu gạt TẮT -> Lọc bỏ ID danh mục ATS ra khỏi danh sách
             const updatedCategoryIds = currentCategoryIds.filter(id => id !== atsCategory.maDanhMuc);
             form.setFieldsValue({ categoryIds: updatedCategoryIds });
         }
     };
+
     const columns = [
         { title: 'ID', key: 'maMau', width: 60, align: 'center', render: (_, r) => r.maMau || r.maMauCv || r.id },
         {
@@ -252,21 +257,27 @@ const CvTemplateManager = () => {
         {
             title: 'Tên & Phân loại',
             key: 'tenMau',
-            render: (_, r) => (
-                <div>
-                    <Text strong style={{ fontSize: 15, display: 'block' }}>{r.tenMau || r.title}</Text>
-                    <Space size={[0, 4]} wrap style={{ marginTop: 4 }}>
-                        {r.categories
-                            ?.filter(c => c?.trim().toUpperCase() !== 'ATS')
-                            .map((c, i) => (
-                                <Tag key={i} color="purple">{c}</Tag>
-                            ))
-                        }
-                        <Tag color="blue"><GlobalOutlined /> {r.ngonNgu === 'EN' ? 'Tiếng Anh' : 'Tiếng Việt'}</Tag>
-                        {r.categories?.map((c, i) => <Tag key={i} color="purple">{c}</Tag>)}
-                    </Space>
-                </div>
-            )
+            render: (_, r) => {
+                const tagList = r.tags ? r.tags.split(',').filter(t => t.trim() !== '') : [];
+                return (
+                    <div>
+                        <Text strong style={{ fontSize: 15, display: 'block' }}>{r.tenMau || r.title}</Text>
+                        <Space size={[0, 4]} wrap style={{ marginTop: 4 }}>
+                            <Tag color="blue"><GlobalOutlined /> {r.ngonNgu === 'EN' ? 'Tiếng Anh' : 'Tiếng Việt'}</Tag>
+                            {r.categories
+                                ?.filter(c => c?.trim().toUpperCase() !== 'ATS')
+                                .map((c, i) => (
+                                    <Tag key={`cat-${i}`} color="purple">{c}</Tag>
+                                ))
+                            }
+                            {/* Hiển thị Tag Ngành nghề */}
+                            {tagList.map((tag, i) => (
+                                <Tag key={`tag-${i}`} color="orange">{tag}</Tag>
+                            ))}
+                        </Space>
+                    </div>
+                );
+            }
         },
         {
             title: 'Trạng thái',
@@ -347,7 +358,10 @@ const CvTemplateManager = () => {
                 <Form form={form} layout="vertical" onFinish={handleSave}>
                     <Row gutter={16}>
                         <Col span={12}>
-                            <Form.Item name="tenMau" label="Tên Mẫu CV" rules={[{ required: true }]}>
+                            <Form.Item name="tenMau"
+                                label="Tên Mẫu CV"
+                                rules={[{ required: true, message: 'Vui lòng nhập tên mẫu CV!' }]}
+                            >
                                 <Input placeholder="Nhập tên mẫu..." />
                             </Form.Item>
                         </Col>
@@ -372,16 +386,35 @@ const CvTemplateManager = () => {
                     </Row>
 
                     <Row gutter={16}>
-                        <Col span={12}>
-                            <Form.Item name="categoryIds" label={<><AppstoreOutlined /> Danh mục</>}>
+                        <Col span={8}>
+                            <Form.Item name="categoryIds" label={<><AppstoreOutlined /> Danh mục CV</>}>
                                 <Select mode="multiple" allowClear placeholder="Chọn danh mục..." onChange={handleCategoryChange}>
                                     {categories.map(c => <Option key={c.maDanhMuc} value={c.maDanhMuc}>{c.tenDanhMuc}</Option>)}
                                 </Select>
                             </Form.Item>
                         </Col>
-                        <Col span={12}>
+
+                        {/* Ô CHỌN NGÀNH NGHỀ PHÙ HỢP (TAGS) */}
+                        <Col span={8}>
+                            <Form.Item name="tags" label={<><TagsOutlined /> Ngành nghề phù hợp</>}>
+                                <Select
+                                    mode="multiple"
+                                    allowClear
+                                    placeholder="Chọn ngành nghề..."
+                                    showSearch
+                                    optionFilterProp="children"
+                                >
+                                    {industries.map(n => {
+                                        const name = n.tenNganh || n.tenNganhCon || n.tenNganhCha;
+                                        return <Option key={name} value={name}>{name}</Option>;
+                                    })}
+                                </Select>
+                            </Form.Item>
+                        </Col>
+
+                        <Col span={8}>
                             <Form.Item name="danhSachMau" label={<><BgColorsOutlined /> Màu hỗ trợ (HEX)</>}>
-                                <Select mode="tags" placeholder="Gõ mã HEX (VD: #1890ff) & Enter" tokenSeparators={[',']} />
+                                <Select mode="tags" placeholder="Gõ mã HEX & Enter" tokenSeparators={[',']} />
                             </Form.Item>
                         </Col>
                     </Row>

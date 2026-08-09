@@ -1,57 +1,120 @@
+/* CandidateLayout.css - Nâng cấp hiệu ứng Hover Header */
+
+/* Thanh Header tổng */
 .topcv-header {
-    background-color: #18191a !important;
-    height: 64px !important;
-    padding: 0 32px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    border-bottom: 1px solid #2d2f31;
+    height: 68px;
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     position: sticky;
     top: 0;
     z-index: 1000;
+    background-color: #ffffff;
+    border-bottom: 1px solid #f0f0f0;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+    transition: all 0.3s ease;
 }
 
-/* Nav Links */
-.topcv-nav-link {
-    color: #e4e6eb;
-    font-weight: 500;
-    font-size: 14px;
-    padding: 0 16px;
+/* Logo thương hiệu */
+.logo-hover {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.logo-hover:hover {
+    transform: scale(1.03);
+}
+
+/* =========================================================
+   HIỆU ỨNG HOVER ĐỒNG BỘ CHO CÁC MỤC MENU (Việc làm, Tạo CV, Công ty)
+   ========================================================= */
+.topcv-nav-link,
+.candidate-nav-item,
+.ant-dropdown-trigger {
+    font-weight: 600 !important;
+    font-size: 14.5px !important;
+    color: #334155 !important;
+    padding: 8px 16px !important;
+    border-radius: 8px !important;
+    height: auto !important; /* Lược bỏ chiều cao block thô */
+    line-height: 1.5 !important;
     cursor: pointer;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    background: transparent !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Hiệu ứng di chuột: Nền xanh mờ nhẹ + Chữ đổi màu xanh + Nhô nhẹ */
+.topcv-nav-link:hover,
+.topcv-nav-link.active,
+.candidate-nav-item:hover,
+.candidate-nav-item.active,
+.ant-dropdown-trigger:hover,
+.ant-dropdown-open {
+    color: #1890ff !important;
+    background-color: rgba(24, 144, 255, 0.08) !important;
+    transform: translateY(-1px);
+}
+
+/* =========================================================
+   CÁC NÚT TÍNH NĂNG VÀ USER DROPDOWN BÊN PHẢI
+   ========================================================= */
+.header-icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
-    gap: 6px;
-    height: 64px;
-    transition: all 0.2s ease;
+    justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.25s ease;
 }
 
-.topcv-nav-link:hover,
-.topcv-nav-link.active {
+.header-icon-btn:hover {
     color: #1890ff !important;
+    background-color: rgba(24, 144, 255, 0.08);
+    transform: translateY(-2px);
 }
 
-/* Action Buttons */
-.btn-topcv-register {
-    background-color: transparent !important;
-    border: 1px solid #1890ff !important;
-    color: #1890ff !important;
-    border-radius: 4px !important;
+/* Nút Đăng ký (Outline) */
+.btn-topcv-register,
+.btn-register-hover {
+    border-radius: 8px !important;
     font-weight: 600 !important;
+    height: 40px !important;
+    padding: 0 20px !important;
+    transition: all 0.25s ease !important;
 }
 
-.btn-topcv-register:hover {
-    background-color: rgba(24, 144, 255, 0.1) !important;
+.btn-topcv-register:hover,
+.btn-register-hover:hover {
+    border-color: #1890ff !important;
+    color: #1890ff !important;
+    background-color: rgba(24, 144, 255, 0.08) !important;
+    transform: translateY(-2px);
 }
 
-.btn-topcv-login {
+/* Nút Đăng nhập (Solid Primary) */
+.btn-topcv-login,
+.btn-login-hover {
     background-color: #1890ff !important;
     border: 1px solid #1890ff !important;
     color: #ffffff !important;
-    border-radius: 4px !important;
+    border-radius: 8px !important;
     font-weight: 600 !important;
+    height: 40px !important;
+    padding: 0 22px !important;
+    box-shadow: 0 4px 12px rgba(24, 144, 255, 0.25);
+    transition: all 0.25s ease !important;
 }
 
-.btn-topcv-login:hover {
-    background-color: #096dd9 !important;
-    border-color: #096dd9 !important;
+.btn-topcv-login:hover,
+.btn-login-hover:hover {
+    background-color: #40a9ff !important;
+    border-color: #40a9ff !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(24, 144, 255, 0.4) !important;
 }
