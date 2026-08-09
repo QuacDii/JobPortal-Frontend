@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Typography, Row, Col, message, Modal } from 'antd';
-import { MailOutlined, LockOutlined, GoogleOutlined, FacebookFilled } from '@ant-design/icons';
+import { Form, Input, Button, Typography, Row, Col, message, Divider } from 'antd';
+import { MailOutlined, LockOutlined, GoogleOutlined, FacebookFilled, ArrowRightOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 import apiClient from '../api/apiClient';
@@ -15,12 +15,10 @@ const Login = () => {
     const navigate = useNavigate();
     const [form] = Form.useForm();
 
-    // HỆ MÀU SẮC LIGHT MODE
-    const primaryColor = '#1890ff';
-    const textColor = '#595959';
-    const headingColor = '#262626';
+    const primaryColor = '#1677ff';
+    const textColor = '#475569';
+    const headingColor = '#0f172a';
 
-    // Hàm điều hướng thông minh dựa vào Quyền (Role) trong Token
     const handleRoleNavigation = (token) => {
         const decoded = jwtDecode(token);
         const role = decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"];
@@ -34,34 +32,23 @@ const Login = () => {
         }
     };
 
-    // HÀM XỬ LÝ ĐĂNG NHẬP CHUẨN
     const handleLogin = async () => {
         try {
-            // 1. Ép Antd quét kiểm tra các ô dữ liệu xem điền đúng/đủ chưa
             const values = await form.validateFields();
-
-            console.log("Form hợp lệ! Đang bắn API đăng nhập với data:", values);
             setLoading(true);
 
-            // 2. Gọi API xuống Backend
             const response = await apiClient.post('/auth/login', {
                 email: values.email,
                 matKhau: values.matKhau
             });
 
             if (response.success) {
-                message.success(response.message);
+                message.success(response.message || 'Đăng nhập thành công!');
                 localStorage.setItem('token', response.token);
                 handleRoleNavigation(response.token);
             }
         } catch (error) {
-            // Nếu là lỗi do người dùng điền thiếu Form thì dừng lại, không báo lỗi API
-            if (error.errorFields) {
-                console.warn("❌ Người dùng chưa điền đủ Form:", error);
-                return;
-            }
-
-            console.error("❌ Lỗi từ API Backend:", error);
+            if (error.errorFields) return;
             const errorMsg = error.response?.data?.message || 'Tài khoản hoặc mật khẩu không chính xác!';
             message.error(errorMsg);
         } finally {
@@ -69,7 +56,6 @@ const Login = () => {
         }
     };
 
-    // Hàm đăng nhập bằng Google
     const loginWithGoogle = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
             try {
@@ -78,7 +64,7 @@ const Login = () => {
                 });
 
                 if (response.success) {
-                    message.success(response.message);
+                    message.success(response.message || 'Đăng nhập Google thành công!');
                     localStorage.setItem('token', response.token);
                     handleRoleNavigation(response.token);
                 }
@@ -93,166 +79,271 @@ const Login = () => {
     });
 
     return (
-        <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <Row style={{ minHeight: '100vh', backgroundColor: '#ffffff' }}>
+            {/* TẤM BANNER BÊN TRÁI */}
+            <Col xs={0} md={10} lg={12} xl={14} style={{
+                background: 'linear-gradient(135deg, #002140 0%, #0050b3 50%, #1890ff 100%)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                padding: '60px',
+                position: 'relative',
+                overflow: 'hidden'
+            }}>
+                <div style={{
+                    position: 'absolute', top: '-10%', left: '-10%', width: '50%', height: '50%',
+                    background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%)', borderRadius: '50%'
+                }}></div>
+                <div style={{
+                    position: 'absolute', bottom: '-20%', right: '-10%', width: '60%', height: '60%',
+                    background: 'radial-gradient(circle, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 70%)', borderRadius: '50%'
+                }}></div>
 
-            <div style={{ width: '100%', maxWidth: 480, backgroundColor: '#ffffff', padding: '40px', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.05)' }}>
-
-                <div style={{ marginBottom: 32, textAlign: 'center' }}>
-                    <Title level={3} style={{ color: headingColor, margin: '0 0 8px 0', fontWeight: '800' }}>
-                        Chào mừng bạn quay lại!
+                <div style={{ maxWidth: 500, zIndex: 1 }}>
+                    <div style={{ fontSize: '42px', fontWeight: '900', color: '#ffffff', letterSpacing: '2px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '48px', height: '48px', backgroundColor: '#ffffff', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1890ff', fontSize: '24px' }}>
+                            JN
+                        </div>
+                        JOBSNOW
+                    </div>
+                    <Title level={2} style={{ color: '#ffffff', fontWeight: '700', lineHeight: 1.4, marginBottom: '20px' }}>
+                        Kết nối nhân tài,<br />Kiến tạo tương lai.
                     </Title>
-                    <Text style={{ color: textColor, fontSize: 14 }}>
-                        Cùng xây dựng một hồ sơ nổi bật và nhận được các cơ hội sự nghiệp lý tưởng.
+                    <Text style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '16px', lineHeight: 1.6, display: 'block' }}>
+                        Nền tảng tuyển dụng thông minh tích hợp công nghệ AI. Giúp bạn quản lý hồ sơ, tìm kiếm cơ hội và xây dựng sự nghiệp mơ ước chỉ với vài cú click.
                     </Text>
+
+                    <div className="glass-card" style={{
+                        marginTop: '40px', padding: '20px', backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        borderRadius: '12px', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.2)',
+                        transition: 'all 0.3s ease', cursor: 'default'
+                    }}>
+                        <Text style={{ color: '#ffffff', fontSize: '14px', fontStyle: 'italic' }}>
+                            "JobsNow đã giúp chúng tôi rút ngắn 50% thời gian tìm kiếm những ứng viên chất lượng nhất."
+                        </Text>
+                    </div>
                 </div>
+            </Col>
 
-                {/*Form chỉ làm nhiệm vụ giữ trạng thái, không tham gia vào hành vi submit của HTML */}
-                <Form form={form} layout="vertical">
+            {/* FORM ĐĂNG NHẬP BÊN PHẢI */}
+            <Col xs={24} md={14} lg={12} xl={10} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 40px' }}>
+                <div style={{ maxWidth: 440, width: '100%', margin: '0 auto' }}>
 
-                    {/* Ô NHẬP EMAIL */}
-                    <Form.Item
-                        label={<span style={{ color: headingColor, fontWeight: 500 }}>Email</span>}
-                        name="email"
-                        rules={[{ required: true, message: 'Vui lòng nhập tài khoản Email!' }, { type: 'email', message: 'Email không đúng định dạng!' }]}
-                        style={{ marginBottom: 20 }}
-                    >
-                        <Input
-                            size="large"
-                            placeholder="Nhập email của bạn"
-                            prefix={<MailOutlined style={{ color: '#bfbfbf', marginRight: 8, fontSize: 18 }} />}
-                            style={{ borderRadius: 6, padding: '10px 14px' }}
-                        />
-                    </Form.Item>
-
-                    {/* Ô NHẬP MẬT KHẨU */}
-                    <Form.Item
-                        label={<span style={{ color: headingColor, fontWeight: 500 }}>Mật khẩu</span>}
-                        name="matKhau"
-                        rules={[{ required: true, message: 'Vui lòng nhập mật khẩu đăng nhập!' }]}
-                        style={{ marginBottom: 12 }}
-                    >
-                        <Input.Password
-                            size="large"
-                            placeholder="Nhập mật khẩu của bạn"
-                            prefix={<LockOutlined style={{ color: '#bfbfbf', marginRight: 8, fontSize: 18 }} />}
-                            style={{ borderRadius: 6, padding: '10px 14px' }}
-                        />
-                    </Form.Item>
-
-                    <div style={{ textAlign: 'right', marginBottom: 24 }}>
-                        <a href="/forgot-password" style={{ color: primaryColor, fontSize: 14, fontWeight: 500 }}>Quên mật khẩu?</a>
+                    <div className="mobile-only-header" style={{ display: 'none', marginBottom: '32px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '28px', fontWeight: '900', color: '#002140', letterSpacing: '1px' }}>JOBSNOW</div>
                     </div>
 
-                    {/* NÚT ĐĂNG NHẬP THỦ CÔNG CHỐNG RELOAD */}
-                    <Form.Item style={{ marginBottom: 24 }}>
-                        <Button
-                            type="primary"
-                            size="large"
-                            loading={loading}
-                            block
-                            style={{ backgroundColor: primaryColor, borderColor: primaryColor, fontWeight: 'bold', height: 44, fontSize: 16, borderRadius: 6 }}
-                            onClick={handleLogin}
+                    <div style={{ marginBottom: '40px' }}>
+                        <Title level={2} style={{ color: headingColor, margin: '0 0 8px 0', fontWeight: '800' }}>
+                            Chào mừng trở lại!
+                        </Title>
+                        <Text style={{ color: textColor, fontSize: 15 }}>
+                            Đăng nhập để tiếp tục hành trình sự nghiệp của bạn.
+                        </Text>
+                    </div>
+
+                    <Form form={form} layout="vertical" onFinish={handleLogin}>
+                        <Form.Item
+                            label={<span style={{ color: headingColor, fontWeight: 600, fontSize: '14px' }}>Địa chỉ Email</span>}
+                            name="email"
+                            rules={[
+                                { required: true, message: 'Vui lòng nhập tài khoản Email!' },
+                                { type: 'email', message: 'Email không đúng định dạng!' }
+                            ]}
+                            style={{ marginBottom: 24 }}
                         >
-                            Đăng nhập
-                        </Button>
-                    </Form.Item>
-
-                    <div style={{ textAlign: 'center', color: textColor, marginBottom: 16, fontSize: 13, position: 'relative' }}>
-                        <span style={{ backgroundColor: '#fff', padding: '0 10px', position: 'relative', zIndex: 1 }}>Hoặc đăng nhập bằng</span>
-                        <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', backgroundColor: '#e8e8e8', zIndex: 0 }}></div>
-                    </div>
-
-                    <Row gutter={16} style={{ marginBottom: 24 }}>
-                        {/* NÚT GOOGLE */}
-                        <Col span={12}>
-                            <Button
+                            <Input
+                                className="custom-input"
                                 size="large"
-                                block
-                                icon={<GoogleOutlined />}
-                                onClick={() => loginWithGoogle()}
-                                style={{ backgroundColor: '#ea4335', color: '#fff', border: 'none', fontWeight: '600', borderRadius: 6 }}
+                                placeholder="VD: nguyenvan.a@gmail.com"
+                                prefix={<MailOutlined style={{ color: '#94a3b8', marginRight: 8, fontSize: 18 }} />}
+                                style={{ borderRadius: '8px', padding: '12px 16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.3s ease' }}
+                            />
+                        </Form.Item>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ color: headingColor, fontWeight: 600, fontSize: '14px' }}>
+                                <span style={{ color: '#ff4d4f', marginRight: '4px' }}>*</span>Mật khẩu
+                            </span>
+                            <a
+                                href="/forgot-password"
+                                className="hover-link"
+                                style={{ color: primaryColor, fontSize: '13.5px', fontWeight: 600, transition: 'all 0.3s ease' }}
                             >
-                                Google
+                                Quên mật khẩu?
+                            </a>
+                        </div>
+
+                        {/* Ô NHẬP MẬT KHẨU */}
+                        <Form.Item
+                            name="matKhau"
+                            rules={[{ required: true, message: 'Vui lòng nhập mật khẩu đăng nhập!' }]}
+                            style={{ marginBottom: 32 }}
+                        >
+                            <Input.Password
+                                className="custom-input"
+                                size="large"
+                                placeholder="Nhập mật khẩu bảo mật"
+                                prefix={<LockOutlined style={{ color: '#94a3b8', marginRight: 8, fontSize: 18 }} />}
+                                style={{ borderRadius: '8px', padding: '12px 16px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', transition: 'all 0.3s ease' }}
+                            />
+                        </Form.Item>
+
+                        <Form.Item style={{ marginBottom: 32 }}>
+                            <Button
+                                className="primary-btn-hover"
+                                type="primary"
+                                size="large"
+                                htmlType="submit"
+                                loading={loading}
+                                block
+                                icon={<ArrowRightOutlined />}
+                                iconPosition="end"
+                                style={{
+                                    backgroundColor: primaryColor,
+                                    fontWeight: '700',
+                                    height: '48px',
+                                    fontSize: '16px',
+                                    borderRadius: '8px',
+                                    boxShadow: '0 4px 14px rgba(22, 119, 255, 0.25)',
+                                    transition: 'all 0.3s ease'
+                                }}
+                            >
+                                Đăng nhập
                             </Button>
-                        </Col>
+                        </Form.Item>
 
-                        {/* NÚT FACEBOOK */}
-                        <Col span={12}>
-                            <FacebookLogin
-                                appId="1594501296013131"
-                                fields="name,email,picture"
-                                scope="public_profile,email"
-                                callback={async (response) => {
-                                    if (response.accessToken) {
-                                        try {
-                                            const res = await apiClient.post('/auth/facebook-login', {
-                                                accessToken: response.accessToken
-                                            });
-                                            if (res.success) {
-                                                message.success(res.message);
-                                                localStorage.setItem('token', res.token);
-                                                const decoded = jwtDecode(res.token);
-                                                const role = decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"];
+                        <Divider style={{ borderColor: '#e2e8f0', color: '#64748b', fontSize: '13px' }} plain>
+                            Hoặc đăng nhập nhanh qua
+                        </Divider>
 
-                                                // 1. Nếu là Admin (Role = 0), chuyển thẳng vào Admin Dashboard
-                                                if (role === "0") {
-                                                    window.location.href = '/admin/dashboard';
-                                                    return;
-                                                }
-                                                if (res.requireUpdateEmail) {
-                                                    Modal.warning({
-                                                        title: 'Cập nhật Email nhận thông báo',
-                                                        content: 'Tài khoản Facebook của bạn chưa có Email chính thức. Vui lòng cập nhật Email thực tế để nhận báo việc làm và thông báo tuyển dụng.',
-                                                        okText: 'Cập nhật ngay',
-                                                        onOk: () => {
-                                                            navigate('/verify-email');
-                                                        }
-                                                    });
-                                                } else {
+                        <Row gutter={16} style={{ marginBottom: 32 }}>
+                            <Col span={12}>
+                                <Button
+                                    className="social-btn-hover"
+                                    size="large"
+                                    block
+                                    icon={<GoogleOutlined style={{ color: '#ea4335', fontSize: '18px' }} />}
+                                    onClick={() => loginWithGoogle()}
+                                    style={{
+                                        color: headingColor,
+                                        fontWeight: '600',
+                                        borderRadius: '8px',
+                                        height: '46px',
+                                        borderColor: '#e2e8f0',
+                                        backgroundColor: '#ffffff',
+                                        transition: 'all 0.3s ease'
+                                    }}
+                                >
+                                    Google
+                                </Button>
+                            </Col>
+
+                            <Col span={12}>
+                                <FacebookLogin
+                                    appId="1594501296013131"
+                                    fields="name,email,picture"
+                                    scope="public_profile,email"
+                                    callback={async (response) => {
+                                        if (response.accessToken) {
+                                            try {
+                                                const res = await apiClient.post('/auth/facebook-login', {
+                                                    accessToken: response.accessToken
+                                                });
+
+                                                if (res.success) {
+                                                    localStorage.setItem('token', res.token);
+                                                    if (res.requireUpdateEmail) localStorage.setItem('requireEmailVerification', 'true');
                                                     handleRoleNavigation(res.token);
                                                 }
+                                            } catch (error) {
+                                                message.error('Đăng nhập Facebook thất bại tại Server!');
                                             }
-                                        } catch (error) {
-                                            message.error('Đăng nhập Facebook thất bại tại Server!');
                                         }
-                                    } else {
-                                        message.error('Hủy kết nối Facebook!');
-                                    }
-                                }}
-                                render={renderProps => (
-                                    <Button
-                                        size="large"
-                                        block
-                                        icon={<FacebookFilled />}
-                                        style={{ backgroundColor: '#1877f2', color: '#fff', border: 'none', fontWeight: '600', borderRadius: 6 }}
-                                        onClick={renderProps.onClick}
-                                    >
-                                        Facebook
-                                    </Button>
-                                )}
-                            />
-                        </Col>
-                    </Row>
+                                    }}
+                                    render={renderProps => (
+                                        <Button
+                                            className="social-btn-hover facebook-btn-hover"
+                                            size="large"
+                                            block
+                                            icon={<FacebookFilled style={{ color: '#1877f2', fontSize: '18px' }} />}
+                                            style={{
+                                                color: headingColor,
+                                                fontWeight: '600',
+                                                borderRadius: '8px',
+                                                height: '46px',
+                                                borderColor: '#e2e8f0',
+                                                backgroundColor: '#ffffff',
+                                                transition: 'all 0.3s ease'
+                                            }}
+                                            onClick={renderProps.onClick}
+                                        >
+                                            Facebook
+                                        </Button>
+                                    )}
+                                />
+                            </Col>
+                        </Row>
 
-                    <div style={{ textAlign: 'center', marginBottom: 30, borderBottom: '1px solid #e8e8e8', paddingBottom: 24 }}>
-                        <span style={{ color: textColor }}>Bạn chưa có tài khoản? </span>
-                        <a href="/register" style={{ color: primaryColor }}>Đăng ký ngay</a>
-                    </div>
+                        <div style={{ textAlign: 'center', fontSize: '15px' }}>
+                            <span style={{ color: textColor }}>Bạn chưa có tài khoản? </span>
+                            <a href="/register" className="hover-link" style={{ color: primaryColor, fontWeight: '700', transition: 'all 0.3s ease' }}>Tạo tài khoản mới</a>
+                        </div>
+                    </Form>
+                </div>
+            </Col>
 
-                    <div style={{ textAlign: 'center', color: textColor, fontSize: 13, lineHeight: '1.8' }}>
-                        <div style={{ fontWeight: 'bold', color: headingColor }}>
-                            Bạn gặp khó khăn khi tạo tài khoản?
-                        </div>
-                        <div>
-                            Vui lòng gọi tới số <span style={{ color: primaryColor, fontWeight: 'bold' }}>1900 6868</span> (giờ hành chính).
-                        </div>
-                        <div style={{ marginTop: 15, color: '#bfbfbf', fontWeight: '500' }}>
-                            © 2026. All Rights Reserved. JobsNow.
-                        </div>
-                    </div>
-                </Form>
-            </div>
-        </div>
+            {/* CSS CHỌN LỌC XỬ LÝ HIỆU ỨNG HOVER VÀ RESPONSIVE */}
+            <style>{`
+                /* Hiệu ứng Nút Đăng nhập chính */
+                .primary-btn-hover:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(22, 119, 255, 0.4) !important;
+                    background-color: #0958d9 !important;
+                }
+
+                /* Hiệu ứng Nút Google/Facebook */
+                .social-btn-hover:hover {
+                    transform: translateY(-2px);
+                    border-color: #1677ff !important;
+                    color: #1677ff !important;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+                }
+                
+                /* Hiệu ứng cho riêng chữ Facebook khi hover đổi sang xanh dương */
+                .facebook-btn-hover:hover {
+                    border-color: #1877f2 !important;
+                    color: #1877f2 !important;
+                }
+
+                /* Hiệu ứng Input */
+                .custom-input:hover, .custom-input:focus, .custom-input-focused {
+                    border-color: #1677ff !important;
+                    background-color: #ffffff !important;
+                    box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1) !important;
+                }
+
+                /* Hiệu ứng Thẻ Glass (Trích dẫn) */
+                .glass-card:hover {
+                    background-color: rgba(255, 255, 255, 0.15) !important;
+                    border-color: rgba(255, 255, 255, 0.4) !important;
+                    transform: translateX(4px);
+                }
+
+                /* Hiệu ứng Link Text */
+                .hover-link:hover {
+                    text-decoration: underline;
+                    opacity: 0.8;
+                }
+
+                @media (max-width: 768px) {
+                    .mobile-only-header {
+                        display: block !important;
+                    }
+                }
+            `}</style>
+        </Row>
     );
 };
 

@@ -1,286 +1,424 @@
-/* ================= BỐ CỤC CHUNG ================= */
-.search-page-container {
+/* ================= TÔNG MÀU XANH DƯƠNG CHỦ ĐẠO ================= */
+.topcv-search-container {
+    background-color: #f8fafc;
     min-height: 100vh;
+    color: #1f2937;
     padding-bottom: 60px;
-    transition: background 0.3s ease;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-.search-page-container.light {
-    background: #f8fafc;
-    color: #1e293b;
-}
-
-.search-page-container.dark {
-    background: #0f172a;
-    color: #f1f5f9;
-}
-
-/* ================= THANH TÌM KIẾM CỐ ĐỊNH ================= */
-.top-search-bar {
-    background: #001529;
-    padding: 20px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+/* TOP SEARCH BAR */
+.topcv-header-search {
+    background: #0a192f;
+    padding: 16px 20px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     position: sticky;
     top: 0;
     z-index: 100;
 }
 
-.top-search-inner {
+.topcv-search-inner {
     max-width: 1200px;
     margin: 0 auto;
     display: flex;
     gap: 12px;
     align-items: center;
-    flex-wrap: wrap;
 }
 
-.search-input-field {
+/* 🌟 CẤU HÌNH INPUT TÌM KIẾM & PLACEHOLDER RÕ NÉT */
+.topcv-input-search {
     flex: 1.5;
-    min-width: 220px;
+    background-color: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #0f172a !important;
     height: 44px;
     border-radius: 8px;
-    font-size: 15px;
+    font-size: 14px;
 }
 
-.search-select-field {
+.topcv-input-search input {
+    color: #0f172a !important;
+}
+
+/* Đổi màu chữ Placeholder của Input */
+.topcv-input-search input::placeholder {
+    color: #64748b !important;
+    opacity: 1 !important;
+}
+
+/* 🌟 CẤU HÌNH SELECT CÁC Ô TỈNH / PHƯỜNG XÃ & PLACEHOLDER */
+.topcv-select-search {
     flex: 1;
     min-width: 160px;
     height: 44px;
 }
 
-.btn-search-submit {
+.topcv-select-search .ant-select-selector {
+    height: 44px !important;
+    border-radius: 8px !important;
+    display: flex;
+    align-items: center;
+    border: 1px solid #cbd5e1 !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+}
+
+/* Đổi màu chữ Placeholder của Antd Select */
+.topcv-select-search .ant-select-selection-placeholder {
+    color: #64748b !important;
+    font-size: 14px;
+    line-height: 42px !important;
+    opacity: 1 !important;
+}
+
+/* Căn chỉnh màu chữ đã chọn và Icon bên trong Select */
+.topcv-select-search .ant-select-selection-item {
+    color: #0f172a !important;
+    line-height: 42px !important;
+    font-weight: 500;
+}
+
+.topcv-select-search .ant-select-arrow {
+    color: #64748b !important;
+}
+
+/* NÚT TÌM KIẾM MÀU XANH DƯƠNG */
+.topcv-btn-search {
+    background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%) !important;
+    border: none !important;
     height: 44px;
     padding: 0 28px;
-    background: #00b96b !important;
-    border-color: #00b96b !important;
-    border-radius: 8px;
-    font-weight: bold;
+    font-weight: 700;
     font-size: 15px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(22, 119, 255, 0.3) !important;
+    transition: all 0.25s ease !important;
 }
 
-.btn-search-submit:hover {
-    background: #009655 !important;
+.topcv-btn-search:hover {
+    background: linear-gradient(135deg, #4096ff 0%, #1677ff 100%) !important;
+    box-shadow: 0 6px 16px rgba(22, 119, 255, 0.4) !important;
 }
 
-/* ================= BỐ CỤC SIDEBAR & BÀI TUYỂN DỤNG ================= */
-.main-layout {
+/* BỐ CỤC CHÍNH */
+.topcv-main-layout {
     max-width: 1200px;
-    margin: 30px auto 0 auto;
+    margin: 28px auto 0 auto;
     padding: 0 20px;
     display: grid;
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 310px 1fr;
     gap: 24px;
 }
 
 /* SIDEBAR BỘ LỌC */
-.filter-sidebar {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 20px;
+.topcv-sidebar-filter {
+    background-color: #ffffff;
     border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 22px;
     height: fit-content;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
 }
 
-.dark .filter-sidebar {
-    background: #1e293b;
-    border-color: #334155;
-}
-
-.filter-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.filter-title-main {
+    font-size: 18px;
+    font-weight: 700;
     margin-bottom: 20px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #f1f5f9;
-}
-
-.dark .filter-header {
-    border-bottom-color: #334155;
-}
-
-.filter-sidebar-title {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 700;
     color: #0f172a;
-}
-
-.dark .filter-sidebar-title {
-    color: #f8fafc;
-}
-
-.filter-section {
-    margin-bottom: 24px;
-}
-
-.filter-section-title {
-    font-weight: 600;
-    margin-bottom: 12px;
-    font-size: 14px;
-    color: #334155;
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.dark .filter-section-title {
-    color: #cbd5e1;
-}
-
-.radio-group-vertical {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.dark .ant-radio-wrapper {
-    color: #cbd5e1;
-}
-
-.btn-apply-sidebar {
-    height: 42px;
-    font-weight: bold;
-    border-radius: 8px;
-    background: #1677ff;
-}
-
-/* BẢNG THẺ BÀI TUYỂN DỤNG */
-.result-count-header {
+.filter-group {
     margin-bottom: 16px;
+}
+
+.filter-group-title {
     font-size: 15px;
-    font-weight: 500;
-}
-
-.job-cards-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.job-item-card {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 20px;
-    border: 1px solid #e2e8f0;
-    transition: all 0.25s ease;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
-}
-
-.dark .job-item-card {
-    background: #1e293b;
-    border-color: #334155;
-}
-
-.job-item-card:hover {
-    border-color: #60a5fa;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.1);
-}
-
-.job-item-card.promoted-item {
-    border: 2px solid #f59e0b;
-    background: linear-gradient(180deg, #ffffff 0%, #fffbeb 100%);
-}
-
-.dark .job-item-card.promoted-item {
-    background: linear-gradient(180deg, #1e293b 0%, #291e11 100%);
-}
-
-.job-card-header {
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-}
-
-.company-logo {
-    width: 60px;
-    height: 60px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 1px solid #f1f5f9;
-}
-
-.job-meta {
-    flex: 1;
-}
-
-.job-campaign-title {
-    margin: 0 0 4px 0;
-    font-size: 17px;
     font-weight: 700;
-    color: #0f172a;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    color: #1e293b;
+    margin-bottom: 12px;
 }
 
-.dark .job-campaign-title {
-    color: #f8fafc;
+.filter-divider {
+    height: 1px;
+    background-color: #f1f5f9;
+    margin: 18px 0;
 }
 
-.company-name {
-    color: #475569;
-    font-size: 14px;
-    font-weight: 500;
-}
-
-.dark .company-name {
-    color: #94a3b8;
-}
-
-.job-location {
-    font-size: 13px;
-    color: #64748b;
-    margin-top: 6px;
-}
-
-.job-action-box {
+/* DANH MỤC NGHỀ CÂY */
+.category-tree-list {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
     gap: 12px;
 }
 
-.salary-text {
+.category-parent-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cat-name {
+    color: #334155;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.cat-name.active {
+    color: #1677ff;
+    font-weight: 700;
+}
+
+.expand-icon {
+    color: #64748b;
+    cursor: pointer;
+    padding: 2px 6px;
+}
+
+.category-chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+    padding-left: 24px;
+}
+
+.sub-cat-chip {
+    background-color: #f1f5f9;
+    color: #475569;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+}
+
+.sub-cat-chip:hover, .sub-cat-chip.selected {
+    background-color: #1677ff;
+    color: #ffffff;
+    border-color: #1677ff;
+}
+
+/* DÒNG XEM THÊM */
+.toggle-see-more-btn {
+    margin-top: 12px;
+    color: #1677ff;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.2s;
+}
+
+.toggle-see-more-btn:hover {
+    color: #0958d9;
+    text-decoration: underline;
+}
+
+/* CHECKBOX & RADIO */
+.radio-grid-2col, .checkbox-grid-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 8px;
+}
+
+.ant-radio-wrapper, .ant-checkbox-wrapper {
+    color: #334155 !important;
+    font-size: 13px !important;
+}
+
+.ant-radio-checked .ant-radio-inner, .ant-checkbox-checked .ant-checkbox-inner {
+    background-color: #1677ff !important;
+    border-color: #1677ff !important;
+}
+
+/* KHOẢNG LƯƠNG */
+.custom-salary-range {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.custom-salary-range .ant-input-affix-wrapper {
+    background-color: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #0f172a !important;
+    border-radius: 16px;
+    height: 36px;
+}
+
+.custom-salary-range input::placeholder {
+    color: #94a3b8 !important;
+}
+
+.range-dash {
+    color: #94a3b8;
+}
+
+/* FOOTER SIDEBAR - NÚT XÓA LỌC */
+.filter-actions-footer {
+    display: flex;
+    justify-content: center;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.btn-reset-filter {
+    color: #64748b !important;
+    font-weight: 600;
+    width: 100%;
+    height: 38px;
+    border-radius: 8px;
+    transition: all 0.25s ease !important;
+}
+
+.btn-reset-filter:hover {
+    color: #ff4d4f !important;
+    background-color: #fff1f0 !important;
+}
+
+.btn-reset-filter:active, .btn-reset-filter:focus {
+    color: #cf1322 !important;
+    background-color: #ffccc7 !important;
+}
+
+/* DANH SÁCH BÀI TUYỂN DỤNG */
+.results-count-text {
+    font-size: 15px;
+    margin-bottom: 16px;
+    color: #334155;
+}
+
+.job-list-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.topcv-job-card {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 18px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+.topcv-job-card.promoted {
+    border: 1.5px solid #f59e0b !important;
+    background: linear-gradient(180deg, #ffffff 0%, #fffbeb 100%) !important;
+}
+
+.topcv-job-card.promoted:hover {
+    border-color: #d97706 !important;
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.2) !important;
+}
+
+.card-main-content {
+    display: flex;
+    gap: 16px;
+}
+
+.company-logo-img {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #f1f5f9;
+    background-color: #ffffff;
+}
+
+.job-details-col {
+    flex: 1;
+}
+
+.job-title-text {
     font-size: 16px;
     font-weight: 700;
-    color: #059669;
+    color: #0f172a;
+    margin: 0 0 4px 0;
 }
 
-.heart-btn {
-    padding: 4px;
-    cursor: pointer;
-    transition: transform 0.2s;
+.company-name-text {
+    font-size: 13px;
+    color: #475569;
+    margin-bottom: 8px;
+    font-weight: 500;
 }
 
-.heart-btn:hover {
-    transform: scale(1.2);
-}
-
-.job-tags-row {
-    margin-top: 14px;
-    padding-top: 12px;
-    border-top: 1px dashed #f1f5f9;
+.job-badges-row {
     display: flex;
     gap: 8px;
+    margin-bottom: 8px;
     flex-wrap: wrap;
 }
 
-.dark .job-tags-row {
-    border-top-color: #334155;
-}
-
-.position-tag {
-    border-radius: 6px;
+.badge-item {
+    background-color: #f1f5f9;
+    color: #475569;
     padding: 2px 10px;
+    border-radius: 4px;
     font-size: 12px;
 }
 
-.empty-card {
-    text-align: center;
+.job-description-snippet {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.card-right-col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: space-between;
+}
+
+.job-salary-highlight {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1677ff;
+}
+
+.heart-icon-btn {
+    cursor: pointer;
+    padding: 4px;
+    transition: transform 0.2s;
+}
+
+.heart-icon-btn:hover {
+    transform: scale(1.15);
+}
+
+.empty-results-box {
+    text-align: center; 
     padding: 60px 0;
+    background-color: #ffffff;
     border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+
+.topcv-select-search.ant-select-disabled .ant-select-selector {
+    background-color: #f1f5f9 !important; 
+    border-color: #cbd5e1 !important;
+    cursor: not-allowed !important;
+}
+
+/* Đổi màu chữ Placeholder khi bị Disabled */
+.topcv-select-search.ant-select-disabled .ant-select-selection-placeholder {
+    color: #94a3b8 !important; /* Màu xám nhạt dễ đọc */
+    line-height: 42px !important;
+    opacity: 1 !important;
+}
+
+/* Đổi màu Icon vị trí khi bị Disabled */
+.topcv-select-search.ant-select-disabled .ant-select-arrow {
+    color: #94a3b8 !important;
 }

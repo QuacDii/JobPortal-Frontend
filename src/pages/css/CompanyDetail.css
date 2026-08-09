@@ -1,0 +1,208 @@
+.company-detail-container {
+    background-color: #0b1329;
+    min-height: 100vh;
+    color: #ffffff;
+    padding: 30px 20px 60px 20px;
+}
+
+.company-header-card {
+    max-width: 1200px;
+    margin: 0 auto;
+    background-color: #1e293b;
+    border-radius: 16px;
+    border: 1px solid #334155;
+    overflow: hidden;
+}
+
+.header-profile-bar {
+    padding: 24px 30px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    border-bottom: 1px solid #334155;
+}
+
+.header-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    background-color: #ffffff;
+    padding: 4px;
+    object-fit: contain;
+    border: 1px solid #334155;
+    flex-shrink: 0;
+}
+
+.header-info {
+    flex: 1;
+}
+
+.company-name {
+    font-size: 22px;
+    font-weight: 800;
+    color: #ffffff;
+    margin: 0 0 6px 0;
+}
+
+.company-meta {
+    display: flex;
+    gap: 20px;
+    color: #94a3b8;
+    font-size: 13.5px;
+}
+
+.company-tabs-bar {
+    padding: 10px 30px 30px 30px;
+}
+
+.company-tabs-bar .ant-tabs-nav::before {
+    border-bottom-color: #334155 !important;
+}
+
+.company-tabs-bar .ant-tabs-tab-btn {
+    color: #94a3b8 !important;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.company-tabs-bar .ant-tabs-tab-active .ant-tabs-tab-btn {
+    color: #38bdf8 !important;
+}
+
+.company-tabs-bar .ant-tabs-ink-bar {
+    background-color: #1677ff !important;
+}
+
+.detail-section-card, .detail-sidebar-card {
+    background-color: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 24px;
+    margin-top: 16px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 20px;
+}
+
+.company-html-desc {
+    color: #cbd5e1;
+    line-height: 1.7;
+    font-size: 14.5px;
+}
+
+.info-item {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.info-icon {
+    font-size: 20px;
+    color: #38bdf8;
+    margin-top: 4px;
+}
+
+.info-label {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.info-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #f1f5f9;
+}
+
+.location-text {
+    color: #cbd5e1;
+    margin-bottom: 14px;
+    font-size: 13.5px;
+}
+
+.jobs-tab-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.jobs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.company-job-card {
+    background-color: #0b1329;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 18px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.2s;
+}
+
+.company-job-card:hover {
+    border-color: #1677ff;
+    transform: translateY(-2px);
+}
+
+.job-info {
+    flex: 1;
+}
+
+.job-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0 0 6px 0;
+}
+
+.job-company {
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 10px;
+}
+
+.job-tags {
+    display: flex;
+    gap: 8px;
+}
+
+.tag-chip {
+    background-color: #1e293b;
+    color: #94a3b8;
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 4px;
+}
+
+.job-right {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 12px;
+}
+
+.job-salary {
+    font-size: 16px;
+    font-weight: 700;
+    color: #38bdf8;
+}
+
+.heart-icon-btn {
+    cursor: pointer;
+    padding: 4px;
+    transition: transform 0.2s;
+}
+
+.heart-icon-btn:hover {
+    transform: scale(1.2);
+}

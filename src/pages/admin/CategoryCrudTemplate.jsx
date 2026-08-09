@@ -8,6 +8,7 @@ import {
     AppstoreOutlined, MergeOutlined, CheckCircleOutlined, ClockCircleOutlined 
 } from '@ant-design/icons';
 import apiClient from '../../api/apiClient';
+import '../css/CategoryCrudTemplate.css';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -149,6 +150,7 @@ const KyNangAdmin = () => {
             key: 'maKyNang',
             width: 80,
             align: 'center',
+            render: (text) => <span className="id-badge">#{text}</span>
         },
         {
             title: 'Tên Kỹ năng',
@@ -290,6 +292,7 @@ const KyNangAdmin = () => {
                     loading={loading}
                     pagination={{ pageSize: 10 }}
                     bordered
+                    rowClassName="hoverable-row"
                 />
             </Card>
 

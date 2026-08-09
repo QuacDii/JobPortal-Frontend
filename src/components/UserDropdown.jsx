@@ -15,7 +15,8 @@ import {
     KeyOutlined,
     MailOutlined,
     CheckCircleFilled,
-    ExclamationCircleFilled
+    HeartOutlined,
+    SendOutlined
 } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -26,14 +27,13 @@ const getIsEmailVerifiedFromToken = () => {
     try {
         const base64Url = token.split('.')[1];
         const decoded = JSON.parse(decodeURIComponent(atob(base64Url.replace(/-/g, '+').replace(/_/g, '/')).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')));
-        
-        const role = decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"];
 
-        if (role === "0") return true; 
+        const role = decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"];
+        if (role === "0") return true;
 
         return decoded.isEmailVerified === 'true' || decoded.isEmailVerified === true;
-    } catch (e) { 
-        return false; 
+    } catch (e) {
+        return false;
     }
 };
 
@@ -167,14 +167,14 @@ const UserDropdown = ({ user, onLogout }) => {
                         else if (typeof actualData === 'string' && actualData.trim().startsWith('http')) setLiveAvatar(actualData);
                     }
                 })
-                .catch(() => {});
+                .catch(() => { });
 
             apiClient.get(`/User/profile/${userId}`)
                 .then(res => {
                     const data = res.data || res;
                     if (data?.isEmailVerified !== undefined) setIsEmailVerified(data.isEmailVerified);
                 })
-                .catch(() => {});
+                .catch(() => { });
         }
     }, [user]);
 
@@ -194,8 +194,18 @@ const UserDropdown = ({ user, onLogout }) => {
             icon: <SolutionOutlined style={{ fontSize: 18 }} />,
             label: <span style={{ fontWeight: 500 }}>Quản lý tìm việc</span>,
             children: [
-                { key: 'viec-lam-da-luu', label: 'Việc làm đã lưu', onClick: () => navigate('/viec-lam-da-luu') },
-                { key: 'viec-lam-da-ung-tuyen', label: 'Việc làm đã ứng tuyển', onClick: () => navigate('/viec-lam-da-ung-tuyen') },
+                {
+                    key: 'viec-lam-da-luu',
+                    icon: <HeartOutlined style={{ color: '#ff4d4f' }} />,
+                    label: 'Việc làm yêu thích',
+                    onClick: () => navigate('/viec-lam-da-luu') 
+                },
+                {
+                    key: 'viec-lam-da-ung-tuyen',
+                    icon: <SendOutlined style={{ color: '#1890ff' }} />,
+                    label: 'Việc làm đã ứng tuyển',
+                    onClick: () => navigate('/viec-lam') 
+                },
             ],
         },
         {
@@ -203,7 +213,11 @@ const UserDropdown = ({ user, onLogout }) => {
             icon: <FilePdfOutlined style={{ fontSize: 18 }} />,
             label: <span style={{ fontWeight: 500 }}>Quản lý CV</span>,
             children: [
-                { key: 'cv-cua-toi', label: 'CV của tôi', onClick: () => navigate('/manage-cv') }
+                {
+                    key: 'cv-cua-toi',
+                    label: 'CV của tôi',
+                    onClick: () => navigate('/manage-cv')
+                }
             ],
         },
         {
@@ -211,9 +225,24 @@ const UserDropdown = ({ user, onLogout }) => {
             icon: <SettingOutlined style={{ fontSize: 18 }} />,
             label: <span style={{ fontWeight: 500 }}>Quản lý tài khoản</span>,
             children: [
-                { key: 'thong-tin-ca-nhan', icon: <UserOutlined />, label: 'Thông tin cá nhân', onClick: () => navigate('/profile') },
-                { key: 'xac-thuc-email', icon: <MailOutlined />, label: 'Xác thực Email', onClick: () => navigate('/verify-email') },
-                { key: 'doi-mat-khau', icon: <KeyOutlined />, label: 'Đổi mật khẩu', onClick: () => navigate('/change-password') },
+                {
+                    key: 'thong-tin-ca-nhan',
+                    icon: <UserOutlined />,
+                    label: 'Thông tin cá nhân',
+                    onClick: () => navigate('/profile')
+                },
+                {
+                    key: 'xac-thuc-email',
+                    icon: <MailOutlined />,
+                    label: 'Xác thực Email',
+                    onClick: () => navigate('/verify-email')
+                },
+                {
+                    key: 'doi-mat-khau',
+                    icon: <KeyOutlined />,
+                    label: 'Quên / Đổi mật khẩu',
+                    onClick: () => navigate('/forgot-password')
+                },
             ],
         },
         { type: 'divider', style: { borderColor: themeColors.borderColor, margin: '8px 0' } },
@@ -231,14 +260,13 @@ const UserDropdown = ({ user, onLogout }) => {
 
     const popoverContent = (
         <div style={{ width: '340px', paddingBottom: '4px' }}>
-            {/* THÔNG TIN USER */}
             <div style={{ display: 'flex', alignItems: 'center', padding: '20px 20px 16px 20px', gap: '14px' }}>
                 <div style={{ position: 'relative' }}>
-                    <Avatar 
-                        size={58} 
-                        src={displayAvatar} 
+                    <Avatar
+                        size={58}
+                        src={displayAvatar}
                         className={actualIsVip ? 'vip-avatar-glow' : ''}
-                        style={{ border: actualIsVip ? '2px solid #faad14' : '2px solid #1890ff' }} 
+                        style={{ border: actualIsVip ? '2px solid #faad14' : '2px solid #1890ff' }}
                     />
                     {actualIsVip && (
                         <div className="vip-badge-premium" style={{ position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', color: '#000', fontSize: '10px', fontWeight: '900', padding: '2px 8px', borderRadius: '12px', whiteSpace: 'nowrap', letterSpacing: '0.5px' }}>
@@ -248,8 +276,6 @@ const UserDropdown = ({ user, onLogout }) => {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     <Text style={{ color: themeColors.textColor, fontSize: 17, fontWeight: '700', letterSpacing: '0.3px' }} ellipsis>{displayName}</Text>
-                    
-                    {/* KHỐI EMAIL & HUY HIỆU XÁC THỰC */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: 2 }}>
                         <Text style={{ color: themeColors.subTextColor, fontSize: 13, maxWidth: '170px' }} ellipsis>{displayEmail}</Text>
                         {isEmailVerified ? (
@@ -258,9 +284,9 @@ const UserDropdown = ({ user, onLogout }) => {
                             </Tooltip>
                         ) : (
                             <Tooltip title="Email chưa xác thực - Bấm để xác thực ngay">
-                                <Tag 
-                                    color="warning" 
-                                    onClick={() => navigate('/verify-email')}
+                                <Tag
+                                    color="warning"
+                                    onClick={() => navigate('/verify-email')} // Khớp <Route path="/verify-email" />[cite: 15]
                                     style={{ cursor: 'pointer', margin: 0, padding: '0 5px', fontSize: '10px', borderRadius: '4px' }}
                                 >
                                     Chưa xác thực
@@ -270,8 +296,7 @@ const UserDropdown = ({ user, onLogout }) => {
                     </div>
                 </div>
             </div>
-            
-            {/* KHỐI VIP BUTTON */}
+
             <div style={{ padding: '0 20px 16px 20px' }}>
                 {actualIsVip ? (
                     <>
@@ -284,7 +309,7 @@ const UserDropdown = ({ user, onLogout }) => {
                         <Button
                             block
                             className="btn-3d-hover"
-                            onClick={() => navigate('/upgrade-vip')}
+                            onClick={() => navigate('/upgrade-vip')} // Khớp <Route path="/upgrade-vip" />[cite: 15]
                             style={{ background: 'rgba(250, 173, 20, 0.1)', color: '#faad14', fontWeight: 'bold', border: '1px solid #faad14', borderRadius: '8px', height: '40px' }}
                         >
                             Gia hạn gói VIP
@@ -295,7 +320,7 @@ const UserDropdown = ({ user, onLogout }) => {
                         block
                         className="btn-3d-hover"
                         icon={<CrownFilled />}
-                        onClick={() => navigate('/upgrade-vip')}
+                        onClick={() => navigate('/upgrade-vip')} // Khớp <Route path="/upgrade-vip" />[cite: 15]
                         style={{ background: 'linear-gradient(135deg, #faad14 0%, #ffc53d 100%)', color: '#000', fontWeight: 'bold', border: 'none', borderRadius: '8px', height: '40px', fontSize: '14px' }}
                     >
                         Nâng cấp tài khoản VIP
@@ -305,7 +330,6 @@ const UserDropdown = ({ user, onLogout }) => {
 
             <Divider style={{ margin: '0', borderColor: themeColors.borderColor }} />
 
-            {/* DANH SÁCH MENU */}
             <div style={{ padding: '8px' }}>
                 <Menu
                     className="premium-menu"
@@ -326,16 +350,16 @@ const UserDropdown = ({ user, onLogout }) => {
                 trigger="click"
                 placement="bottomRight"
                 arrow={false}
-                overlayInnerStyle={{ 
-                    backgroundColor: themeColors.popoverBg, 
-                    padding: 0, 
-                    border: `1px solid ${themeColors.borderColor}`, 
-                    borderRadius: '12px', 
-                    boxShadow: `0 10px 30px ${themeColors.shadowColor}` 
+                overlayInnerStyle={{
+                    backgroundColor: themeColors.popoverBg,
+                    padding: 0,
+                    border: `1px solid ${themeColors.borderColor}`,
+                    borderRadius: '12px',
+                    boxShadow: `0 10px 30px ${themeColors.shadowColor}`
                 }}
             >
                 <div className="user-dropdown-trigger" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px', padding: '6px 14px', borderRadius: '24px' }}>
-                    <Avatar src={displayAvatar} size={32} style={{ border: actualIsVip ? '1.5px solid #faad14' : '1px solid #1890ff' }}/>
+                    <Avatar src={displayAvatar} size={32} style={{ border: actualIsVip ? '1.5px solid #faad14' : '1px solid #1890ff' }} />
                     <span style={{ color: '#262626', fontWeight: 500, fontSize: '14px' }}>{displayName}</span>
                     <DownOutlined style={{ color: '#8c8c8c', fontSize: 12, marginLeft: '2px' }} />
                 </div>

@@ -128,11 +128,28 @@ const UpgradeVip = () => {
 
             const giaThucTe = (pkg.giaKhuyenMai && pkg.giaKhuyenMai > 0) ? pkg.giaKhuyenMai : pkg.giaTien;
 
-            const response = await apiClient.post(`/Payment/create?maUser=${maUser}&soTien=${giaThucTe}&maGoi=${pkg.maGoi}`);
-            const responseData = response.data || response;
+            // XỬ LÝ LUỒNG THANH TOÁN VNPAY
+            if (paymentMethod === 'VNPAY') {
+                const response = await apiClient.post('/Payment/create-vnpay-url', {
+                    maUser: parseInt(maUser),
+                    soTien: giaThucTe,
+                    maGoi: pkg.maGoi
+                });
+                const responseData = response.data || response;
 
-            if (responseData && responseData.url) {
-                if (paymentMethod === 'MOMO') {
+                if (responseData && responseData.paymentUrl) {
+                    message.success({ content: 'Đang chuyển hướng đến VNPay...', key: 'payment', duration: 2 });
+                    window.location.href = responseData.paymentUrl;
+                } else {
+                    throw new Error("Không nhận được URL thanh toán VNPay từ server");
+                }
+            }
+            // XỬ LÝ LUỒNG THANH TOÁN MOMO
+            else if (paymentMethod === 'MOMO') {
+                const response = await apiClient.post(`/Payment/create?maUser=${maUser}&soTien=${giaThucTe}&maGoi=${pkg.maGoi}`);
+                const responseData = response.data || response;
+
+                if (responseData && responseData.url) {
                     let orderId = new Date().getTime().toString();
 
                     try {
@@ -148,14 +165,9 @@ const UpgradeVip = () => {
                     message.success({ content: 'Khởi tạo MoMo thành công!', key: 'payment', duration: 2 });
                     setIsMomoModalVisible(true);
                     setIsPolling(true);
-
                 } else {
-                    message.success({ content: 'Đang chuyển hướng...', key: 'payment', duration: 2 });
-                    window.location.href = responseData.url;
+                    throw new Error("Không nhận được URL thanh toán MoMo từ server");
                 }
-
-            } else {
-                throw new Error("Không nhận được URL thanh toán từ server");
             }
 
         } catch (error) {

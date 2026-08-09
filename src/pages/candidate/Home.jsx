@@ -31,7 +31,6 @@ const Home = () => {
     const [thanhPhos, setThanhPhos] = useState([]);
     const [phuongXas, setPhuongXas] = useState([]);
 
-    // 🌟 Khai báo state nganhNghesTree bên trong Component
     const [nganhNghesTree, setNganhNghesTree] = useState([]);
     const [activeCategory, setActiveCategory] = useState(null);
     const [suggestedKeywords, setSuggestedKeywords] = useState([]);
@@ -292,21 +291,28 @@ const Home = () => {
                         <div className="category-flyout">
                             {activeCategory && activeCategory.danhSachCon && activeCategory.danhSachCon.length > 0 ? (
                                 <div>
-                                    <Title level={5} style={{ color: '#2563eb', marginBottom: 18, fontWeight: '700' }}>
+                                    {/* 🌟 Bấm vào Tiêu đề ngành cha -> Nhảy sang lọc ngành cha */}
+                                    <Title
+                                        level={5}
+                                        style={{ color: '#2563eb', marginBottom: 18, fontWeight: '700', cursor: 'pointer' }}
+                                        onClick={() => navigate(`/jobs?maNganh=${activeCategory.maNganh}&loaiNganh=cha`)}
+                                    >
                                         {activeCategory.tenNganh} — Vị trí tuyển dụng hàng đầu
                                     </Title>
+
                                     <Row gutter={[16, 14]}>
                                         {activeCategory.danhSachCon.map((sub) => (
                                             <Col span={12} key={sub.maNganh}>
+                                                {/* 🌟 Bấm vào Ngành con -> Nhảy sang lọc ngành con */}
                                                 <div
                                                     className="sub-category-card"
-                                                    onClick={() => navigate(`/jobs?maNganh=${sub.maNganh}`)}
+                                                    onClick={() => navigate(`/jobs?maNganh=${sub.maNganh}&loaiNganh=con`)}
                                                 >
                                                     <Text strong style={{ display: 'block', color: '#1e293b', fontSize: 14, paddingRight: 20 }}>
                                                         {sub.tenNganh}
                                                     </Text>
                                                     <Text type="secondary" style={{ fontSize: 12 }}>
-                                                        {sub.viTriChuyenMon?.length || 0} chuyên môn mở rộng
+                                                        Việc làm nổi bật
                                                     </Text>
                                                 </div>
                                             </Col>

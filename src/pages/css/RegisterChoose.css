@@ -1,0 +1,97 @@
+    .role-card {
+        background: #f8fafc;
+        border: 2px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 28px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .icon-wrapper {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        margin-bottom: 16px;
+        transition: all 0.3s ease;
+    }
+
+    .candidate-icon {
+        background-color: #e6f4ff;
+        color: #1677ff;
+    }
+
+    .employer-icon {
+        background-color: #f6ffed;
+        color: #52c41a;
+    }
+
+    /* Hover Thẻ Ứng viên */
+    .choice-candidate:hover {
+        border-color: #1677ff;
+        background: #ffffff;
+        transform: translateY(-6px);
+        box-shadow: 0 12px 24px rgba(22, 119, 255, 0.12);
+    }
+
+    .choice-candidate:hover .candidate-icon {
+        transform: scale(1.1);
+        background-color: #1677ff;
+        color: #ffffff;
+    }
+
+    /* Hover Thẻ Nhà tuyển dụng */
+    .choice-employer:hover {
+        border-color: #52c41a;
+        background: #ffffff;
+        transform: translateY(-6px);
+        box-shadow: 0 12px 24px rgba(82, 196, 26, 0.12);
+    }
+
+    .choice-employer:hover .employer-icon {
+        transform: scale(1.1);
+        background-color: #52c41a;
+        color: #ffffff;
+    }
+
+    .btn-role {
+        height: 44px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 14.5px;
+    }
+
+    .btn-candidate {
+        background-color: #1677ff;
+        border-color: #1677ff;
+    }
+
+    .btn-employer {
+        background-color: #52c41a;
+        border-color: #52c41a;
+    }
+
+    .hover-back-btn:hover {
+        color: #1677ff !important;
+        background: transparent !important;
+    }
+
+    .btn-employer:hover,
+    .btn-employer:focus,
+    .choice-employer:hover .btn-employer {
+        background-color: #389e0d !important;
+        border-color: #389e0d !important;
+        color: #ffffff !important;
+    }
+
+    .btn-candidate:hover,
+    .btn-candidate:focus,
+    .choice-candidate:hover .btn-candidate {
+        background-color: #0958d9 !important;
+        border-color: #0958d9 !important;
+        color: #ffffff !important;
+    }
