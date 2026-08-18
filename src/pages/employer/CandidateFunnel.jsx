@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Table, Tag, Button, Modal, Input, message, Tooltip,
-    Slider, Row, Col, Progress, Card, Space, Typography, Alert, Spin, Image, Popover
+    Slider, Row, Col, Progress, Card, Space, Typography, Alert, Spin, Image, Popover, Tabs, Badge
 } from 'antd';
 import { 
     RobotOutlined, FilePdfOutlined, CalendarOutlined, 
     CrownOutlined, EyeOutlined, FormOutlined, SwapOutlined, 
-    CheckCircleOutlined, CloseCircleOutlined
+    CheckCircleOutlined, CloseCircleOutlined, AppstoreOutlined, ArrowLeftOutlined,
+    UserOutlined
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../../api/apiClient';
@@ -17,18 +18,23 @@ const { TextArea } = Input;
 const CandidateFunnel = () => {
     const { maViTri } = useParams(); 
     const navigate = useNavigate();
+    
     const [candidates, setCandidates] = useState([]);
+    const [positions, setPositions] = useState([]);
+    const [campaignTitle, setCampaignTitle] = useState('');
+    const [activePositionKey, setActivePositionKey] = useState(null);
+
     const [loading, setLoading] = useState(true);
     const [isPremium, setIsPremium] = useState(false);
 
-    // --- STATE LỌC & AI MATCHING (DÀNH CHO PREMIUM) ---
+    // --- STATE LỌC & AI MATCHING ---
     const [matchRange, setMatchRange] = useState([0, 100]);
     const [statusFilter, setStatusFilter] = useState(null);
     const [selectedRowKeys, setSelectedRowKeys] = useState([]);
     const [selectedCandidates, setSelectedCandidates] = useState([]);
     const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
 
-    // --- STATE XEM CV & HẸN PHỎNG VẤN (DÀNH CHO CẢ 2 TÀI KHOẢN) ---
+    // --- STATE XEM CV & HẸN PHỎNG VẤN ---
     const [selectedCandidate, setSelectedCandidate] = useState(null);
     const [isViewCvModalOpen, setIsViewCvModalOpen] = useState(false);
     const [newStatus, setNewStatus] = useState(0);
@@ -49,49 +55,93 @@ const CandidateFunnel = () => {
             const isSubscribed = response?.isPremium ?? response?.data?.isPremium ?? false;
             setIsPremium(Boolean(isSubscribed));
         } catch (error) {
-            console.error("Lỗi kiểm tra gói dịch vụ:", error);
             setIsPremium(false);
         }
     };
 
-    // 2. Lấy danh sách ứng viên (Lưu raw data)
+    // 2. Lấy danh sách ứng viên & các vị trí thuộc chiến dịch
     const fetchCandidates = async () => {
         setLoading(true);
         try {
             const response = await apiClient.get(`/employer/jobs/${maViTri}/candidates`);
-            const list = Array.isArray(response) ? response : (Array.isArray(response?.data) ? response.data : []);
-            setCandidates(list);
+            const payload = response?.data || response;
+            
+            const list = Array.isArray(payload) ? payload : (payload?.data || payload?.candidates || []);
+            let posList = payload?.positions || [];
+            
+            setCandidates(Array.isArray(list) ? list : []);
+            
+            // Tự động phân tách danh sách vị trí nếu backend trả về danh sách ứng viên tổng hợp
+            if (posList.length === 0 && list.length > 0) {
+                const uniqueMap = new Map();
+                list.forEach(item => {
+                    if (item.maViTri && !uniqueMap.has(item.maViTri)) {
+                        uniqueMap.set(item.maViTri, {
+                            maViTri: item.maViTri,
+                            tenViTri: item.tenViTri || `Vị trí #${item.maViTri}`,
+                            soLuongUngVien: list.filter(c => c.maViTri === item.maViTri).length
+                        });
+                    }
+                });
+                posList = Array.from(uniqueMap.values());
+            }
+
+            setPositions(posList);
+
+            if (payload?.tieuDeChienDich) {
+                setCampaignTitle(payload.tieuDeChienDich);
+            }
+
+            // Thiết lập vị trí hiển thị mặc định
+            if (posList.length > 0) {
+                const matchedPos = posList.find(p => String(p.maViTri) === String(maViTri));
+                const defaultKey = matchedPos ? String(matchedPos.maViTri) : String(posList[0].maViTri);
+                setActivePositionKey(prev => prev || defaultKey);
+            }
         } catch (error) {
-            console.error("Lỗi khi tải danh sách ứng viên:", error);
             message.error("Lỗi khi tải danh sách ứng viên!");
-            setCandidates([]); 
+            setCandidates([]);
+            setPositions([]);
         } finally {
             setLoading(false);
         }
     };
 
-    // 3. HÀM LỌC DỮ LIỆU ĐA TIÊU CHÍ TỰ ĐỘNG (MATCHING SCORE + STATUS PHỄU)
-    const filteredCandidates = candidates.filter(cand => {
+    // Khi chuyển Tab giữa các vị trí: Xóa sạch hàng đã chọn để chống so sánh chéo vị trí
+    const handleTabChange = (key) => {
+        setActivePositionKey(key);
+        setSelectedRowKeys([]);
+        setSelectedCandidates([]);
+        setStatusFilter(null);
+        setMatchRange([0, 100]);
+    };
+
+    // Vị trí đang được xem phễu hiện tại
+    const currentPosition = positions.find(p => String(p.maViTri) === String(activePositionKey));
+
+    // Tập ứng viên nộp riêng cho vị trí đang chọn
+    const currentPositionCandidates = candidates.filter(cand => 
+        !activePositionKey || String(cand.maViTri) === String(activePositionKey)
+    );
+
+    // Lọc theo trạng thái và khoảng điểm AI Matching cho vị trí đó
+    const filteredCandidates = currentPositionCandidates.filter(cand => {
         const score = cand.diemMatchingTong || 0; 
         const matchesScore = score >= matchRange[0] && score <= matchRange[1];
         const matchesStatus = (statusFilter === null || statusFilter === undefined) 
             ? true 
             : cand.trangThai === statusFilter;
+
         return matchesScore && matchesStatus;
     });
 
-    // 🌟 HÀM TÁCH CHUỖI THÀNH DẠNG DANH SÁCH GẠCH ĐẦU DÒNG (XUỐNG HÀNG TỪNG Ý)
     const renderBulletList = (text) => {
         if (!text) return <p style={{ margin: '4px 0 8px 0', fontSize: 12, color: '#94a3b8' }}>Không có</p>;
-
-        // Tách chuỗi dựa trên dấu gạch đầu dòng '- ' hoặc xuống dòng '\n'
         const items = text
             .split(/(?:\r?\n|\s*-\s+)/)
             .map(item => item.trim())
             .filter(Boolean);
-
         if (items.length === 0) return <p style={{ margin: '4px 0 8px 0', fontSize: 12, color: '#94a3b8' }}>Không có</p>;
-
         return (
             <ul style={{ margin: '4px 0 10px 0', paddingLeft: 18, fontSize: 12, lineHeight: '1.5' }}>
                 {items.map((item, idx) => (
@@ -103,7 +153,7 @@ const CandidateFunnel = () => {
         );
     };
 
-    // 4. Kích hoạt AI chạy lẻ cho 1 CV cũ
+    // 4. Kích hoạt AI chấm điểm lại
     const handleTriggerAiSingle = async (maDon) => {
         try {
             message.loading({ content: "Đang gửi yêu cầu phân tích AI...", key: "ai_loading" });
@@ -138,7 +188,7 @@ const CandidateFunnel = () => {
         }
     };
 
-    // 6. Mở Modal Soi CV và đổi trạng thái "Đã xem" ngầm
+    // 6. Mở Modal Xem CV
     const handleOpenViewCvModal = async (record) => {
         setSelectedCandidate(record);
         setIsViewCvModalOpen(true);
@@ -150,7 +200,7 @@ const CandidateFunnel = () => {
             try {
                 await apiClient.put(`/employer/applications/${record.maDon}/status`, { status: 1 });
             } catch (error) {
-                console.error("Lỗi cập nhật ngầm trạng thái đã xem:", error);
+                console.error("Lỗi cập nhật trạng thái đã xem:", error);
             }
         } else {
             setNewStatus(record.trangThai);
@@ -181,9 +231,7 @@ const CandidateFunnel = () => {
                 </div>
             );
         }
-
         if (isPdfUrl(cvUrl)) {
-            // Nhúng Google Docs Viewer giúp preview PDF chuẩn xác trên mọi trình duyệt
             const pdfViewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(cvUrl)}&embedded=true`;
             return (
                 <iframe 
@@ -193,7 +241,6 @@ const CandidateFunnel = () => {
                 />
             );
         }
-
         return (
             <div style={{ 
                 width: '100%', height: '500px', maxHeight: '500px', 
@@ -223,7 +270,6 @@ const CandidateFunnel = () => {
         return '#f5222d';
     };
 
-    // POPOVER SOI 4 CHỈ SỐ AI KHI HOVER
     const renderMatchDetailPopover = (record) => (
         <div style={{ width: 260, padding: 4 }}>
             <Text strong style={{ display: 'block', marginBottom: 8, borderBottom: '1px solid #f0f0f0', paddingBottom: 4 }}>
@@ -258,48 +304,32 @@ const CandidateFunnel = () => {
         </div>
     );
 
-    // 🌟 HÀM HELPER RENDER TAG GỌN ĐẸP + TOOLTIP FULL NỘI DUNG
     const renderCompactTag = (text, isSuccess) => {
         if (!text) return null;
         const Icon = isSuccess ? CheckCircleOutlined : CloseCircleOutlined;
         const color = isSuccess ? 'success' : 'error';
-
         return (
             <Tooltip 
-                title={
-                    <div style={{ maxHeight: 220, overflowY: 'auto', padding: '4px 2px', lineHeight: '1.5' }}>
-                        {text}
-                    </div>
-                } 
+                title={<div style={{ maxHeight: 220, overflowY: 'auto', padding: '4px 2px', lineHeight: '1.5' }}>{text}</div>} 
                 placement="bottomLeft"
                 overlayStyle={{ maxWidth: 450 }}
             >
                 <Tag 
                     color={color} 
                     style={{ 
-                        fontSize: 11, 
-                        margin: '2px 0', 
-                        borderRadius: 4,
-                        maxWidth: 380, // Khống chế chiều rộng tối đa tránh làm phình hàng
-                        overflow: 'hidden', 
-                        textOverflow: 'ellipsis', 
-                        whiteSpace: 'nowrap',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        cursor: 'pointer'
+                        fontSize: 11, margin: '2px 0', borderRadius: 4, maxWidth: 350,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer'
                     }}
                 >
                     <Icon style={{ flexShrink: 0 }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {text}
-                    </span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span>
                 </Tag>
             </Tooltip>
         );
     };
 
-    // --- CỘT BẢNG PREMIUM (CÓ AI MATCHING, POPOVER & TAGS TÓM TẮT) ---
+    // --- CỘT BẢNG PREMIUM ---
     const premiumColumns = [
         {
             title: 'Ứng viên',
@@ -308,8 +338,6 @@ const CandidateFunnel = () => {
                 <div>
                     <Text strong style={{ fontSize: 14 }}>{record.hoTen || "Ứng viên"}</Text>
                     <div style={{ fontSize: '12px', color: '#64748b' }}>{record.email}</div>
-                    
-                    {/* 🌟 CẬP NHẬT: Render Tag gọn gàng bằng renderCompactTag */}
                     <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
                         {renderCompactTag(record.diemManhTieuBieu, true)}
                         {renderCompactTag(record.diemConThieu, false)}
@@ -321,12 +349,14 @@ const CandidateFunnel = () => {
             title: 'Ngày nộp',
             dataIndex: 'ngayNop',
             key: 'ngayNop',
+            width: 130,
             render: (date) => new Date(date).toLocaleDateString('vi-VN')
         },
         {
             title: 'Độ khớp AI (Matching)',
             dataIndex: 'diemMatchingTong',
             key: 'diemMatchingTong',
+            width: 190,
             sorter: (a, b) => (a.diemMatchingTong || 0) - (b.diemMatchingTong || 0),
             render: (score, record) => (
                 <Popover content={renderMatchDetailPopover(record)} trigger="hover" placement="right">
@@ -352,11 +382,13 @@ const CandidateFunnel = () => {
             title: 'Trạng thái',
             dataIndex: 'trangThai',
             key: 'trangThai',
+            width: 140,
             render: (status) => renderStatusTag(status)
         },
         {
             title: 'Hành động',
             key: 'hanhDong',
+            width: 180,
             align: 'center',
             render: (_, record) => {
                 if (record.isPendingAi) {
@@ -384,7 +416,7 @@ const CandidateFunnel = () => {
         }
     ];
 
-    // --- CỘT BẢNG THƯỜNG (DÀNH CHO TÀI KHOẢN BASIC) ---
+    // --- CỘT BẢNG BASIC ---
     const basicColumns = [
         {
             title: 'Ứng viên',
@@ -400,17 +432,20 @@ const CandidateFunnel = () => {
             title: 'Ngày nộp đơn',
             dataIndex: 'ngayNop',
             key: 'ngayNop',
+            width: 140,
             render: (date) => new Date(date).toLocaleDateString('vi-VN')
         },
         {
             title: 'Trạng thái phễu',
             dataIndex: 'trangThai',
             key: 'trangThai',
+            width: 140,
             render: (status) => renderStatusTag(status)
         },
         {
             title: 'Hành động',
             key: 'hanhDong',
+            width: 160,
             align: 'center',
             render: (_, record) => (
                 <Button 
@@ -425,12 +460,11 @@ const CandidateFunnel = () => {
         }
     ];
 
-    // Xử lý chọn hàng để so sánh
     const rowSelection = {
         selectedRowKeys,
         onChange: (keys, selectedRows) => {
             if (keys.length > 3) {
-                message.warning("Chỉ được chọn tối đa 3 ứng viên để so sánh!");
+                message.warning("Chỉ được chọn tối đa 3 ứng viên trong cùng vị trí để so sánh!");
                 return;
             }
             setSelectedRowKeys(keys);
@@ -440,48 +474,122 @@ const CandidateFunnel = () => {
 
     if (loading) return <div style={{ textAlign: 'center', padding: '100px 0' }}><Spin size="large" /></div>;
 
+    // Danh sách Tab Vị trí tuyển dụng
+    const tabItems = positions.map(pos => {
+        const count = candidates.filter(c => String(c.maViTri) === String(pos.maViTri)).length;
+        return {
+            key: String(pos.maViTri),
+            label: (
+                <span style={{ fontSize: 14, fontWeight: 600, padding: '0 4px' }}>
+                    <AppstoreOutlined style={{ marginRight: 6 }} />
+                    {pos.tenViTri}
+                    <Badge 
+                        count={count} 
+                        overflowCount={99} 
+                        style={{ 
+                            marginLeft: 8, 
+                            backgroundColor: String(activePositionKey) === String(pos.maViTri) ? '#1677ff' : '#94a3b8' 
+                        }} 
+                    />
+                </span>
+            )
+        };
+    });
+
     return (
         <div style={{ padding: '24px', background: '#f8fafc', minHeight: '100vh' }}>
-                
-                {/* 🌟 BỘ LỌC DÙNG CHUNG CHO TẤT CẢ NHÀ TUYỂN DỤNG */}
-                <Card style={{ marginBottom: 20, borderRadius: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                    <Row gutter={[24, 16]} align="middle">
-                        {/* Lọc Trạng thái phễu (Basic & Premium đều dùng được) */}
-                        <Col xs={24} md={isPremium ? 12 : 24}>
-                            <Text strong style={{ marginRight: 8, display: 'inline-block', marginBottom: 8 }}>
-                                Phân loại phễu ứng viên:
-                            </Text>
-                            <Space wrap style={{ marginTop: 4 }}>
-                                <Button type={statusFilter === null ? "primary" : "default"} onClick={() => setStatusFilter(null)}>Tất cả ({candidates.length})</Button>
-                                <Button type={statusFilter === 0 ? "primary" : "default"} onClick={() => setStatusFilter(0)}>Mới nộp</Button>
-                                <Button type={statusFilter === 1 ? "primary" : "default"} onClick={() => setStatusFilter(1)}>Đã xem</Button>
-                                <Button type={statusFilter === 2 ? "primary" : "default"} style={statusFilter === 2 ? { backgroundColor: '#16a34a', borderColor: '#16a34a' } : {}} onClick={() => setStatusFilter(2)}>Hẹn phỏng vấn</Button>
-                                <Button danger type={statusFilter === 3 ? "primary" : "default"} onClick={() => setStatusFilter(3)}>Từ chối</Button>
-                            </Space>
-                        </Col>
+            
+            {/* Header: Nút quay lại & Tiêu đề Chiến dịch */}
+            <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                <Space>
+                    <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/employer/jobs')}>
+                        Quay lại
+                    </Button>
+                    {campaignTitle && (
+                        <Title level={4} style={{ margin: 0, color: '#0f172a' }}>
+                            Chiến dịch: <span style={{ color: '#1677ff' }}>{campaignTitle}</span>
+                        </Title>
+                    )}
+                </Space>
+                {currentPosition && (
+                    <Space size={12}>
+                        <Tag color="blue" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6 }}>
+                            Cấp bậc: <b>{currentPosition.capBac || 'Không yêu cầu'}</b>
+                        </Tag>
+                        <Tag color="green" style={{ fontSize: 13, padding: '4px 10px', borderRadius: 6 }}>
+                            Chỉ tiêu: <b>{currentPosition.soLuongTuyen || 1} nhân sự</b>
+                        </Tag>
+                    </Space>
+                )}
+            </div>
 
-                        {/* Tính năng Nâng cao (Chỉ dành cho Premium) */}
-                        {isPremium && (
-                            <>
-                                <Col xs={24} md={7}>
-                                    <Text strong style={{ color: '#0f172a' }}>
-                                        <CrownOutlined style={{ color: '#fa8c16', marginRight: 6 }} />
-                                        Điểm Matching AI:
-                                    </Text>
-                                    <Slider 
-                                        range 
-                                        value={matchRange} 
-                                        onChange={(val) => setMatchRange(val)}
-                                        tooltip={{ formatter: (v) => `${v}%` }}
-                                    />
-                                </Col>
-                                <Col xs={24} md={5} style={{ textAlign: 'right' }}>
+            {/* TAB CHUYỂN ĐỔI VỊ TRÍ ĐỘC LẬP */}
+            {positions.length > 0 && (
+                <Tabs
+                    activeKey={activePositionKey}
+                    onChange={handleTabChange}
+                    type="card"
+                    size="large"
+                    items={tabItems}
+                    style={{ marginBottom: 16 }}
+                />
+            )}
+
+            {/* BỘ LỌC PHỄU ỨNG VIÊN CHO VỊ TRÍ HIỆN TẠI */}
+            <Card style={{ marginBottom: 20, borderRadius: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                <Row gutter={[24, 16]} align="middle">
+                    
+                    {/* Lọc Trạng thái phễu */}
+                    <Col xs={24} md={isPremium ? 12 : 24}>
+                        <Text strong style={{ marginRight: 8, display: 'inline-block', marginBottom: 8 }}>
+                            Trạng thái hồ sơ:
+                        </Text>
+                        <Space wrap style={{ marginTop: 4 }}>
+                            <Button type={statusFilter === null ? "primary" : "default"} onClick={() => setStatusFilter(null)}>
+                                Tất cả ({currentPositionCandidates.length})
+                            </Button>
+                            <Button type={statusFilter === 0 ? "primary" : "default"} onClick={() => setStatusFilter(0)}>
+                                Mới nộp
+                            </Button>
+                            <Button type={statusFilter === 1 ? "primary" : "default"} onClick={() => setStatusFilter(1)}>
+                                Đã xem
+                            </Button>
+                            <Button 
+                                type={statusFilter === 2 ? "primary" : "default"} 
+                                style={statusFilter === 2 ? { backgroundColor: '#16a34a', borderColor: '#16a34a' } : {}} 
+                                onClick={() => setStatusFilter(2)}
+                            >
+                                Hẹn phỏng vấn
+                            </Button>
+                            <Button danger type={statusFilter === 3 ? "primary" : "default"} onClick={() => setStatusFilter(3)}>
+                                Từ chối
+                            </Button>
+                        </Space>
+                    </Col>
+
+                    {/* Lọc điểm Matching AI (Gói Premium) */}
+                    {isPremium && (
+                        <>
+                            <Col xs={24} md={7}>
+                                <Text strong style={{ color: '#0f172a' }}>
+                                    <CrownOutlined style={{ color: '#fa8c16', marginRight: 6 }} />
+                                    Điểm Matching AI:
+                                </Text>
+                                <Slider 
+                                    range 
+                                    value={matchRange} 
+                                    onChange={(val) => setMatchRange(val)}
+                                    tooltip={{ formatter: (v) => `${v}%` }}
+                                />
+                            </Col>
+                            <Col xs={24} md={5} style={{ textAlign: 'right' }}>
+                                <Tooltip title={selectedCandidates.length < 2 ? "Tick chọn từ 2 đến 3 ứng viên trong cùng vị trí để so sánh" : ""}>
                                     <Button 
                                         type="primary" 
                                         icon={<SwapOutlined />}
                                         onClick={() => {
                                             if (selectedCandidates.length < 2) {
-                                                message.warning("Vui lòng chọn ít nhất 2 ứng viên để so sánh!");
+                                                message.warning("Vui lòng chọn ít nhất 2 ứng viên trong cùng vị trí để so sánh!");
                                                 return;
                                             }
                                             setIsCompareModalOpen(true);
@@ -493,48 +601,49 @@ const CandidateFunnel = () => {
                                     >
                                         So sánh ({selectedCandidates.length}/3)
                                     </Button>
-                                </Col>
-                            </>
-                        )}
-                    </Row>
-                </Card>
+                                </Tooltip>
+                            </Col>
+                        </>
+                    )}
+                </Row>
+            </Card>
 
-                {/* THÔNG BÁO GỢI Ý NÂNG CẤP NẾU LÀ TÀI KHOẢN TIÊU CHUẨN */}
-                {!isPremium && (
-                    <Alert
-                        message={<Text strong style={{ color: '#1e40af', fontSize: 15 }}><CrownOutlined /> Nâng cấp tài khoản Doanh nghiệp Premium</Text>}
-                        description={
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 4 }}>
-                                <span>Kích hoạt tính năng AI tự động chấm % độ hợp CV, bóc tách kỹ năng và so sánh ứng viên thông minh.</span>
-                                <Button type="primary" style={{ backgroundColor: '#fa8c16', borderColor: '#fa8c16' }} onClick={() => navigate('/employer/service-package')}>
-                                    Nâng cấp Premium
-                                </Button>
-                            </div>
-                        }
-                        type="info"
-                        showIcon={false}
-                        style={{ marginBottom: 20, borderRadius: 10, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe' }}
-                    />
-                )}
-
-                {/* BẢNG HỒ SƠ ỨNG VIÊN */}
-                <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                    <Title level={4} style={{ marginBottom: 16, color: '#0f172a' }}>
-                        {isPremium ? <RobotOutlined style={{ color: '#1677ff', marginRight: 8 }} /> : null}
-                        Danh sách Ứng viên ({filteredCandidates.length})
+            {/* BẢNG HỒ SƠ ỨNG VIÊN THUỘC VỊ TRÍ ĐANG CHỌN */}
+            <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <Title level={4} style={{ margin: 0, color: '#0f172a' }}>
+                        {isPremium ? <RobotOutlined style={{ color: '#1677ff', marginRight: 8 }} /> : <UserOutlined style={{ color: '#1677ff', marginRight: 8 }} />}
+                        Danh sách ứng viên ứng tuyển vị trí: <span style={{ color: '#1677ff' }}>{currentPosition?.tenViTri || 'Vị trí'}</span> ({filteredCandidates.length})
                     </Title>
-                    <Table 
-                        rowSelection={isPremium ? rowSelection : null}
-                        columns={isPremium ? premiumColumns : basicColumns} 
-                        dataSource={filteredCandidates}
-                        rowKey="maDon" 
-                        pagination={{ pageSize: 10 }}
-                    />
+                    {isPremium && (
+                        <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic' }}>
+                            * Tick chọn ô vuông đầu dòng để so sánh ứng viên cho vị trí này
+                        </Text>
+                    )}
                 </div>
+                
+                <Table 
+                    rowSelection={isPremium ? rowSelection : null}
+                    columns={isPremium ? premiumColumns : basicColumns} 
+                    dataSource={filteredCandidates}
+                    rowKey="maDon" 
+                    pagination={{ pageSize: 10 }}
+                    locale={{ emptyText: 'Chưa có hồ sơ nào ứng tuyển vào vị trí này.' }}
+                />
+            </div>
 
-            {/* MODAL SO SÁNH SONG SONG 2 - 3 ỨNG VIÊN (PREMIUM) */}
+            {/* MODAL SO SÁNH SONG SONG 2 - 3 ỨNG VIÊN CÙNG 1 VỊ TRÍ */}
             <Modal
-                title={<Title level={4} style={{ margin: 0 }}><SwapOutlined style={{ color: '#722ed1' }} /> So sánh giữa các ứng viên</Title>}
+                title={
+                    <div>
+                        <Title level={4} style={{ margin: 0, color: '#722ed1' }}>
+                            <SwapOutlined /> So sánh ứng viên vị trí: {currentPosition?.tenViTri}
+                        </Title>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                            Đối chiếu năng lực và chỉ số Matching AI giữa các ứng viên cùng ứng tuyển một vị trí
+                        </Text>
+                    </div>
+                }
                 open={isCompareModalOpen}
                 onCancel={() => setIsCompareModalOpen(false)}
                 footer={[<Button key="close" onClick={() => setIsCompareModalOpen(false)}>Đóng</Button>]}
@@ -546,7 +655,7 @@ const CandidateFunnel = () => {
                         <Col 
                             span={24 / selectedCandidates.length} 
                             key={cand.maDon}
-                            style={{ display: 'flex' }} // Ép Col giãn theo chiều cao chung
+                            style={{ display: 'flex' }}
                         >
                             <Card 
                                 style={{ 
@@ -560,13 +669,13 @@ const CandidateFunnel = () => {
                                     padding: 16,
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    flex: 1 // Đẩy body giãn hết chiều cao Card
+                                    flex: 1
                                 }}
                             >
                                 <Title level={5} style={{ marginBottom: 2 }}>{cand.hoTen}</Title>
                                 <Text type="secondary" style={{ fontSize: 12 }}>{cand.email}</Text>
                                 
-                                <div style={{ textAlign: 'center', margin: '16px 0' }}>
+                                <div style={{ textAlign: 'center', margin: '14px 0' }}>
                                     <Progress 
                                         type="circle" 
                                         percent={cand.diemMatchingTong || 0} 
@@ -574,21 +683,14 @@ const CandidateFunnel = () => {
                                         strokeColor={getMatchColor(cand.diemMatchingTong || 0)} 
                                     />
                                 </div>
-
                                 <Space direction="vertical" style={{ width: '100%', fontSize: 13 }} size={8}>
                                     <div>🎯 Kỹ năng: <b>{cand.diemKyNang || 0}/100</b></div>
                                     <div>💼 Kinh nghiệm: <b>{cand.diemKinhNghiem || 0}/100</b></div>
                                     <div>🏢 Lĩnh vực: <b>{cand.diemLinhVuc || 0}/100</b></div>
                                     <div>📊 Cấp bậc: <b>{cand.diemCapBac || 0}/100</b></div>
                                 </Space>
-
-                                {/* 🌟 VÙNG ĐÁNH GIÁ TỰ MỞ RỘNG THEO NỘI DUNG DÀI NHẤT */}
-                                <div style={{ 
-                                    borderTop: '1px dashed #e2e8f0', 
-                                    paddingTop: 10, 
-                                    marginTop: 12,
-                                    flex: 1 // Tự co giãn linh hoạt
-                                }}>
+                                
+                                <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: 10, marginTop: 12, flex: 1 }}>
                                     <Text type="success" strong style={{ fontSize: 12 }}>🟢 Điểm mạnh tiêu biểu:</Text>
                                     {renderBulletList(cand.diemManhTieuBieu)}
                                     
@@ -596,7 +698,6 @@ const CandidateFunnel = () => {
                                     {renderBulletList(cand.diemConThieu)}
                                 </div>
 
-                                {/* 🌟 NÚT BẤM GHIM CỐ ĐỊNH Ở ĐÁY CỦA TẤT CẢ CÁC CARD */}
                                 <Button 
                                     type="primary" 
                                     block 
@@ -614,7 +715,7 @@ const CandidateFunnel = () => {
                 </Row>
             </Modal>
 
-            {/* MODAL SOI CV & CHUYỂN TRẠNG THÁI (CHO TÀI KHOẢN BASIC) */}
+            {/* MODAL SOI CV & CHUYỂN TRẠNG THÁI */}
             <Modal
                 title={
                     <Space>
