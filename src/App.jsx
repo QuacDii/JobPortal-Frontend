@@ -52,6 +52,7 @@ import EmployerJobs from './components/EmployerJobs';
 import CandidateAiDetail from './pages/Employer/CandidateAiDetail';
 import CvHunter from './pages/Employer/CvHunter';
 import ServicePackage from './pages/Employer/ServicePackage';
+import EditJob from './pages/Employer/EditJob';
 
 import VnPayReturn from './pages/Payment/VnPayReturn';
 
@@ -261,7 +262,7 @@ const App = () => {
         <Route path="/employer/service-package" element={renderEmployerRoute(<ServicePackage />)} />
         <Route path="/employer/post-job" element={renderEmployerRoute(<PostJob />)} />
         <Route path="/employer/cv-hunter" element={renderEmployerRoute(<CvHunter />)} />
-
+        <Route path="/employer/edit-job/:maTin" element={renderEmployerRoute(<EditJob />)} />
         {/* ================= TRANG ỨNG VIÊN & KHÁCH ================= */}
         <Route path="/manage-cv" element={user ? <CandidateLayout user={user}><ManageCv /></CandidateLayout> : <Navigate to="/login" replace />} />
         <Route path="/job/:id" element={<CandidateLayout user={user}><JobDetail isEmployer={false} /></CandidateLayout>} />

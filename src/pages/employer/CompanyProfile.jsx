@@ -11,6 +11,7 @@ import {
     InfoCircleOutlined, IdcardOutlined, BulbOutlined
 } from '@ant-design/icons';
 import apiClient from '../../api/apiClient';
+import '../css/CompanyProfile.css';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -23,14 +24,11 @@ const CompanyProfile = ({ onStatusChange }) => {
     const [logoFileList, setLogoFileList] = useState([]);
     const [frontFileList, setFrontFileList] = useState([]);
     const [backFileList, setBackFileList] = useState([]);
-
     const [currentLogo, setCurrentLogo] = useState(null);
     const [currentFront, setCurrentFront] = useState(null);
     const [currentBack, setCurrentBack] = useState(null);
-
-    // 🌟 STATE PHỤC VỤ XEM TRƯỚC (PREVIEW) TỨC THÌ KHI CHỌN FILE MỚI
-    const [logoPreview, setLogoPreview] = useState(null);
     
+    const [logoPreview, setLogoPreview] = useState(null);
     const [companyStatus, setCompanyStatus] = useState(null);
     const [yeuCauBoSung, setYeuCauBoSung] = useState(null);
     const [hasPendingUpdate, setHasPendingUpdate] = useState(false);
@@ -39,7 +37,6 @@ const CompanyProfile = ({ onStatusChange }) => {
         fetchCompanyData();
     }, []);
 
-    // 🌟 HÀM LẤY ĐỐI TƯỢNG FILE THỰC TẾ AN TOÀN (Tránh bị undefined)
     const getActualFile = (fileItem) => {
         if (!fileItem) return null;
         if (fileItem.originFileObj instanceof File) return fileItem.originFileObj;
@@ -101,7 +98,6 @@ const CompanyProfile = ({ onStatusChange }) => {
         const logoFile = getActualFile(logoFileList[0]);
         const frontFile = getActualFile(frontFileList[0]);
         const backFile = getActualFile(backFileList[0]);
-
         const hasLogo = currentLogo || logoFile;
         if (!hasLogo) {
             message.error("Vui lòng tải lên Logo của doanh nghiệp!");
@@ -112,7 +108,6 @@ const CompanyProfile = ({ onStatusChange }) => {
             message.error("Vui lòng tải lên Giấy phép kinh doanh (Mặt trước / Bản chính)!");
             return;
         }
-
         setLoading(true);
         try {
             const formData = new FormData();
@@ -123,8 +118,7 @@ const CompanyProfile = ({ onStatusChange }) => {
             formData.append('MoTa', values.moTa || '');
             formData.append('MauEmailInterview', values.mauEmailInterview || '');
             formData.append('ChuKyEmail', values.chuKyEmail || '');
-
-            // 🌟 TRUYỀN FILE CHÍNH XÁC VÀO FORMDATA
+            
             if (logoFile) formData.append('LogoFile', logoFile);
             if (frontFile) formData.append('GiayPhepKinhDoanhMatTruocFile', frontFile);
             if (backFile) formData.append('GiayPhepKinhDoanhMatSauFile', backFile);
@@ -150,7 +144,6 @@ const CompanyProfile = ({ onStatusChange }) => {
 
     if (pageLoading) return <div style={{ textAlign: 'center', padding: '100px 0' }}><Spin size="large" tip="Đang tải dữ liệu hồ sơ..." /></div>;
 
-    // Ưu tiên hiển thị Ảnh Xem Trước Mới -> Ảnh cũ từ Server
     const displayLogoUrl = logoPreview || currentLogo;
 
     return (
@@ -184,7 +177,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                             </Text>
                         </div>
                     </Space>
-
                     <div>
                         {companyStatus === 1 && !hasPendingUpdate && (
                             <Tag color="success" style={{ padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600 }}>
@@ -231,6 +223,7 @@ const CompanyProfile = ({ onStatusChange }) => {
                     style={{ marginBottom: 24, borderRadius: 10, border: '1px solid #fca5a5', backgroundColor: '#fef2f2' }}
                 />
             )}
+
             {companyStatus === 0 && !yeuCauBoSung && (
                 <Alert 
                     message={<Text strong style={{ color: '#9a3412' }}>Hồ sơ đang trong quá trình thẩm định lần đầu</Text>}
@@ -241,6 +234,7 @@ const CompanyProfile = ({ onStatusChange }) => {
                     style={{ marginBottom: 24, borderRadius: 10, backgroundColor: '#fff7ed', border: '1px solid #ffedd5' }}
                 />
             )}
+
             {companyStatus === 1 && hasPendingUpdate && (
                 <Alert 
                     message={<Text strong style={{ color: '#1e40af' }}>Yêu cầu thay đổi thông tin đang chờ Admin thẩm định</Text>}
@@ -377,7 +371,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                             style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', textAlign: 'center' }}
                         >
                             <div style={{ padding: '4px 0' }}>
-                                {/* 🌟 KHỐI PREVIEW LOGO (ẢNH MỚI HOẶC ẢNH ĐÃ CÓ TRÊN SERVER) */}
                                 {displayLogoUrl && (
                                     <div style={{ marginBottom: 10 }}>
                                         <Image 
@@ -386,15 +379,11 @@ const CompanyProfile = ({ onStatusChange }) => {
                                         />
                                     </div>
                                 )}
-
-                                {/* 🌟 XỬ LÝ SỰ KIỆN TẠO PREVIEW TỨC THÌ TRONG ONCHANGE */}
                                 <Upload 
                                     beforeUpload={(file) => validateFileBeforeUpload(file, true)} 
                                     onChange={({ fileList }) => {
                                         const singleList = fileList.slice(-1);
                                         setLogoFileList(singleList);
-
-                                        // Tạo Blob URL xem trước ngay lập tức khi chọn file thành công
                                         const fileObj = getActualFile(singleList[0]);
                                         if (fileObj) {
                                             setLogoPreview(URL.createObjectURL(fileObj));
@@ -421,13 +410,12 @@ const CompanyProfile = ({ onStatusChange }) => {
                                     <SafetyCertificateOutlined style={{ color: '#1677ff' }} />
                                     <span>Xác Minh Giấy Phép KD</span>
                                 </Space>
-                            }
+                            } 
                             style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', flex: 1 }}
                         >
                             <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 12 }}>
                                 Vui lòng tải lên bản chụp/scan Giấy phép kinh doanh chính thức (Ảnh chụp rõ nét hoặc file PDF).
                             </Paragraph>
-
                             <div style={{ marginBottom: 12, border: '1px dashed #0284c7', padding: '10px', borderRadius: '10px', textAlign: 'center', backgroundColor: '#f0f9ff' }}>
                                 <Text strong style={{ display: 'block', marginBottom: 4, color: '#0369a1', fontSize: 13 }}>
                                     <FileImageOutlined /> Mặt Trước / Bản Chính <Text type="danger">*</Text>
@@ -453,7 +441,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                                     <Button icon={<UploadOutlined />} size="small">Tải tệp mặt trước</Button>
                                 </Upload>
                             </div>
-
                             <div style={{ border: '1px dashed #0284c7', padding: '10px', borderRadius: '10px', textAlign: 'center', backgroundColor: '#f0f9ff' }}>
                                 <Text strong style={{ display: 'block', marginBottom: 4, color: '#0369a1', fontSize: 13 }}>
                                     <FileImageOutlined /> Mặt Sau (Tùy chọn)
@@ -500,7 +487,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                     <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 12 }}>
                         Thiết lập mẫu email phỏng vấn và chữ ký thương hiệu. Hệ thống sẽ tự động ghép thông tin khi bạn duyệt ứng viên.
                     </Paragraph>
-
                     <div style={{ marginBottom: 20, padding: '10px 14px', backgroundColor: '#f1f5f9', borderRadius: 8, fontSize: 12 }}>
                         <Text strong style={{ color: '#475569', display: 'block', marginBottom: 6 }}>Từ khóa hệ thống hỗ trợ:</Text>
                         <Space wrap size={[6, 6]}>
@@ -513,8 +499,9 @@ const CompanyProfile = ({ onStatusChange }) => {
                         </Space>
                     </div>
 
-                    <Row gutter={[20, 20]}>
-                        <Col xs={24} lg={14}>
+                    {/* HÀNG CÂN BẰNG TỰ ĐỘNG GIỮA 2 CỘT */}
+                    <Row gutter={[20, 20]} align="stretch">
+                        <Col xs={24} lg={14} className="email-form-col">
                             <Form.Item 
                                 label={
                                     <Space>
@@ -523,17 +510,15 @@ const CompanyProfile = ({ onStatusChange }) => {
                                     </Space>
                                 }
                                 name="mauEmailInterview" 
-                                style={{ marginBottom: 0 }}
+                                className="email-form-item"
                             >
                                 <TextArea 
-                                    autoSize={{ minRows: 6, maxRows: 10 }}
                                     placeholder={`Chào {TenUngVien},\n\nCông ty {TenCongTy} trân trọng mời bạn tham gia phỏng vấn vị trí {TenViTri}.\n• Thời gian: {ThoiGian}\n• Địa điểm: {DiaDiem}\n\n{LinkBaiTest}`} 
-                                    style={{ width: '100%' }}
                                 />
                             </Form.Item>
                         </Col>
 
-                        <Col xs={24} lg={10}>
+                        <Col xs={24} lg={10} className="email-form-col">
                             <Form.Item 
                                 label={
                                     <Space>
@@ -542,12 +527,10 @@ const CompanyProfile = ({ onStatusChange }) => {
                                     </Space>
                                 }
                                 name="chuKyEmail" 
-                                style={{ marginBottom: 0 }}
+                                className="email-form-item"
                             >
                                 <TextArea 
-                                    autoSize={{ minRows: 6, maxRows: 10 }}
                                     placeholder={`Trân trọng,\nPhòng Tuyển dụng - Công ty JobsNow\nHotline: 090x xxx xxx | Website: jobsnow.vn\nĐịa chỉ: Tòa nhà ABC, Q.1, TP.HCM`} 
-                                    style={{ width: '100%' }}
                                 />
                             </Form.Item>
                         </Col>
@@ -587,7 +570,6 @@ const CompanyProfile = ({ onStatusChange }) => {
                     >
                         Lưu & Nộp lại hồ sơ
                     </Button>
-
                     <Text type="secondary" style={{ fontSize: 13, fontStyle: 'italic', color: '#64748b' }}>
                         * Thông tin phụ (Logo, Mô tả, Quy mô, Chữ ký Email) sẽ được cập nhật ngay. Thay đổi Tên/MST/GPKD sẽ gửi thẩm định lại.
                     </Text>

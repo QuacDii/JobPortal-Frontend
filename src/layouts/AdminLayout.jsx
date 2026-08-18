@@ -115,15 +115,6 @@ const AdminLayout = ({ children, user }) => {
 
     const employerMenuItems = [
         { key: '/employer/dashboard', icon: <DashboardOutlined />, label: 'Bảng điều khiển' },
-        {
-            key: '/employer/company-profile',
-            icon: <IdcardOutlined />,
-            label: (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <span>Quản lý hồ sơ</span>
-                </div>
-            )
-        },
         { type: 'divider' },
         {
             key: 'sub-recruitment', icon: <AppstoreOutlined />, label: 'Quản lý Tuyển dụng', disabled: !canAccessAllFeatures,

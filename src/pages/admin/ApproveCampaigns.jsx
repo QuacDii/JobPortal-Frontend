@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { 
-    Table, Button, Space, message, Card, Popconfirm, Tag, Row, Col,
-    Drawer, Descriptions, Typography, Avatar, Badge, List, Tooltip 
+    Table, Button, Space, message, Card, Modal, Input, Tag, Row, Col,
+    Drawer, Descriptions, Typography, Avatar, Badge, List, Tooltip, Alert, Popconfirm 
 } from 'antd';
 import { 
     CheckOutlined, CloseOutlined, NotificationOutlined, 
     CalendarOutlined, EyeOutlined, BuildOutlined, DollarOutlined, 
-    TeamOutlined, SolutionOutlined, RocketOutlined 
+    TeamOutlined, SolutionOutlined, RocketOutlined, CheckCircleOutlined 
 } from '@ant-design/icons';
 import apiClient from '../../api/apiClient';
 
@@ -16,12 +16,14 @@ const ApproveCampaigns = () => {
     const [jobPosts, setJobPosts] = useState([]);
     const [loading, setLoading] = useState(true);
     
-    // State quản lý Drawer xem chi tiết Tin & Vị trí tuyển dụng
+    // State quản lý Drawer và Thẩm định
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [selectedJob, setSelectedJob] = useState(null);
+    const [rejectingViTri, setRejectingViTri] = useState(null);
+    const [rejectReason, setRejectReason] = useState('');
+    const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    // 1. Tải danh sách chiến dịch / tin tuyển dụng chờ duyệt từ Server
     const fetchPendingJobPosts = async () => {
         setLoading(true);
         try {
@@ -30,9 +32,18 @@ const ApproveCampaigns = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const payload = response?.data || response;
-            setJobPosts(Array.isArray(payload) ? payload : []);
+            const list = Array.isArray(payload) ? payload : [];
+            setJobPosts(list);
+
+            if (selectedJob) {
+                const updated = list.find(j => j.maTin === selectedJob.maTin);
+                if (updated) {
+                    setSelectedJob(updated);
+                } else {
+                    setDrawerOpen(false); // Đóng Drawer nếu toàn bộ vị trí trong chiến dịch đã được duyệt/từ chối xong
+                }
+            }
         } catch (error) {
-            console.error("Lỗi tải danh sách tin tuyển dụng:", error);
             message.error("Lỗi khi tải danh sách tin tuyển dụng chờ duyệt!");
         } finally {
             setLoading(false);
@@ -43,28 +54,51 @@ const ApproveCampaigns = () => {
         fetchPendingJobPosts();
     }, []);
 
-    // 2. Thẩm định Phê duyệt / Từ chối Chiến dịch
-    const handleReview = async (id, isApproved) => {
+    // 1. Duyệt / Từ chối riêng 1 vị trí
+    const handleReviewPosition = async (maViTri, isApproved, lyDo = null) => {
         setSubmitting(true);
         try {
             const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
-            await apiClient.put(`/AdminApproval/review-job-post/${id}`, 
-                { isApproved }, 
+            const res = await apiClient.put('/AdminApproval/review-position', 
+                { maViTri, isApproved, lyDoTuChoi: lyDo },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-            
-            message.success(isApproved ? "Đã phê duyệt tin tuyển dụng thành công!" : "Đã từ chối tin tuyển dụng!");
-            setDrawerOpen(false);
-            fetchPendingJobPosts(); // Tải lại danh sách sau khi xử lý
+
+            if (res?.data?.success || res?.success) {
+                message.success(isApproved ? "Đã duyệt vị trí thành công!" : "Đã từ chối vị trí!");
+                setIsRejectModalOpen(false);
+                setRejectReason('');
+                setRejectingViTri(null);
+                fetchPendingJobPosts();
+            }
         } catch (error) {
-            console.error("Lỗi kiểm duyệt tin:", error);
-            message.error("Có lỗi xảy ra trong quá trình xử lý!");
+            message.error("Lỗi khi thẩm định vị trí!");
         } finally {
             setSubmitting(false);
         }
     };
 
-    // 3. Mở Drawer xem chi tiết chiến dịch và các vị trí
+    // 2. Duyệt TẤT CẢ vị trí trong 1 chiến dịch
+    const handleApproveAll = async (maTin) => {
+        setSubmitting(true);
+        try {
+            const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
+            const res = await apiClient.put(`/AdminApproval/approve-all-positions/${maTin}`, null, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (res?.data?.success || res?.success) {
+                message.success("Đã phê duyệt toàn bộ vị trí trong chiến dịch!");
+                setDrawerOpen(false);
+                fetchPendingJobPosts();
+            }
+        } catch (error) {
+            message.error("Lỗi khi duyệt toàn bộ vị trí!");
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const handleOpenDetail = (record) => {
         setSelectedJob(record);
         setDrawerOpen(true);
@@ -90,7 +124,7 @@ const ApproveCampaigns = () => {
             )
         },
         {
-            title: 'Doanh Nghiệp Tuyển Dụng',
+            title: 'Doanh Nghiệp',
             dataIndex: 'tenCongTy',
             key: 'tenCongTy',
             render: (text, record) => (
@@ -106,18 +140,21 @@ const ApproveCampaigns = () => {
             )
         },
         {
-            title: 'Số vị trí tuyển',
+            title: 'Chờ duyệt',
             dataIndex: 'danhSachViTri',
             key: 'soLuongViTri',
             align: 'center',
-            render: (viTriList) => (
-                <Tooltip title={`${viTriList?.length || 0} vị trí cần tuyển trong chiến dịch này`}>
-                    <Badge count={viTriList?.length || 0} showZero color="#10b981" />
-                </Tooltip>
-            )
+            render: (viTriList) => {
+                const pendingCount = viTriList?.filter(v => v.trangThai === 0).length || 0;
+                return (
+                    <Tooltip title={`${pendingCount}/${viTriList?.length || 0} vị trí đang chờ duyệt`}>
+                        <Badge count={pendingCount} showZero color={pendingCount > 0 ? "#faad14" : "#10b981"} />
+                    </Tooltip>
+                );
+            }
         },
         {
-            title: 'Hạn chót ứng tuyển',
+            title: 'Hạn chót chiến dịch',
             dataIndex: 'ngayHetHan',
             key: 'ngayHetHan',
             render: (date) => (
@@ -128,31 +165,17 @@ const ApproveCampaigns = () => {
             )
         },
         {
-            title: 'Thao tác thẩm định',
+            title: 'Thao tác',
             key: 'action',
             align: 'center',
             render: (_, record) => (
-                <Space size="small">
-                    <Button 
-                        type="default" 
-                        icon={<EyeOutlined />} 
-                        onClick={() => handleOpenDetail(record)}
-                        style={{ borderColor: '#cbd5e1' }}
-                    >
-                        Xem & Thẩm định
-                    </Button>
-                    <Popconfirm
-                        title="Xác nhận phê duyệt"
-                        description="Duyệt chiến dịch này công khai lên cổng việc làm?"
-                        onConfirm={() => handleReview(record.maTin, true)}
-                        okText="Duyệt ngay"
-                        cancelText="Hủy"
-                    >
-                        <Button type="primary" icon={<CheckOutlined />} style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}>
-                            Duyệt nhanh
-                        </Button>
-                    </Popconfirm>
-                </Space>
+                <Button 
+                    type="primary" 
+                    icon={<EyeOutlined />} 
+                    onClick={() => handleOpenDetail(record)}
+                >
+                    Xem & Thẩm định
+                </Button>
             ),
         },
     ];
@@ -176,46 +199,40 @@ const ApproveCampaigns = () => {
                 locale={{ emptyText: 'Hiện tại không có chiến dịch nào đang chờ duyệt.' }}
             />
 
-            {/* DRAWER CHI TIẾT CHIẾN DỊCH VÀ CÁC VỊ TRÍ */}
+            {/* DRAWER THẨM ĐỊNH CHI TIẾT */}
             <Drawer
                 title={
                     <Space>
                         <SolutionOutlined style={{ color: '#1677ff' }} />
-                        <span>Chi tiết Chiến dịch tuyển dụng #{selectedJob?.maTin}</span>
+                        <span>Thẩm định Chiến dịch #{selectedJob?.maTin}</span>
                     </Space>
                 }
-                width={720}
+                width={780}
                 open={drawerOpen}
                 onClose={() => setDrawerOpen(false)}
                 extra={
-                    <Space>
+                    selectedJob && (
                         <Popconfirm
-                            title="Xác nhận từ chối"
-                            description="Bạn chắc chắn muốn từ chối chiến dịch tuyển dụng này?"
-                            onConfirm={() => handleReview(selectedJob?.maTin, false)}
-                            okText="Từ chối"
+                            title="Duyệt tất cả vị trí?"
+                            description="Phê duyệt toàn bộ các vị trí đang chờ trong chiến dịch này lên hệ thống?"
+                            onConfirm={() => handleApproveAll(selectedJob.maTin)}
+                            okText="Duyệt tất cả"
                             cancelText="Hủy"
-                            okButtonProps={{ danger: true }}
                         >
-                            <Button danger icon={<CloseOutlined />} loading={submitting}>
-                                Từ chối tin
+                            <Button 
+                                type="primary" 
+                                icon={<CheckCircleOutlined />} 
+                                style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}
+                                loading={submitting}
+                            >
+                                Duyệt tất cả vị trí
                             </Button>
                         </Popconfirm>
-                        <Button 
-                            type="primary" 
-                            icon={<CheckOutlined />} 
-                            style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
-                            loading={submitting}
-                            onClick={() => handleReview(selectedJob?.maTin, true)}
-                        >
-                            Phê duyệt chiến dịch
-                        </Button>
-                    </Space>
+                    )
                 }
             >
                 {selectedJob && (
                     <div>
-                        {/* THÔNG TIN TỔNG QUAN DOANH NGHIỆP */}
                         <Card size="small" style={{ backgroundColor: '#f8fafc', borderRadius: 10, marginBottom: 20, border: '1px solid #e2e8f0' }}>
                             <Space size={16} align="start">
                                 <Avatar size={54} src={selectedJob.logoCongTy} icon={<BuildOutlined />} />
@@ -231,64 +248,132 @@ const ApproveCampaigns = () => {
                         </Card>
 
                         <Title level={5} style={{ color: '#334155', marginBottom: 12 }}>
-                            📋 Các vị trí công việc chi tiết ({selectedJob.danhSachViTri?.length || 0}):
+                            📋 Danh sách các vị trí tuyển dụng ({selectedJob.danhSachViTri?.length || 0}):
                         </Title>
 
-                        {/* DANH SÁCH BÓC TÁCH TỪNG VỊ TRÍ CÔNG VIỆC */}
                         <List
                             itemLayout="vertical"
                             dataSource={selectedJob.danhSachViTri || []}
                             renderItem={(viTri, index) => (
                                 <Card 
                                     key={viTri.maViTri || index} 
-                                    style={{ marginBottom: 16, borderRadius: 10, border: '1px solid #cbd5e1' }}
+                                    style={{ 
+                                        marginBottom: 16, 
+                                        borderRadius: 10, 
+                                        border: viTri.trangThai === 1 
+                                            ? '1px solid #86efac' 
+                                            : viTri.trangThai === 3 
+                                            ? '1px solid #fca5a5' 
+                                            : '1px solid #cbd5e1' 
+                                    }}
                                     bodyStyle={{ padding: 16 }}
                                 >
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                                         <Text strong style={{ fontSize: 16, color: '#1e293b' }}>
                                             {index + 1}. {viTri.tenViTri}
                                         </Text>
-                                        <Tag color="geekblue">{viTri.tenNganh || 'Chưa phân ngành'}</Tag>
+                                        <Space>
+                                            {viTri.trangThai === 1 && <Tag color="success">Đã duyệt</Tag>}
+                                            {viTri.trangThai === 3 && <Tag color="error">Bị từ chối</Tag>}
+                                            {viTri.trangThai === 0 && <Tag color="warning">Chờ thẩm định</Tag>}
+                                            <Tag color="geekblue">{viTri.tenNganh || 'Chưa phân ngành'}</Tag>
+                                        </Space>
                                     </div>
 
                                     <Row gutter={[16, 8]} style={{ marginBottom: 12, backgroundColor: '#f1f5f9', padding: '8px 12px', borderRadius: 6 }}>
-                                        <Col span={12}>
-                                            <Text type="secondary"><DollarOutlined /> Mức lương: </Text>
-                                            <Text strong style={{ color: '#16a34a' }}>{viTri.luong || 'Thỏa thuận'}</Text>
-                                        </Col>
-                                        <Col span={12}>
-                                            <Text type="secondary"><TeamOutlined /> Số lượng tuyển: </Text>
-                                            <Text strong>{viTri.soLuongTuyen} người</Text>
-                                        </Col>
+                                        <Col span={8}><Text type="secondary"><DollarOutlined /> Lương: </Text><Text strong style={{ color: '#16a34a' }}>{viTri.luong || 'Thỏa thuận'}</Text></Col>
+                                        <Col span={8}><Text type="secondary"><TeamOutlined /> Tuyển: </Text><Text strong>{viTri.soLuongTuyen} người</Text></Col>
+                                        <Col span={8}><Text type="secondary"><CalendarOutlined /> Hạn chót: </Text><Text strong>{viTri.ngayHetHan ? new Date(viTri.ngayHetHan).toLocaleDateString('vi-VN') : 'Theo chiến dịch'}</Text></Col>
                                     </Row>
 
                                     <Descriptions column={1} size="small" layout="vertical">
                                         <Descriptions.Item label={<Text strong style={{ color: '#475569' }}>Mô tả công việc:</Text>}>
-                                            <Paragraph style={{ margin: 0, whiteSpace: 'pre-line', fontSize: 13, color: '#334155' }}>
-                                                {viTri.moTaCongViec || 'Chưa cập nhật'}
-                                            </Paragraph>
+                                            <Paragraph style={{ margin: 0, whiteSpace: 'pre-line', fontSize: 13 }}>{viTri.moTaCongViec}</Paragraph>
                                         </Descriptions.Item>
-                                        
                                         <Descriptions.Item label={<Text strong style={{ color: '#475569' }}>Yêu cầu ứng viên:</Text>}>
-                                            <Paragraph style={{ margin: 0, whiteSpace: 'pre-line', fontSize: 13, color: '#334155' }}>
-                                                {viTri.yeuCauUngVien || 'Chưa cập nhật'}
-                                            </Paragraph>
+                                            <Paragraph style={{ margin: 0, whiteSpace: 'pre-line', fontSize: 13 }}>{viTri.yeuCauUngVien}</Paragraph>
                                         </Descriptions.Item>
-
                                         {viTri.quyenLoi && (
                                             <Descriptions.Item label={<Text strong style={{ color: '#475569' }}>Quyền lợi & Chế độ:</Text>}>
-                                                <Paragraph style={{ margin: 0, whiteSpace: 'pre-line', fontSize: 13, color: '#334155' }}>
-                                                    {viTri.quyenLoi}
-                                                </Paragraph>
+                                                <Paragraph style={{ margin: 0, whiteSpace: 'pre-line', fontSize: 13 }}>{viTri.quyenLoi}</Paragraph>
                                             </Descriptions.Item>
                                         )}
                                     </Descriptions>
+
+                                    {viTri.trangThai === 3 && viTri.lyDoTuChoi && (
+                                        <Alert 
+                                            type="error" 
+                                            message={<Text strong>Lý do từ chối: {viTri.lyDoTuChoi}</Text>}
+                                            style={{ marginTop: 10, borderRadius: 6 }}
+                                        />
+                                    )}
+
+                                    {/* Nút thao tác riêng cho vị trí */}
+                                    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                                        {viTri.trangThai !== 3 && (
+                                            <Button 
+                                                danger 
+                                                size="middle"
+                                                icon={<CloseOutlined />}
+                                                loading={submitting}
+                                                onClick={() => {
+                                                    setRejectingViTri(viTri);
+                                                    setIsRejectModalOpen(true);
+                                                }}
+                                            >
+                                                Từ chối vị trí này
+                                            </Button>
+                                        )}
+                                        {viTri.trangThai !== 1 && (
+                                            <Button 
+                                                type="primary" 
+                                                size="middle"
+                                                icon={<CheckOutlined />}
+                                                style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+                                                loading={submitting}
+                                                onClick={() => handleReviewPosition(viTri.maViTri, true)}
+                                            >
+                                                Duyệt vị trí này
+                                            </Button>
+                                        )}
+                                    </div>
                                 </Card>
                             )}
                         />
                     </div>
                 )}
             </Drawer>
+
+            {/* MODAL TỪ CHỐI VỊ TRÍ */}
+            <Modal
+                title={`Từ chối vị trí: ${rejectingViTri?.tenViTri}`}
+                open={isRejectModalOpen}
+                onCancel={() => {
+                    setIsRejectModalOpen(false);
+                    setRejectReason('');
+                    setRejectingViTri(null);
+                }}
+                onOk={() => {
+                    if (!rejectReason.trim()) {
+                        message.warning("Vui lòng nhập lý do từ chối vị trí này!");
+                        return;
+                    }
+                    handleReviewPosition(rejectingViTri.maViTri, false, rejectReason.trim());
+                }}
+                okText="Xác nhận từ chối"
+                okButtonProps={{ danger: true, loading: submitting }}
+                cancelText="Hủy"
+            >
+                <div style={{ marginTop: 12 }}>
+                    <Text strong style={{ display: 'block', marginBottom: 6 }}>Lý do từ chối vị trí:</Text>
+                    <Input.TextArea 
+                        rows={4} 
+                        placeholder="VD: Mô tả công việc chưa rõ ràng, mức lương vi phạm chính sách..." 
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                    />
+                </div>
+            </Modal>
         </Card>
     );
 };

@@ -1,0 +1,32 @@
+                .email-form-col {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    width: 100% !important;
+                }
+                .email-form-item {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    flex: 1 !important;
+                    width: 100% !important;
+                    margin-bottom: 0 !important;
+                }
+                .email-form-item .ant-form-item-row,
+                .email-form-item .ant-form-item-control,
+                .email-form-item .ant-form-item-control-input,
+                .email-form-item .ant-form-item-control-input-content {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    flex: 1 !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                }
+                .email-form-item textarea {
+                    width: 100% !important;
+                    flex: 1 !important;
+                    min-height: 220px !important;
+                    box-sizing: border-box !important;
+                    line-height: 1.6 !important;
+                    padding: 12px 14px !important;
+                    border-radius: 8px !important;
+                    resize: vertical !important;
+                }
