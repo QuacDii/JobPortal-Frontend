@@ -30,12 +30,10 @@ const Home = () => {
     const [loading, setLoading] = useState(true);
     const [thanhPhos, setThanhPhos] = useState([]);
     const [phuongXas, setPhuongXas] = useState([]);
-
     const [nganhNghesTree, setNganhNghesTree] = useState([]);
     const [activeCategory, setActiveCategory] = useState(null);
     const [suggestedKeywords, setSuggestedKeywords] = useState([]);
     const [bookmarkedViTris, setBookmarkedViTris] = useState([]);
-
     const [searchQuery, setSearchQuery] = useState({
         keyword: '',
         maTP: null,
@@ -80,7 +78,6 @@ const Home = () => {
 
     useEffect(() => {
         fetchJobs();
-
         const token = localStorage.getItem('token');
         let userId = null;
         if (token) {
@@ -97,7 +94,6 @@ const Home = () => {
             }).catch(err => console.error("Lỗi lấy bài đã lưu", err));
         }
 
-        // Tải từ khóa gợi ý
         apiClient.get('/Jobs/suggestions', {
             headers: userId ? { maUser: parseInt(userId) } : {}
         }).then(res => {
@@ -111,12 +107,10 @@ const Home = () => {
             setSuggestedKeywords(['Lập trình viên', 'Thực tập sinh', 'Marketing', 'Kinh doanh']);
         });
 
-        // Tải danh sách Thành phố
         apiClient.get('/KhuVuc/ThanhPho')
             .then(res => setThanhPhos(res?.data?.data || res?.data || (Array.isArray(res) ? res : [])))
             .catch(err => console.error("Lỗi lấy danh sách thành phố", err));
 
-        // Tải danh sách Ngành nghề dạng Cây
         apiClient.get('/NganhNghe/tree')
             .then(res => {
                 const treeData = Array.isArray(res) ? res : (res?.data?.data || res?.data || []);
@@ -133,24 +127,19 @@ const Home = () => {
             message.warning("Chiến dịch này hiện chưa có vị trí cụ thể để lưu!");
             return;
         }
-
         const token = localStorage.getItem('token');
         if (!token) {
             message.warning("Vui lòng đăng nhập để lưu bài tuyển dụng!");
             return;
         }
-
         const decoded = parseJwt(token);
         const userId = decoded?.maUser || decoded?.nameid || 1;
-
         try {
             const res = await apiClient.post(`/Jobs/${maViTri}/bookmark`, null, {
                 headers: { Authorization: `Bearer ${token}`, maUser: parseInt(userId) }
             });
-
             const success = res?.success !== undefined ? res.success : res?.data?.success;
             const isBookmarked = res?.isBookmarked !== undefined ? res.isBookmarked : res?.data?.isBookmarked;
-
             if (success) {
                 if (isBookmarked) {
                     setBookmarkedViTris(prev => [...prev, maViTri]);
@@ -171,7 +160,6 @@ const Home = () => {
         if (searchQuery.maTP) params.append('maTP', searchQuery.maTP);
         if (searchQuery.maPhuong) params.append('maPhuong', searchQuery.maPhuong);
         if (searchQuery.maNganh) params.append('maNganh', searchQuery.maNganh);
-
         const queryString = params.toString();
         navigate(queryString ? `/jobs?${queryString}` : '/jobs');
     };
@@ -183,7 +171,6 @@ const Home = () => {
 
     return (
         <div style={{ background: '#f8fafc', minHeight: '100vh', paddingBottom: 60, color: '#1f2937' }}>
-
             {/* HERO SECTION */}
             <div className="hero-wrapper">
                 <div className="hero-content-inner">
@@ -205,7 +192,6 @@ const Home = () => {
                             onChange={(e) => setSearchQuery({ ...searchQuery, keyword: e.target.value })}
                             onPressEnter={handleSearchNavigate}
                         />
-
                         <div style={{ width: 1, height: 28, background: '#cbd5e1' }}></div>
 
                         {/* LỌC TỈNH / THÀNH PHỐ */}
@@ -287,11 +273,9 @@ const Home = () => {
                                 </div>
                             ))}
                         </div>
-
                         <div className="category-flyout">
                             {activeCategory && activeCategory.danhSachCon && activeCategory.danhSachCon.length > 0 ? (
                                 <div>
-                                    {/* 🌟 Bấm vào Tiêu đề ngành cha -> Nhảy sang lọc ngành cha */}
                                     <Title
                                         level={5}
                                         style={{ color: '#2563eb', marginBottom: 18, fontWeight: '700', cursor: 'pointer' }}
@@ -299,13 +283,12 @@ const Home = () => {
                                     >
                                         {activeCategory.tenNganh} — Vị trí tuyển dụng hàng đầu
                                     </Title>
-
                                     <Row gutter={[16, 14]}>
                                         {activeCategory.danhSachCon.map((sub) => (
-                                            <Col span={12} key={sub.maNganh}>
-                                                {/* 🌟 Bấm vào Ngành con -> Nhảy sang lọc ngành con */}
+                                            <Col span={12} key={sub.maNganh} style={{ display: 'flex' }}>
                                                 <div
                                                     className="sub-category-card"
+                                                    style={{ width: '100%' }}
                                                     onClick={() => navigate(`/jobs?maNganh=${sub.maNganh}&loaiNganh=con`)}
                                                 >
                                                     <Text strong style={{ display: 'block', color: '#1e293b', fontSize: 14, paddingRight: 20 }}>
@@ -352,7 +335,7 @@ const Home = () => {
                         </Button>
                     </div>
 
-                    <Row gutter={[20, 20]}>
+                    <Row gutter={[20, 20]} align="stretch">
                         {vipCampaigns.length === 0 ? (
                             <Col span={24}>
                                 <Text type="secondary" style={{ fontStyle: 'italic' }}>Hiện chưa có tin tuyển dụng VIP nổi bật.</Text>
@@ -361,26 +344,60 @@ const Home = () => {
                             vipCampaigns.map((campaign, index) => {
                                 const maViTriDauTien = campaign.viTris && campaign.viTris.length > 0 ? (campaign.viTris[0].id || campaign.viTris[0].maViTri) : null;
                                 const isBookmarked = bookmarkedViTris.includes(maViTriDauTien);
-
                                 return (
-                                    <Col xs={24} md={12} lg={8} key={campaign.maTin || index}>
+                                    <Col xs={24} md={12} lg={8} key={campaign.maTin || index} style={{ display: 'flex' }}>
                                         <Card
                                             hoverable
                                             className="vip-card"
-                                            styles={{ body: { padding: '20px' } }}
+                                            style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}
+                                            styles={{ body: { padding: '20px', display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' } }}
                                             onClick={() => navigate(`/job/${campaign.maTin || campaign.id}`)}
                                         >
                                             <div className="vip-badge">HOT PRO</div>
-
+                                            
+                                            {/* Header Card (Logo + Tiêu đề + Tên Công ty) */}
                                             <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                                                <Avatar shape="square" size={56} src={campaign.logo} style={{ border: '1px solid #e2e8f0', background: '#fff' }} />
+                                                <Avatar shape="square" size={56} src={campaign.logo} style={{ border: '1px solid #e2e8f0', background: '#fff', flexShrink: 0 }} />
                                                 <div style={{ flex: 1, paddingRight: 20 }}>
-                                                    <Title level={5} style={{ margin: 0, color: '#0f172a', fontSize: 16 }}>{campaign.tieuDeChienDich || campaign.title}</Title>
-                                                    <Text style={{ color: '#0284c7', fontSize: 13, fontWeight: '600', display: 'block', marginTop: 2 }}>{campaign.companyName}</Text>
+                                                    <Title 
+                                                        level={5} 
+                                                        title={campaign.tieuDeChienDich || campaign.title}
+                                                        style={{ 
+                                                            margin: 0, 
+                                                            color: '#0f172a', 
+                                                            fontSize: 16, 
+                                                            lineHeight: 1.4,
+                                                            height: '45px', // Cố định chiều cao 2 dòng
+                                                            display: '-webkit-box',
+                                                            WebkitLineClamp: 2,
+                                                            WebkitBoxOrient: 'vertical',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            wordBreak: 'break-word'
+                                                        }}
+                                                    >
+                                                        {campaign.tieuDeChienDich || campaign.title}
+                                                    </Title>
+                                                    <Text 
+                                                        title={campaign.companyName}
+                                                        style={{ 
+                                                            color: '#0284c7', 
+                                                            fontSize: 13, 
+                                                            fontWeight: '600', 
+                                                            display: 'block', 
+                                                            marginTop: 4,
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis'
+                                                        }}
+                                                    >
+                                                        {campaign.companyName}
+                                                    </Text>
                                                 </div>
                                             </div>
 
-                                            <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px dashed #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            {/* Footer Card (Tự động ghim đáy) */}
+                                            <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px dashed #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <Tag color="orange" style={{ fontWeight: 'bold' }}>
                                                     Đang mở {campaign.viTris?.length || 0} vị trí
                                                 </Tag>
@@ -411,13 +428,12 @@ const Home = () => {
                             Hàng ngàn công việc chất lượng dành cho bạn
                         </Text>
                     </div>
-
                     <Button type="link" onClick={() => navigate('/jobs')} style={{ color: '#1677ff', fontWeight: '600' }}>
                         Xem tất cả <RightOutlined style={{ fontSize: 12 }} />
                     </Button>
                 </div>
 
-                <Row gutter={[24, 24]}>
+                <Row gutter={[24, 24]} align="stretch">
                     {regularCampaigns.length === 0 ? (
                         <Col span={24}>
                             <Card style={{ textAlign: 'center', background: '#ffffff', borderRadius: 12, padding: '40px 0' }}>
@@ -428,27 +444,56 @@ const Home = () => {
                         regularCampaigns.map((campaign, index) => {
                             const maViTriDauTien = campaign.viTris && campaign.viTris.length > 0 ? (campaign.viTris[0].id || campaign.viTris[0].maViTri) : null;
                             const isBookmarked = bookmarkedViTris.includes(maViTriDauTien);
-
                             return (
-                                <Col xs={24} md={12} lg={8} key={campaign.maTin || index}>
+                                <Col xs={24} md={12} lg={8} key={campaign.maTin || index} style={{ display: 'flex' }}>
                                     <Card
                                         hoverable
                                         className="regular-card"
-                                        styles={{ body: { padding: '20px', display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' } }}
+                                        style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}
+                                        styles={{ body: { padding: '20px', display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' } }}
                                         onClick={() => navigate(`/job/${campaign.maTin || campaign.id}`)}
                                     >
+                                        {/* Header Card */}
                                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                                            <Avatar shape="square" size={52} src={campaign.logo} style={{ border: '1px solid #f0f0f0', background: '#fff' }} />
+                                            <Avatar shape="square" size={52} src={campaign.logo} style={{ border: '1px solid #f0f0f0', background: '#fff', flexShrink: 0 }} />
                                             <div style={{ flex: 1, paddingRight: 28 }}>
-                                                <Title level={5} style={{ margin: '0 0 4px 0', fontSize: 16, color: '#111827', fontWeight: '700' }}>
+                                                <Title 
+                                                    level={5} 
+                                                    title={campaign.tieuDeChienDich || campaign.title}
+                                                    style={{ 
+                                                        margin: '0 0 4px 0', 
+                                                        fontSize: 16, 
+                                                        color: '#111827', 
+                                                        fontWeight: '700',
+                                                        lineHeight: 1.4,
+                                                        height: '45px', // Cố định chiều cao 2 dòng
+                                                        display: '-webkit-box',
+                                                        WebkitLineClamp: 2,
+                                                        WebkitBoxOrient: 'vertical',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        wordBreak: 'break-word'
+                                                    }}
+                                                >
                                                     {campaign.tieuDeChienDich || campaign.title}
                                                 </Title>
-                                                <Text style={{ color: '#4b5563', fontSize: 13, display: 'block' }}>
+                                                <Text 
+                                                    title={campaign.companyName}
+                                                    style={{ 
+                                                        color: '#4b5563', 
+                                                        fontSize: 13, 
+                                                        display: 'block',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis'
+                                                    }}
+                                                >
                                                     {campaign.companyName}
                                                 </Text>
                                             </div>
                                         </div>
 
+                                        {/* Nút Bookmark */}
                                         <div style={{ position: 'absolute', top: 18, right: 18 }}>
                                             {isBookmarked ? (
                                                 <HeartFilled className="bookmark-icon bookmarked" onClick={(e) => { e.stopPropagation(); handleBookmark(maViTriDauTien); }} />
@@ -457,6 +502,7 @@ const Home = () => {
                                             )}
                                         </div>
 
+                                        {/* Footer Card (Tự động ghim đáy) */}
                                         <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px dashed #f0f0f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
                                             <Text style={{ color: '#1677ff', fontSize: 13, fontWeight: '600' }}>
                                                 <PushpinOutlined style={{ marginRight: 4 }} /> Đang mở {campaign.viTris?.length || 0} vị trí tuyển dụng

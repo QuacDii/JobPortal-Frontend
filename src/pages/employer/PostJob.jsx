@@ -105,7 +105,7 @@ const PostJob = () => {
                     return {
                         tenViTri: pos.tenViTri,
                         capBac: pos.capBac,
-                        soLuongTuyen: pos.soLuongTuyen || 1,
+                        soLuongTuyen: pos.soLuongTuyen,
                         luong: luongText,
                         moTaCongViec: pos.moTaCongViec,
                         yeuCauUngVien: pos.yeuCauUngVien,
@@ -150,7 +150,7 @@ const PostJob = () => {
                 layout="vertical"
                 form={form}
                 onFinish={onFinish}
-                initialValues={{ danhSachViTri: [{ loaiLuong: 'khoang', soLuongTuyen: 1 }] }}
+                initialValues={{ danhSachViTri: [{ loaiLuong: 'khoang' }] }}
             >
                 <Card title="Thông tin chung" style={{ marginBottom: 24, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
                     <Row gutter={24}>
@@ -262,9 +262,19 @@ const PostJob = () => {
                                                                     <Form.Item
                                                                         {...restField}
                                                                         name={[name, 'luongTu']}
-                                                                        rules={[{ required: true, message: 'Nhập lương từ!' }]}
+                                                                        rules={[
+                                                                            { required: true, message: 'Nhập lương từ!' },
+                                                                            {
+                                                                                validator: (_, value) => {
+                                                                                    if (value === null || value === undefined || value >= 0) {
+                                                                                        return Promise.resolve();
+                                                                                    }
+                                                                                    return Promise.reject(new Error('Mức lương từ phải lớn hơn hoặc bằng 0!'));
+                                                                                }
+                                                                            }
+                                                                        ]}
                                                                     >
-                                                                        <InputNumber min={0} style={{ width: '100%' }} placeholder="Từ (VD: 15)" addonAfter="Triệu" />
+                                                                        <InputNumber style={{ width: '100%' }} placeholder="Từ (VD: 15)" addonAfter="Triệu" />
                                                                     </Form.Item>
                                                                 </Col>
                                                                 <Col span={2} style={{ textAlign: 'center', marginBottom: 24, fontWeight: 'bold' }}>-</Col>
@@ -274,6 +284,14 @@ const PostJob = () => {
                                                                         name={[name, 'luongDen']}
                                                                         rules={[
                                                                             { required: true, message: 'Nhập lương đến!' },
+                                                                            {
+                                                                                validator: (_, value) => {
+                                                                                    if (value === null || value === undefined || value >= 0) {
+                                                                                        return Promise.resolve();
+                                                                                    }
+                                                                                    return Promise.reject(new Error('Mức lương đến phải lớn hơn hoặc bằng 0!'));
+                                                                                }
+                                                                            },
                                                                             ({ getFieldValue }) => ({
                                                                                 validator(_, value) {
                                                                                     const tu = getFieldValue(['danhSachViTri', name, 'luongTu']);
@@ -285,7 +303,7 @@ const PostJob = () => {
                                                                             }),
                                                                         ]}
                                                                     >
-                                                                        <InputNumber min={0} style={{ width: '100%' }} placeholder="Đến (VD: 20)" addonAfter="Triệu" />
+                                                                        <InputNumber style={{ width: '100%' }} placeholder="Đến (VD: 20)" addonAfter="Triệu" />
                                                                     </Form.Item>
                                                                 </Col>
                                                             </Row>
@@ -300,10 +318,25 @@ const PostJob = () => {
                                                 {...restField}
                                                 label="Số lượng tuyển"
                                                 name={[name, 'soLuongTuyen']}
-                                                rules={[{ required: true, message: 'Bắt buộc nhập!' }]}
-                                                initialValue={1}
+                                                rules={[
+                                                    { required: true, message: 'Bắt buộc nhập!' },
+                                                    {
+                                                        validator: (_, value) => {
+                                                            if (value === null || value === undefined) {
+                                                                return Promise.resolve();
+                                                            }
+                                                            if (!Number.isInteger(value)) {
+                                                                return Promise.reject(new Error('Số lượng tuyển phải là số nguyên!'));
+                                                            }
+                                                            if (value > 0) {
+                                                                return Promise.resolve();
+                                                            }
+                                                            return Promise.reject(new Error('Số lượng tuyển phải lớn hơn 0!'));
+                                                        }
+                                                    }
+                                                ]}
                                             >
-                                                <InputNumber min={1} style={{ width: '100%' }} placeholder="VD: 2" />
+                                                <InputNumber style={{ width: '100%' }} placeholder="VD: 2" />
                                             </Form.Item>
                                         </Col>
                                     </Row>
@@ -384,7 +417,6 @@ const PostJob = () => {
                                         />
                                     </Form.Item>
 
-                                    {/* 🌟 CẬP NHẬT: CẢ 3 Ố NHẬP XẾP HÀNG DỌC FULL-WIDTH KÈM AUTOSIZE CO GIÃN TỰ ĐỘNG */}
                                     <Form.Item 
                                         {...restField} 
                                         label="Mô tả công việc" 
@@ -424,7 +456,7 @@ const PostJob = () => {
                             ))}
 
                             <Form.Item>
-                                <Button type="dashed" onClick={() => add({ loaiLuong: 'khoang', soLuongTuyen: 1 })} block icon={<PlusOutlined />} style={{ height: 50, borderColor: '#1890ff', color: '#1890ff', fontSize: 16 }}>
+                                <Button type="dashed" onClick={() => add({ loaiLuong: 'khoang' })} block icon={<PlusOutlined />} style={{ height: 50, borderColor: '#1890ff', color: '#1890ff', fontSize: 16 }}>
                                     Thêm vị trí công việc
                                 </Button>
                             </Form.Item>
