@@ -10,13 +10,34 @@ import useCvStore from '../../store/useCvStore';
 import { Popover, Checkbox } from 'antd';
 import {
   PhoneOutlined, CalendarOutlined, MailOutlined, EnvironmentOutlined, GlobalOutlined, UserOutlined,
-  ArrowUpOutlined, ArrowDownOutlined, DeleteOutlined, DragOutlined, EyeOutlined, InfoCircleOutlined
+  ArrowUpOutlined, ArrowDownOutlined, DeleteOutlined, DragOutlined, EyeOutlined, InfoCircleOutlined,
+  BulbOutlined, TeamOutlined, ProjectOutlined, AppstoreOutlined, TrophyOutlined, FileTextOutlined, CheckCircleOutlined
 } from '@ant-design/icons';
 
 const hiddenSectionsListeners = new Set();
 window.__hiddenCvSections = window.__hiddenCvSections || [];
 window.__customCvSections = window.__customCvSections || [];
 window.__contactChildrenOrder = window.__contactChildrenOrder || [];
+
+const hoverListeners = new Set();
+let globalHoveredBlockId = null;
+
+const setGlobalHovered = (id) => {
+  if (globalHoveredBlockId !== id) {
+    globalHoveredBlockId = id;
+    const listeners = Array.from(hoverListeners);
+    listeners.forEach(fn => fn());
+  }
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('mousemove', (e) => {
+    if (!globalHoveredBlockId) return;
+    if (!e.target || !e.target.closest || !e.target.closest('.cv-macro-section-block')) {
+      setGlobalHovered(null);
+    }
+  });
+}
 
 const ThemeContext = createContext({ columnIndex: -1, isInsideColoredBg: false, isInsideLoopItem: false });
 
@@ -29,6 +50,187 @@ window.__cleanupCvDrag = () => {
     window.__cvDragState.el.style.display = '';
   }
   window.__cvDragState = null;
+};
+
+export const transformSectionForColumn = (section, targetColId, passedLang = null) => {
+  if (!section || !section.id) return section;
+
+  const store = useCvStore.getState();
+  const currentSchema = store.layoutSchema || store.schema || {};
+
+  // 1. Kiểm tra chính xác xem có phải cột trái không
+  const isLeftCol = (colId) => {
+    if (!colId) return false;
+    const lower = colId.toLowerCase();
+    return lower.includes('left') || lower.includes('col-1') || lower.includes('sidebar') || lower.includes('col-4-left');
+  };
+  const isLeft = isLeftCol(targetColId);
+
+  const activeLang = (
+    passedLang ||
+    store.language ||
+    store.currentLang ||
+    store.layoutSettings?.language ||
+    (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('lang') : null) ||
+    'vi'
+  ).toLowerCase();
+
+  const isEn = activeLang === 'en' || activeLang === 'english';
+  const t = (vi, en) => (isEn ? en : vi);
+
+  const newSection = JSON.parse(JSON.stringify(section));
+  const id = newSection.id;
+
+  // 🌟 2. XỬ LÝ AN TOÀN & LINH HOẠT CHO HEADER / AVATAR / DANH THIẾP
+  if (id === 'section-avatar-profile' || id === 'section-business-card' || id === 'section-contact-info') {
+    const hasNegativeMargin = newSection.styles?.marginLeft && String(newSection.styles.marginLeft).startsWith('-');
+
+    if (hasNegativeMargin) {
+      let targetPadding = 0;
+      const findColPadding = (node) => {
+        if (node?.id === targetColId && node.styles?.padding) {
+          const parts = node.styles.padding.trim().split(/\s+/);
+          // Lấy padding ngang (nếu là "0px 25px" thì lấy 25, nếu là "20px" thì lấy 20)
+          const horiz = parts.length >= 2 ? parts[1] : parts[0];
+          targetPadding = parseFloat(horiz) || 0;
+        }
+        if (node?.children) node.children.forEach(findColPadding);
+      };
+      findColPadding(currentSchema);
+
+      if (targetPadding > 0) {
+        newSection.styles.marginLeft = `-${targetPadding}px`;
+        newSection.styles.marginRight = `-${targetPadding}px`;
+      } else {
+        delete newSection.styles.marginLeft;
+        delete newSection.styles.marginRight;
+      }
+    }
+
+    return newSection;
+  }
+
+  // 3. Trích xuất Text tiêu đề
+  const titleDictionary = {
+    'section-summary': { vi: 'Mục tiêu nghề nghiệp', en: 'Career Objective' },
+    'section-education': { vi: 'Học vấn', en: 'Education' },
+    'section-experience': { vi: 'Kinh nghiệm làm việc', en: 'Work Experience' },
+    'section-skills': { vi: 'Kỹ năng', en: 'Skills' },
+    'section-hobbies': { vi: 'Sở thích', en: 'Hobbies' },
+    'section-projects': { vi: 'Dự án', en: 'Projects' },
+    'section-activities': { vi: 'Hoạt động', en: 'Activities' },
+    'section-awards': { vi: 'Danh hiệu và giải thưởng', en: 'Honors & Awards' },
+    'section-certificates': { vi: 'Chứng chỉ', en: 'Certificates' },
+    'section-references': { vi: 'Người giới thiệu', en: 'References' },
+    'section-additional': { vi: 'Thông tin thêm', en: 'Additional Information' }
+  };
+
+  let titleText = titleDictionary[id] ? t(titleDictionary[id].vi, titleDictionary[id].en) : 'Section';
+
+  // 4. Học kiểu dáng Tiêu đề và Card Wrapper từ cột đích
+  let sampleHeading = null;
+  let sampleCardStyles = null;
+  const excludeIds = ['section-avatar-profile', 'section-business-card', 'section-contact-info', id];
+
+  const findSample = (node) => {
+    if (!node) return;
+    if (node.id === targetColId && node.children && node.children.length > 0) {
+      const validSec = node.children.find(c => c && c.id && !excludeIds.includes(c.id) && c.children && c.children.length > 0);
+      if (validSec) {
+        if (validSec.children[0] && validSec.children[0].type !== 'Image') {
+          sampleHeading = JSON.parse(JSON.stringify(validSec.children[0]));
+        }
+        // Kiểm tra xem các khối ở cột đích có bọc ô vuông/ô xanh không
+        const secondChild = validSec.children[1];
+        if (secondChild && secondChild.type === 'Container' && (secondChild.styles?.backgroundColor || secondChild.styles?.background)) {
+          sampleCardStyles = JSON.parse(JSON.stringify(secondChild.styles));
+        }
+      }
+    }
+    if (!sampleHeading && node.children) node.children.forEach(findSample);
+  };
+  findSample(currentSchema);
+
+  // Tái tạo Tiêu đề chuẩn theo cột đích
+  let formattedHeading;
+  if (sampleHeading) {
+    const replaceHeadingContent = (n) => {
+      if (!n) return;
+      if (n.type === 'Text' && n.content && n.content !== '•' && n.content !== '-' && n.content !== '|') {
+        n.content = (sampleHeading.styles?.textTransform === 'uppercase' || n.styles?.textTransform === 'uppercase')
+          ? titleText.toUpperCase()
+          : titleText;
+      }
+      if (n.children) n.children.forEach(replaceHeadingContent);
+    };
+    replaceHeadingContent(sampleHeading);
+    formattedHeading = sampleHeading;
+  } else {
+    formattedHeading = newSection.children[0];
+  }
+
+  // 🌟 5. BÓC TÁCH (UNWRAP) VỎ BỌC NỀN XANH
+  let contentNode = (newSection.children && newSection.children[1]) ? newSection.children[1] : null;
+
+  // Nếu nội dung đang bị bọc bởi Container nền xanh/card -> Bóc lấy nội dung con bên trong
+  if (contentNode && contentNode.type === 'Container' && contentNode.children && contentNode.children.length === 1) {
+    const hasCardBg = contentNode.styles?.backgroundColor || contentNode.styles?.background;
+    if (hasCardBg && contentNode.styles?.backgroundColor !== 'transparent') {
+      contentNode = contentNode.children[0];
+    }
+  }
+
+  // 🌟 6. XỬ LÝ THEO CỘT ĐÍCH
+  if (isLeft) {
+    // KHI SANG CỘT TRÁI: Xóa triệt để màu nền, padding và bo góc thừa
+    if (contentNode && contentNode.styles) {
+      delete contentNode.styles.backgroundColor;
+      delete contentNode.styles.background;
+      delete contentNode.styles.padding;
+      delete contentNode.styles.borderRadius;
+    }
+  } else {
+    // KHI SANG CỘT PHẢI: Nếu cột phải có ô xanh, tự động bọc lại
+    if (sampleCardStyles) {
+      contentNode = {
+        type: "Container",
+        styles: { ...sampleCardStyles, width: "100%", boxSizing: "border-box" },
+        children: [contentNode]
+      };
+    } else {
+      // Dự phòng cho mẫu có timeline card xanh
+      const schemaStr = JSON.stringify(currentSchema);
+      if (schemaStr.includes('#e6f0fa') || schemaStr.includes('borderRadius": "20px"')) {
+        contentNode = {
+          type: "Container",
+          styles: { backgroundColor: "#e6f0fa", borderRadius: "20px", padding: "18px 22px", width: "100%", boxSizing: "border-box" },
+          children: [contentNode]
+        };
+      }
+    }
+  }
+
+  // 7. Đồng bộ màu chữ theo màu nền của cột
+  const syncTextColor = (node, toLeft) => {
+    if (!node) return;
+    if (node.styles) {
+      if (toLeft) {
+        if (!node.styles.color || !node.styles.color.includes('var(')) {
+          node.styles.color = (node.styles.fontWeight === 'bold' || node.styles.fontWeight === '600') ? '#1e293b' : '#64748b';
+        }
+      } else {
+        if (node.styles.color && (node.styles.color.includes('#fff') || node.styles.color.includes('255, 255, 255'))) {
+          node.styles.color = '#1e293b';
+        }
+      }
+    }
+    if (node.children) node.children.forEach(c => syncTextColor(c, toLeft));
+    if (node.itemTemplate) syncTextColor(node.itemTemplate, toLeft);
+  };
+  syncTextColor(contentNode, isLeft);
+
+  newSection.children = [formattedHeading, contentNode];
+  return newSection;
 };
 
 const toggleSectionVisibility = (id, isVisible) => {
@@ -70,10 +272,8 @@ const moveContactSection = (id, direction) => {
 
 const getSectionLabel = (id) => {
   if (!id) return 'Mục con';
-
   const currentLang = (new URLSearchParams(window.location.search).get('lang') || 'vi').toLowerCase();
   const isEn = currentLang === 'en';
-
   const lower = id.toLowerCase();
   if (lower.includes('phone') || lower.includes('dienthoai')) return isEn ? 'Phone' : 'Số điện thoại';
   if (lower.includes('email')) return 'Email';
@@ -85,30 +285,35 @@ const getSectionLabel = (id) => {
 };
 
 const getMacroSectionTitle = (id) => {
-  if (!id) return 'Mục nội dung';
+  if (!id) return 'Section';
+  const currentLang = (
+    (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('lang') : null) || 'vi'
+  ).toLowerCase();
+  const isEn = currentLang === 'en' || currentLang === 'english';
+  const t = (vi, en) => (isEn ? en : vi);
+
   const map = {
-    'section-summary': 'Mục tiêu nghề nghiệp',
-    'section-experience': 'Kinh nghiệm làm việc',
-    'section-education': 'Học vấn',
-    'section-skills': 'Kỹ năng',
-    'section-hobbies': 'Sở thích',
-    'section-awards': 'Danh hiệu và giải thưởng',
-    'section-certificates': 'Chứng chỉ',
-    'section-activities': 'Hoạt động',
-    'section-projects': 'Dự án',
-    'section-contact-info': 'Thông tin liên hệ',
-    'section-avatar-profile': 'Ảnh đại diện',
-    'section-references': 'Người tham chiếu',
-    'section-additional': 'Thông tin thêm',
-    'section-business-card': 'Danh thiếp'
+    'section-summary': t('Mục tiêu nghề nghiệp', 'Career Objective'),
+    'section-experience': t('Kinh nghiệm làm việc', 'Work Experience'),
+    'section-education': t('Học vấn', 'Education'),
+    'section-skills': t('Kỹ năng', 'Skills'),
+    'section-hobbies': t('Sở thích', 'Hobbies'),
+    'section-awards': t('Danh hiệu và giải thưởng', 'Honors & Awards'),
+    'section-certificates': t('Chứng chỉ', 'Certificates'),
+    'section-activities': t('Hoạt động', 'Activities'),
+    'section-projects': t('Dự án', 'Projects'),
+    'section-contact-info': t('Thông tin liên hệ', 'Contact Information'),
+    'section-avatar-profile': t('Ảnh đại diện', 'Avatar'),
+    'section-references': t('Người giới thiệu', 'References'),
+    'section-additional': t('Thông tin thêm', 'Additional Information'),
+    'section-business-card': t('Danh thiếp', 'Business Card')
   };
   if (map[id]) return map[id];
   if (id.startsWith('section-contact-')) return getSectionLabel(id);
-  return 'Mục con';
+  return 'Section';
 };
 
 const isSectionRequired = (id) => {
-  if (!id) return false;
   return id === 'section-contact-phone' || id === 'section-contact-email';
 };
 
@@ -118,18 +323,6 @@ const findSiblings = (root, targetId) => {
   for (const child of root.children) {
     const res = findSiblings(child, targetId);
     if (res) return res;
-  }
-  return null;
-};
-
-const findDataPathInsideNode = (n) => {
-  if (!n) return null;
-  if (n.dataPath) return n.dataPath;
-  if (n.children && n.children.length > 0) {
-    for (const child of n.children) {
-      const foundPath = findDataPathInsideNode(child);
-      if (foundPath) return foundPath;
-    }
   }
   return null;
 };
@@ -156,21 +349,6 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
   const themeCtx = useContext(ThemeContext);
   const layoutSchema = useCvStore(state => state.layoutSchema || state.schema);
 
-  const isReq = isSectionRequired(node.id);
-  const exactDataPath = isReq ? findDataPathInsideNode(node) : null;
-  const storeValue = useCvStore(state => {
-    if (!isReq || !exactDataPath) return null;
-    const data = state.cvData || state.data || {};
-    return exactDataPath.split('.').reduce((acc, part) => (acc ? acc[part] : undefined), data);
-  });
-
-  let isEmptyRequired = false;
-  if (isReq) {
-    if (storeValue === undefined || storeValue === null || String(storeValue).trim() === "") {
-      isEmptyRequired = true;
-    }
-  }
-
   const mainSections = [
     'section-contact-info', 'section-education', 'section-experience',
     'section-awards', 'section-certificates', 'section-activities',
@@ -188,6 +366,59 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
 
   if (!isValidNode) return children;
 
+  let loopBaseString = null;
+  let computedIndex = -1;
+
+  if (isLoopRow) {
+    loopBaseString = node._loopBasePath || (node.dataPath ? node.dataPath.replace(/\[\d+\].*/, '').replace(/\.\d+\..*/, '') : null);
+    computedIndex = (dataScope && dataScope.index !== undefined)
+      ? dataScope.index
+      : extractLoopIndexSafely(node);
+  }
+
+  const fallbackIdRef = useRef(`block-${Math.random().toString(36).substr(2, 9)}`);
+  const uniqueBlockId = isLoopRow
+    ? `${loopBaseString || 'loop'}-${computedIndex}`
+    : (node.id || fallbackIdRef.current);
+
+  const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    const handleHoverUpdate = () => {
+      const isCurrentlyHovered = globalHoveredBlockId === uniqueBlockId;
+      setIsHovered(prev => (prev !== isCurrentlyHovered ? isCurrentlyHovered : prev));
+    };
+    hoverListeners.add(handleHoverUpdate);
+    handleHoverUpdate();
+
+    return () => {
+      hoverListeners.delete(handleHoverUpdate);
+      if (globalHoveredBlockId === uniqueBlockId) {
+        setGlobalHovered(null);
+      }
+    };
+  }, [uniqueBlockId]);
+
+  const handleMouseEnter = (e) => {
+    e.stopPropagation();
+    setGlobalHovered(uniqueBlockId);
+  };
+
+  const handleMouseLeave = (e) => {
+    e.stopPropagation();
+    if (globalHoveredBlockId === uniqueBlockId) {
+      const targetBlock = e.relatedTarget?.closest?.('.cv-macro-section-block');
+      if (targetBlock) {
+        const targetId = targetBlock.getAttribute('data-block-id');
+        if (targetId) {
+          setGlobalHovered(targetId);
+          return;
+        }
+      }
+      setGlobalHovered(null);
+    }
+  };
+
   const undeletableSections = ['section-avatar-profile', 'section-contact-info', 'section-business-card'];
   const canDeleteMacro = !undeletableSections.includes(node.id);
 
@@ -196,21 +427,16 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
     canDeleteChild = node.id !== 'section-contact-phone' && node.id !== 'section-contact-email';
   }
 
-  const isAvatar = node.id === 'section-avatar-profile';
-  const hasMacroToolbar = isLargeBlock;
-  const hasChildToolbar = isAnyChildBlock;
+  const isTopBlock = node.id === 'section-avatar-profile' || node.id === 'section-business-card';
 
-  let isFirst = false; let isLast = false;
-  let loopBaseString = null; let isSingleItem = false;
-  let computedIndex = -1;
+  const showMacroToolbar = isLargeBlock && (isHovered || popoverOpen);
+  const showChildToolbar = isAnyChildBlock && isHovered;
+
+  let isFirst = false;
+  let isLast = false;
+  let isSingleItem = false;
 
   if (isLoopRow) {
-    loopBaseString = node._loopBasePath || (node.dataPath ? node.dataPath.replace(/\[\d+\].*/, '').replace(/\.\d+\..*/, '') : null);
-
-    computedIndex = (dataScope && dataScope.index !== undefined)
-      ? dataScope.index
-      : extractLoopIndexSafely(node);
-
     const storeState = useCvStore.getState();
     const currentData = storeState.cvData || storeState.data || {};
     let arr = currentData;
@@ -466,7 +692,8 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
       if (!currentSchema) return;
 
       const newSchema = JSON.parse(JSON.stringify(currentSchema));
-      let draggedItemObj = null; let sourceArray = null;
+      let draggedItemObj = null;
+      let sourceArray = null;
 
       const extractItem = (parent) => {
         if (!parent || !parent.children) return false;
@@ -485,12 +712,17 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
 
       if (draggedItemObj) {
         let targetArray = null;
+        let targetColId = null;
         const siblingId = newOrderIds.find(id => id !== draggedId);
 
         if (siblingId) {
           const findTargetArray = (parent) => {
             if (!parent || !parent.children) return false;
-            if (parent.children.some(c => c && c.id === siblingId)) { targetArray = parent.children; return true; }
+            if (parent.children.some(c => c && c.id === siblingId)) {
+              targetArray = parent.children;
+              targetColId = parent.id;
+              return true;
+            }
             for (const c of parent.children) { if (findTargetArray(c)) return true; }
             return false;
           };
@@ -503,7 +735,9 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
               if (!parent) return false;
               if (parent.id === parentContainerId) {
                 if (!parent.children) parent.children = [];
-                targetArray = parent.children; return true;
+                targetArray = parent.children;
+                targetColId = parent.id;
+                return true;
               }
               if (parent.children) {
                 for (const c of parent.children) { if (findContainerArray(c)) return true; }
@@ -512,10 +746,31 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
             };
             findContainerArray(newSchema);
           }
-          if (!targetArray) targetArray = sourceArray;
+          if (!targetArray) {
+            targetArray = sourceArray;
+          }
         }
 
         if (targetArray) {
+          if (!targetColId && targetArray) {
+            if (newSchema.children && newSchema.children[0] && newSchema.children[0].children === targetArray) {
+              targetColId = newSchema.children[0].id || 'left-col';
+            } else if (newSchema.children && newSchema.children[1] && newSchema.children[1].children === targetArray) {
+              targetColId = newSchema.children[1].id || 'right-col';
+            }
+          }
+
+          if (targetColId) {
+            const currentLang = (
+              store.language ||
+              store.currentLang ||
+              store.layoutSettings?.language ||
+              (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('lang') : null) ||
+              'vi'
+            );
+            draggedItemObj = transformSectionForColumn(draggedItemObj, targetColId, currentLang);
+          }
+
           targetArray.push(draggedItemObj);
           targetArray.sort((a, b) => {
             const idxA = newOrderIds.indexOf(a.id);
@@ -524,6 +779,7 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
             if (idxB === -1) return -1;
             return idxA - idxB;
           });
+
           if (typeof store.setLayoutSchema === 'function') store.setLayoutSchema(newSchema);
           else useCvStore.setState({ layoutSchema: newSchema, schema: newSchema });
           hiddenSectionsListeners.forEach(l => l());
@@ -552,53 +808,60 @@ const MacroSectionWrapper = ({ node, children, isRoot, dataScope }) => {
     <div
       ref={wrapperRef}
       data-cv-id={node.id}
+      data-block-id={uniqueBlockId}
       data-column-index={themeCtx.columnIndex}
-      className={`cv-macro-section-block ${isEmptyRequired ? 'has-empty-required' : ''}`}
+      className={`cv-macro-section-block ${isAnyChildBlock ? 'is-loop-child' : ''}`}
       style={{
         position: 'relative',
         width: '100%',
+        minWidth: '0',
         display: 'block',
         boxSizing: 'border-box'
       }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {hasMacroToolbar && (
+      {showMacroToolbar && (
         <div
           className={`cv-macro-toolbar no-print ${popoverOpen ? 'force-show' : ''}`}
           style={{
-            position: 'absolute', alignItems: 'center', gap: '2px',
-            top: isAvatar ? '10px' : '-32px', left: '10px', zIndex: 999
+            position: 'absolute',
+            alignItems: 'center',
+            gap: '2px',
+            top: isTopBlock ? '10px' : '-32px',
+            left: '10px',
+            zIndex: 1000
           }}
         >
-          <div draggable={true} onDragStart={handleDragStart} onDragEnd={handleDragEnd} className="cv-btn-item" style={{ cursor: 'move' }}>
+          <div draggable={true} onDragStart={handleDragStart} onDragEnd={handleDragEnd} className="cv-btn-item" style={{ cursor: 'move' }} title="Kéo thả di chuyển mục">
             <DragOutlined />
           </div>
           {node.id === 'section-contact-info' && (
             <Popover content={popoverContent} title={null} trigger="click" placement="topLeft" overlayClassName="custom-cv-popover-wrapper" onOpenChange={(open) => setPopoverOpen(open)}>
-              <button className="cv-btn-item"><EyeOutlined /></button>
+              <button className="cv-btn-item" title="Ẩn/Hiện thông tin"><EyeOutlined /></button>
             </Popover>
           )}
-          {!isFirst && <button className="cv-btn-item" onClick={() => useCvStore.getState().moveMacroSection(node.id, 'up')}><ArrowUpOutlined /></button>}
-          {!isLast && <button className="cv-btn-item" onClick={() => useCvStore.getState().moveMacroSection(node.id, 'down')}><ArrowDownOutlined /></button>}
+          {!isFirst && <button className="cv-btn-item" onClick={() => useCvStore.getState().moveMacroSection(node.id, 'up')} title="Di chuyển lên"><ArrowUpOutlined /></button>}
+          {!isLast && <button className="cv-btn-item" onClick={() => useCvStore.getState().moveMacroSection(node.id, 'down')} title="Di chuyển xuống"><ArrowDownOutlined /></button>}
           {canDeleteMacro && <button className="cv-btn-delete" onClick={() => useCvStore.getState().removeMacroSection(node.id)}>Xóa</button>}
         </div>
       )}
-
-      {hasChildToolbar && (
+      {showChildToolbar && (
         <div
-          className="cv-macro-toolbar no-print"
+          className="cv-macro-toolbar cv-new-child-toolbar no-print"
           style={{
             position: 'absolute', alignItems: 'center', gap: '2px',
-            top: '-32px', right: '10px', zIndex: 999
+            top: '-32px', right: '10px', zIndex: 1000
           }}
         >
           {isSingleItem ? (
             <button className="cv-btn-add" onClick={handleAddClick}>+ Thêm</button>
           ) : (
             <>
-              {!isFirst && <button className="cv-btn-item" onClick={() => handleMoveChildClick('up')}><ArrowUpOutlined /></button>}
-              {!isLast && <button className="cv-btn-item" onClick={() => handleMoveChildClick('down')}><ArrowDownOutlined /></button>}
+              {!isFirst && <button className="cv-btn-item" onClick={() => handleMoveChildClick('up')} title="Di chuyển lên"><ArrowUpOutlined /></button>}
+              {!isLast && <button className="cv-btn-item" onClick={() => handleMoveChildClick('down')} title="Di chuyển xuống"><ArrowDownOutlined /></button>}
               {canDeleteChild && <button className="cv-btn-delete" onClick={handleDeleteClick}>Xóa</button>}
               <button className="cv-btn-add" onClick={handleAddClick}>+ Thêm</button>
             </>
@@ -622,14 +885,14 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
     return () => hiddenSectionsListeners.delete(handler);
   }, []);
 
-  if (!node) return null;
+  if (!node || typeof node !== 'object') return null;
 
-  const isColumnNode = isRoot || isDirectColumn;
   const checkSolidBg = (styles) => {
     if (!styles || !styles.backgroundColor) return false;
     const bg = styles.backgroundColor.replace(/\s/g, '').toLowerCase();
     return bg !== 'transparent' && bg !== 'initial' && bg !== 'inherit' && !bg.startsWith('rgba(0,0,0,0)');
   };
+  const isColumnNode = isRoot || isDirectColumn;
   const hasSolidBg = !isColumnNode && checkSolidBg(node.styles);
   const nextIsInsideColoredBg = themeCtx.isInsideColoredBg || hasSolidBg;
 
@@ -666,17 +929,27 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
       case 'Container':
         if (node.id === 'section-contact-info') {
           const STANDARD_CONTACTS = [
-            'section-contact-dob',
-            'section-contact-gender',
             'section-contact-phone',
             'section-contact-email',
             'section-contact-website',
-            'section-contact-address'
+            'section-contact-address',
+            'section-contact-dob',
+            'section-contact-gender'
           ];
 
-          if (!window.__contactChildrenOrder || window.__contactChildrenOrder.length === 0) {
-            window.__contactChildrenOrder = node.children ? node.children.map(c => c && c.id).filter(Boolean) : [];
+          const headerNode = node.children
+            ? node.children.find(c => c && (c.id === 'contact-section-header' || c.id === 'section-contact-header'))
+            : null;
+          const itemNodes = node.children
+            ? node.children.filter(c => c && c !== headerNode)
+            : [];
+
+          if (!window.__contactChildrenOrder || window.__contactChildrenOrder.length === 0 || !window.__contactChildrenOrder.some(id => STANDARD_CONTACTS.includes(id))) {
+            window.__contactChildrenOrder = itemNodes.map(c => c && c.id).filter(Boolean);
           }
+          window.__contactChildrenOrder = window.__contactChildrenOrder.filter(
+            id => id !== 'contact-section-header' && id !== 'section-contact-header'
+          );
 
           STANDARD_CONTACTS.forEach(stdId => {
             if (!window.__contactChildrenOrder.includes(stdId)) {
@@ -687,8 +960,8 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
             }
           });
 
-          if (node.children) {
-            node.children.forEach(c => {
+          if (itemNodes) {
+            itemNodes.forEach(c => {
               if (c && c.id && !window.__contactChildrenOrder.includes(c.id)) {
                 window.__contactChildrenOrder.push(c.id);
               }
@@ -701,57 +974,73 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
             return true;
           });
 
-          // Kiểm tra xem các mục liên hệ sẵn có trong mẫu này dùng Icon hay dùng Text nhãn
-          const isIconTemplate = node.children && node.children.some(c => c && c.children && c.children.some(sub => sub.type === 'Icon'));
+          const isIconTemplate = itemNodes.some(c => c && c.children && c.children.some(sub => sub.type === 'Icon'));
+          const sampleItem = itemNodes.find(c => c && c.children && c.children.length > 0) || itemNodes[0];
 
           const mixedChildren = visibleIds.map(id => {
-            const standard = node.children ? node.children.find(c => c && c.id === id) : null;
+            const standard = itemNodes.find(c => c && c.id === id);
             if (standard) return standard;
 
-            if (STANDARD_CONTACTS.includes(id)) {
-              const templateChild = node.children ? node.children.find(c => c && STANDARD_CONTACTS.includes(c.id)) : null;
+            if (sampleItem) {
+              const clonedChild = JSON.parse(JSON.stringify(sampleItem));
+              clonedChild.id = id;
 
-              if (templateChild) {
-                const clonedChild = JSON.parse(JSON.stringify(templateChild));
-                clonedChild.id = id;
+              const currentLang = new URLSearchParams(window.location.search).get('lang') || 'vi';
+              const t = (viText, enText) => currentLang === 'en' ? enText : viText;
 
-                const currentLang = new URLSearchParams(window.location.search).get('lang') || 'vi';
-                const t = (viText, enText) => currentLang === 'en' ? enText : viText;
+              const metaMap = {
+                'section-contact-dob': { icon: 'calendar', key: 'dob', placeholder: t('Ngày sinh', 'Date of Birth'), label: t('Ngày sinh:', 'Date of Birth:') },
+                'section-contact-gender': { icon: 'user', key: 'gender', placeholder: t('Giới tính', 'Gender'), label: t('Giới tính:', 'Gender:') },
+                'section-contact-phone': { icon: 'phone', key: 'phone', placeholder: t('Số điện thoại', 'Phone'), label: t('Số điện thoại:', 'Phone:') },
+                'section-contact-email': { icon: 'mail', key: 'email', placeholder: 'Email', label: 'Email:' },
+                'section-contact-website': { icon: 'website', key: 'website', placeholder: 'Website', label: 'Website:' },
+                'section-contact-address': { icon: 'address', key: 'address', placeholder: t('Địa chỉ', 'Address'), label: t('Địa chỉ:', 'Address:') }
+              };
 
-                const metaMap = {
-                  'section-contact-dob': { icon: 'calendar', key: 'dob', placeholder: t('Ngày sinh', 'Date of Birth'), label: t('Ngày sinh:', 'Date of Birth:') },
-                  'section-contact-gender': { icon: 'user', key: 'gender', placeholder: t('Giới tính', 'Gender'), label: t('Giới tính:', 'Gender:') },
-                  'section-contact-phone': { icon: 'phone', key: 'phone', placeholder: t('Số điện thoại', 'Phone'), label: t('Số điện thoại:', 'Phone:') },
-                  'section-contact-email': { icon: 'mail', key: 'email', placeholder: 'Email', label: 'Email:' },
-                  'section-contact-website': { icon: 'website', key: 'website', placeholder: 'Website', label: 'Website:' },
-                  'section-contact-address': { icon: 'address', key: 'address', placeholder: t('Địa chỉ', 'Address'), label: t('Địa chỉ:', 'Address:') }
-                };
+              const isCustom = id.startsWith('section-contact-custom-');
 
-                const replaceData = (n) => {
-                  if (!n) return;
-                  if (n.type === 'Icon') n.name = metaMap[id].icon;
-                  if (n.type === 'Text' && n.dataPath) {
-                    const parts = n.dataPath.split('.');
-                    parts.pop();
-                    const prefix = parts.length > 0 ? parts.join('.') + '.' : '';
-                    n.dataPath = prefix + metaMap[id].key;
-                    n.placeholder = metaMap[id].placeholder;
+              const transformChild = (n) => {
+                if (!n) return;
+                if (n.type === 'Icon') {
+                  n.name = isCustom ? 'info-circle' : (metaMap[id]?.icon || 'info-circle');
+                }
+                if (n.type === 'Text') {
+                  if (n.dataPath) {
+                    if (isCustom) {
+                      n.dataPath = `contact.custom.${id}`;
+                      n.placeholder = t('Nhập nội dung...', 'Enter information...');
+                    } else {
+                      const parts = n.dataPath.split('.');
+                      parts.pop();
+                      const prefix = parts.length > 0 ? parts.join('.') + '.' : '';
+                      n.dataPath = prefix + metaMap[id].key;
+                      n.placeholder = metaMap[id].placeholder;
+                    }
+                  } else if (n.content !== undefined) {
+                    if (isCustom) {
+                      n.dataPath = `contact.custom_label.${id}`;
+                      n.placeholder = t('Tiêu đề:', 'Title:');
+                      delete n.content;
+                    } else {
+                      n.content = metaMap[id].label;
+                    }
                   }
-                  if (n.type === 'Text' && n.content && (n.content.includes(':') || /Website|Email|Phone|Ngày/i.test(n.content))) {
-                    n.content = metaMap[id].label;
-                  }
-                  if (n.children) n.children.forEach(replaceData);
-                };
+                }
+                if (n.children) n.children.forEach(transformChild);
+              };
 
-                replaceData(clonedChild);
-                return clonedChild;
-              }
+              transformChild(clonedChild);
+              return clonedChild;
             }
+
             return { id: id, type: 'CustomInputRow', _useIcon: isIconTemplate };
           });
 
           return (
             <ContainerNode node={{ ...node, styles: dynamicStyles }} isRoot={isRoot}>
+              {headerNode && (
+                <AtomicRenderer node={headerNode} dataScope={dataScope} isRoot={false} />
+              )}
               {mixedChildren.map((child, index) => (
                 <ThemeContext.Provider key={child.id || `contact-${index}`} value={{ columnIndex: themeCtx.columnIndex, isInsideColoredBg: nextIsInsideColoredBg, isInsideLoopItem: themeCtx.isInsideLoopItem }}>
                   <AtomicRenderer node={child} dataScope={dataScope} isRoot={false} />
@@ -765,37 +1054,8 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
           ? node.children.filter(child => !child || !child.id || !window.__hiddenCvSections.includes(child.id))
           : [];
 
-        const responsiveStyles = { ...dynamicStyles };
-        const isMainColumn = isRoot || isDirectColumn || node.id === 'left-col' || node.id === 'right-col' || node.id === 'main-col';
-        const isContactItem = node.id && node.id.startsWith('section-contact-');
-
-        if (!isMainColumn && themeCtx.columnIndex === 0) {
-          if (isContactItem) {
-            if (responsiveStyles.display === 'flex') {
-              responsiveStyles.flexDirection = 'row';
-              responsiveStyles.alignItems = 'center';
-            }
-          } else {
-            const hasNarrowChild = node.children && node.children.some(
-              c => c && c.styles && c.styles.width && c.styles.width.includes('%') && parseFloat(c.styles.width) <= 30
-            );
-            const isSpaceBetween = responsiveStyles.justifyContent === 'space-between';
-
-            if ((hasNarrowChild || isSpaceBetween) && responsiveStyles.display === 'flex') {
-              responsiveStyles.flexDirection = 'column';
-              responsiveStyles.alignItems = 'flex-start';
-              delete responsiveStyles.justifyContent;
-              responsiveStyles.gap = '4px';
-            }
-
-            if (responsiveStyles.width && responsiveStyles.width.includes('%') && parseFloat(responsiveStyles.width) <= 30) {
-              responsiveStyles.width = '100%';
-            }
-          }
-        }
-
         return (
-          <ContainerNode node={{ ...node, styles: responsiveStyles }} isRoot={isRoot}>
+          <ContainerNode node={{ ...node, styles: dynamicStyles }} isRoot={isRoot}>
             {visibleChildren.map((child, index) => {
               const childColIdx = isRoot ? index : themeCtx.columnIndex;
               return (
@@ -828,17 +1088,19 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
 
       case 'CustomInputRow':
         const hasIconMode = node._useIcon === true;
+        const isReqField = node.id === 'section-contact-phone' || node.id === 'section-contact-email';
 
         if (hasIconMode) {
           return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', minHeight: '28px' }}>
-              <InfoCircleOutlined style={{ color: 'inherit', opacity: 0.9, fontSize: '14px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', minHeight: '28px' }}>
+              <InfoCircleOutlined style={{ color: 'inherit', opacity: 0.9, fontSize: '14px', flexShrink: 0 }} />
               <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
                 <TextNode
                   dataPath={`contact.custom.${node.id}`}
-                  placeholder="Nhập nội dung"
+                  placeholder="Nhập nội dung..."
                   styles={{ width: '100%', fontSize: '13.5px', fontFamily: 'inherit', color: 'inherit', background: 'transparent', border: 'none', padding: 0, margin: 0 }}
                   dataScope={dataScope}
+                  isRequired={isReqField}
                 />
               </div>
             </div>
@@ -858,9 +1120,10 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
             <div style={{ flex: 1, display: 'flex', alignItems: 'baseline' }}>
               <TextNode
                 dataPath={`contact.custom.${node.id}`}
-                placeholder="Nhập nội dung"
+                placeholder="Nhập nội dung..."
                 styles={{ width: '100%', color: 'inherit', background: 'transparent', border: 'none', padding: 0, margin: 0 }}
                 dataScope={dataScope}
+                isRequired={isReqField}
               />
             </div>
           </div>
@@ -868,28 +1131,96 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
 
       case 'Text':
         if (node.dataPath) {
-          return <TextNode dataPath={node.dataPath} placeholder={node.placeholder} styles={dynamicStyles} dataScope={dataScope} />;
+          const isReqField = node.dataPath.includes('phone') || node.dataPath.includes('email');
+          return <TextNode dataPath={node.dataPath} placeholder={node.placeholder} styles={dynamicStyles} dataScope={dataScope} isRequired={isReqField} />;
         }
         return <div style={dynamicStyles}>{resolveContent(node.content, dataScope)}</div>;
 
       case 'RichText':
         if (node.dataPath) {
-          return (
-            <div className="rich-text-force-dynamic" style={{ width: '100%' }}>
-              <RichTextNode dataPath={node.dataPath} placeholder={node.placeholder} styles={dynamicStyles} dataScope={dataScope} />
-            </div>
-          );
+          return <RichTextNode dataPath={node.dataPath} placeholder={node.placeholder} styles={dynamicStyles} dataScope={dataScope} />;
         }
-        return <div className="rich-text-force-dynamic" style={dynamicStyles} dangerouslySetInnerHTML={{ __html: resolveContent(node.content, dataScope) }} />;
+        return <div style={dynamicStyles} dangerouslySetInnerHTML={{ __html: resolveContent(node.content, dataScope) }} />;
 
       case 'Image':
         return <ImageNode dataPath={node.dataPath} styles={dynamicStyles} dataScope={dataScope} />;
 
-      case 'Icon':
-        const IconMap = { phone: PhoneOutlined, calendar: CalendarOutlined, mail: MailOutlined, address: EnvironmentOutlined, website: GlobalOutlined, user: UserOutlined };
-        const TargetIcon = IconMap[node.name];
-        if (!TargetIcon) return null;
+      case 'Icon': {
+        const IconMap = {
+          phone: PhoneOutlined,
+          calendar: CalendarOutlined,
+          dob: CalendarOutlined,
+          mail: MailOutlined,
+          email: MailOutlined,
+          address: EnvironmentOutlined,
+          location: EnvironmentOutlined,
+          website: GlobalOutlined,
+          user: UserOutlined,
+          gender: UserOutlined,
+          bulb: BulbOutlined,
+          team: TeamOutlined,
+          project: ProjectOutlined,
+          activity: AppstoreOutlined,
+          trophy: TrophyOutlined,
+          award: TrophyOutlined,
+          file: FileTextOutlined,
+          certificate: FileTextOutlined,
+          default: CheckCircleOutlined
+        };
+        const TargetIcon = IconMap[node.name?.toLowerCase()] || IconMap.default;
         return <TargetIcon style={{ color: 'inherit', ...dynamicStyles }} />;
+      }
+
+      case 'ProgressBar': {
+        const rawLevel = dataScope && dataScope.level !== undefined ? dataScope.level : 75;
+        const currentPercent = typeof rawLevel === 'number' ? rawLevel : parseInt(rawLevel) || 75;
+
+        const handleBarClick = (e) => {
+          e.stopPropagation();
+          const rect = e.currentTarget.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          let newPercent = Math.round((clickX / rect.width) * 10) * 10;
+          if (newPercent < 10) newPercent = 10;
+          if (newPercent > 100) newPercent = 100;
+
+          const store = useCvStore.getState();
+          const newCvData = JSON.parse(JSON.stringify(store.cvData || {}));
+
+          if (dataScope?.parentPath !== undefined && dataScope?.index !== undefined) {
+            if (newCvData[dataScope.parentPath] && newCvData[dataScope.parentPath][dataScope.index]) {
+              newCvData[dataScope.parentPath][dataScope.index][node.dataPath || 'level'] = newPercent;
+              store.setInitialData(store.layoutSchema || store.schema, newCvData);
+            }
+          }
+        };
+
+        return (
+          <div
+            onClick={handleBarClick}
+            title={`Mức độ: ${currentPercent}% (Nhấp chuột để chọn mức)`}
+            style={{
+              width: '100%',
+              height: dynamicStyles.height || '7px',
+              backgroundColor: dynamicStyles.backgroundColor || 'rgba(255, 255, 255, 0.25)',
+              borderRadius: dynamicStyles.borderRadius || '2px',
+              overflow: 'hidden',
+              cursor: 'pointer',
+              position: 'relative',
+              ...dynamicStyles
+            }}
+          >
+            <div
+              style={{
+                width: `${currentPercent}%`,
+                height: '100%',
+                backgroundColor: dynamicStyles.fill || '#ffffff',
+                borderRadius: 'inherit',
+                transition: 'width 0.25s ease'
+              }}
+            />
+          </div>
+        );
+      }
 
       case 'LoopContainer':
         if (node.itemTemplate) {
@@ -899,26 +1230,14 @@ const AtomicRenderer = ({ node, dataScope, isRoot = false, isDirectColumn = fals
 
         const loopStyles = { ...dynamicStyles };
 
-        const parentNodeContainer = node; 
-        const isHobbiesSection =
-          node.dataPath === 'hobbies' ||
-          node.dataPath === 'Hobby' ||
-          JSON.stringify(node).toLowerCase().includes('hobbie') ||
-          JSON.stringify(node).toLowerCase().includes('sở thích');
-
-        if (isHobbiesSection) {
-          loopStyles.flexDirection = 'column';
-          loopStyles.flexWrap = 'nowrap';
-          loopStyles.gap = '8px';
-        }
-
         return (
-          <div style={loopStyles}>
+          <div style={{ width: '100%' }}>
             <ThemeContext.Provider value={{ columnIndex: themeCtx.columnIndex, isInsideColoredBg: nextIsInsideColoredBg, isInsideLoopItem: true }}>
               <LoopNode dataPath={node.dataPath} styles={loopStyles} itemTemplate={node.itemTemplate} />
             </ThemeContext.Provider>
           </div>
         );
+
       case 'Divider':
         return <div style={{ width: '100%', height: '1px', backgroundColor: 'currentColor', opacity: 0.3, ...dynamicStyles }} />;
 

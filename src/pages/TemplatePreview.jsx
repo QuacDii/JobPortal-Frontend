@@ -58,6 +58,7 @@ const TemplatePreview = () => {
     const [positionsList, setPositionsList] = useState([]);
     const [selectedColor, setSelectedColor] = useState(searchParams.get('color') || null);
     const [uploadedFile, setUploadedFile] = useState(null);
+    const [isVipUser, setIsVipUser] = useState(false);
 
     useEffect(() => {
         const fetchTemplateDetail = async () => {
@@ -68,12 +69,12 @@ const TemplatePreview = () => {
 
                 if (result) {
                     if (result.ngonNgu) setLanguageOption(result.ngonNgu.toLowerCase());
-                    
+
                     const rawColorsString = result.danhSachMau || result.DanhSachMau || '';
-                    const colorArray = typeof rawColorsString === 'string' && rawColorsString.trim() !== '' 
-                        ? rawColorsString.split(',').map(c => c.trim()) 
+                    const colorArray = typeof rawColorsString === 'string' && rawColorsString.trim() !== ''
+                        ? rawColorsString.split(',').map(c => c.trim())
                         : [];
-                    
+
                     result.parsedColors = colorArray;
                     setTemplate(result);
 
@@ -104,11 +105,28 @@ const TemplatePreview = () => {
                 const token = localStorage.getItem('token');
                 const userInfo = getUserInfoFromToken(token);
                 if (userInfo?.userId) {
+                    // Lấy số lượng CV đã tạo
                     const cvRes = await apiClient.get(`/Cv/user/${userInfo.userId}`);
                     const cvs = Array.isArray(cvRes) ? cvRes : (cvRes?.data || []);
                     setUserCvCount(cvs.length);
+
+                    // 🌟 LẤY THÔNG TIN QUYỀN HẠN THỰC TẾ TỪ BACKEND
+                    try {
+                        const balanceRes = await apiClient.get('/Service/balance');
+                        const balData = balanceRes?.data !== undefined ? balanceRes.data : balanceRes;
+                        const isStillVip = balData?.ngayHetHanGoi && new Date(balData.ngayHetHanGoi) > new Date();
+                        const privileges = balData?.cacDacQuyen || [];
+
+                        // Cho phép nếu còn hạn VIP VÀ sở hữu đặc quyền tạo CV không giới hạn
+                        const canCreateUnlimited = Boolean(isStillVip) && privileges.includes('UV_UNLIMITED_CV');
+                        setIsVipUser(canCreateUnlimited);
+                    } catch (balErr) {
+                        console.error("Lỗi kiểm tra quyền VIP:", balErr);
+                    }
                 }
-            } catch (error) {}
+            } catch (error) {
+                console.error("Lỗi khởi tạo dữ liệu:", error);
+            }
         };
         fetchPositionsAndCvCount();
     }, []);
@@ -121,10 +139,7 @@ const TemplatePreview = () => {
             return;
         }
 
-        const userInfo = getUserInfoFromToken(token);
-        const isVip = userInfo?.isVip || false;
-
-        if (!isVip && userCvCount >= 5) {
+        if (!isVipUser && userCvCount >= 5) {
             Modal.confirm({
                 title: 'Đã đạt giới hạn tạo hồ sơ',
                 content: 'Tài khoản miễn phí chỉ được tạo tối đa 5 CV. Hãy nâng cấp VIP để tạo CV từ mẫu này và sử dụng không giới hạn!',
@@ -174,7 +189,7 @@ const TemplatePreview = () => {
 
         let buildUrl = `/builder?templateId=${id}&source=${sourceOption}&lang=${languageOption}&position=${positionOption || ''}`;
         if (selectedColor) buildUrl += `&color=${encodeURIComponent(selectedColor)}`;
-        
+
         navigate(buildUrl);
     };
 
@@ -267,7 +282,7 @@ const TemplatePreview = () => {
                                 Ngành nghề ứng tuyển <span style={{ color: '#ff4d4f' }}>*</span>
                             </Title>
                             <Text style={{ color: themeColors.subTextColor, fontSize: '13.5px', display: 'block', marginBottom: '12px' }}>
-                                Chọn ngành nghề để hệ thống tối ưu bố cục và từ khóa cho CV của bạn.
+                                Chọn ngành nghề để Nhà tuyển dụng dễ dàng tìm ra CV của bạn.
                             </Text>
                             <Select
                                 size="large"
@@ -291,7 +306,7 @@ const TemplatePreview = () => {
                         <Title level={5} style={{ color: themeColors.textColor, marginTop: 0, marginBottom: '20px' }}>Bạn muốn tạo CV từ?</Title>
 
                         <Radio.Group value={sourceOption} onChange={(e) => setSourceOption(e.target.value)} style={{ width: '100%' }}>
-                            
+
                             {/* Option 1: Nội dung gợi ý */}
                             <div style={radioCardStyle(sourceOption === 'suggested')} onClick={() => setSourceOption('suggested')}>
                                 <Radio value="suggested" style={{ marginTop: '2px', marginRight: '12px' }} />
@@ -323,12 +338,12 @@ const TemplatePreview = () => {
                                 <div style={{ flex: 1 }}>
                                     <Text strong style={{ color: themeColors.textColor, fontSize: '15px' }}>Nội dung CV từ máy tính của bạn</Text>
                                     <Text style={{ color: themeColors.subTextColor, fontSize: '13px', display: 'block', marginTop: '4px' }}>Tự động bóc tách dữ liệu từ file PDF có sẵn của bạn.</Text>
-                                    
+
                                     {sourceOption === 'upload-linkedin' && (
                                         <div style={{ marginTop: '16px' }} onClick={(e) => e.stopPropagation()}>
-                                            <Upload 
-                                                accept=".pdf" 
-                                                maxCount={1} 
+                                            <Upload
+                                                accept=".pdf"
+                                                maxCount={1}
                                                 beforeUpload={(file) => {
                                                     setUploadedFile(file);
                                                     return false;
@@ -363,7 +378,7 @@ const TemplatePreview = () => {
                                         message.warning("Vui lòng chọn Ngành nghề ứng tuyển trước khi tạo CV!");
                                         return;
                                     }
-                                    handleStartBuilding(); 
+                                    handleStartBuilding();
                                 }}
                                 loading={isVerifyingFile}
                                 style={{ backgroundColor: '#1890ff', borderColor: '#1890ff', height: '48px', fontWeight: 'bold', borderRadius: '8px', fontSize: '16px', boxShadow: '0 4px 12px rgba(24,144,255,0.3)' }}

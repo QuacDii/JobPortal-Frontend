@@ -89,3 +89,34 @@
     ::placeholder, ::-webkit-input-placeholder, [contenteditable]:empty::before, [data-placeholder]:empty::before, .ProseMirror p.is-editor-empty:first-child::before, .ProseMirror .is-empty::before { content: "" !important; display: none !important; color: transparent !important; }
     .no-print, .cv-block-actions, .cv-drag-handle, .add-item-btn { display: none !important; }
 }
+
+/* Ghi đè CSS của Quill để nó trong suốt và vừa vặn với CV */
+.custom-rich-text-wrapper .ql-container {
+    font-family: inherit;
+    font-size: inherit;
+}
+
+.custom-rich-text-wrapper .ql-editor {
+    padding: 0; /* Xóa khoảng trắng thừa */
+    min-height: unset;
+}
+
+/* Tùy chỉnh thanh toolbar màu trắng, bo góc giống ảnh của bạn */
+.ql-bubble .ql-tooltip {
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border: 1px solid #e8e8e8;
+    color: #333;
+}
+
+.ql-bubble .ql-tooltip .ql-picker {
+    color: #333;
+}
+
+.ql-bubble .ql-stroke {
+    stroke: #595959; /* Màu icon xám như trong hình */
+}
+.ql-bubble .ql-fill {
+    fill: #595959;
+}

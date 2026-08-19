@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Row, Col, Button, Card, Typography, Spin, Tag, Space, message,
-    Modal, Input, Radio, Upload, Checkbox, Form, Divider, Select, Progress
+    Modal, Input, Radio, Upload, Form, Divider, Select, Progress
 } from 'antd';
 import './css/JobDetail.css';
 import {
@@ -15,6 +15,7 @@ import {
 import apiClient from '../api/apiClient';
 import { useGoogleLogin } from '@react-oauth/google';
 import FacebookLoginRaw from 'react-facebook-login/dist/facebook-login-render-props';
+import { PDFDocument, PDFName } from 'pdf-lib';
 
 const FacebookLogin = FacebookLoginRaw.default || FacebookLoginRaw;
 const { Title, Text, Paragraph } = Typography;
@@ -30,16 +31,25 @@ const parseJwt = (token) => {
     }
 };
 
+// 🌟 HÀM FORMAT TEXT VÀ XỬ LÝ SẠCH CÁC THẺ <br>
+const formatContentText = (content) => {
+    if (!content) return "Chưa cập nhật";
+    return content
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/&nbsp;/gi, ' ')
+        .trim();
+};
+
 const JobDetail = ({ isEmployer = false }) => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [job, setJob] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // ================= STATES: LỊCH SỬ ĐÃ ỨNG TUYỂN =================
+    // STATES: LỊCH SỬ ĐÃ ỨNG TUYỂN
     const [myApplications, setMyApplications] = useState([]);
 
-    // ================= STATES: MODAL ỨNG TUYỂN =================
+    // STATES: MODAL ỨNG TUYỂN
     const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
     const [selectedViTri, setSelectedViTri] = useState(null);
     const [userCvs, setUserCvs] = useState([]);
@@ -58,11 +68,9 @@ const JobDetail = ({ isEmployer = false }) => {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
     const [loginLoading, setLoginLoading] = useState(false);
 
-    // ================= FETCH DATA CHI TIẾT CHIẾN DỊCH & LỊCH SỬ ỨNG TUYỂN =================
     useEffect(() => {
         const fetchJobDetailAndApplications = async () => {
             try {
-                // 1. Tải thông tin chiến dịch tuyển dụng
                 const response = await apiClient.get(`/Jobs/${id}`);
                 let finalJobData = null;
                 if (response) {
@@ -77,7 +85,6 @@ const JobDetail = ({ isEmployer = false }) => {
                         setSelectedViTri(finalJobData.danhSachViTri[0].maViTri);
                     }
 
-                    // TỰ ĐỘNG GỌI API ĐẾM LƯỢT XEM NGẦM (Chỉ đếm khi là Ứng viên xem)
                     if (!isEmployer) {
                         apiClient.post(`/Jobs/${id}/view`).catch(err => {
                             console.error("Lỗi đếm lượt xem tin:", err);
@@ -87,7 +94,6 @@ const JobDetail = ({ isEmployer = false }) => {
                     message.error("Không tìm thấy thông tin công việc!");
                 }
 
-                // 2. Tải danh sách đơn ứng tuyển của User (khớp với bảng DonUngTuyen)
                 const token = localStorage.getItem('token');
                 if (token) {
                     const appRes = await apiClient.get('/JobApplication/my-applications', {
@@ -106,7 +112,6 @@ const JobDetail = ({ isEmployer = false }) => {
         if (id) fetchJobDetailAndApplications();
     }, [id, isEmployer]);
 
-    // ================= FETCH DANH SÁCH CV CỦA USER =================
     useEffect(() => {
         if (isApplyModalOpen && !isEmployer) {
             const token = localStorage.getItem('token');
@@ -157,7 +162,6 @@ const JobDetail = ({ isEmployer = false }) => {
             const token = localStorage.getItem('token');
             let cvIdToAnalyze = selectedCv;
 
-            // Xử lý Upload file tạm thời
             if (selectedCv === 'upload') {
                 message.loading({ content: 'Đang chuẩn bị dữ liệu CV...', key: 'analyze_loading' });
                 const formData = new FormData();
@@ -183,7 +187,6 @@ const JobDetail = ({ isEmployer = false }) => {
                 setSelectedCv(cvIdToAnalyze);
             }
 
-            // Gọi API phân tích AI
             message.loading({ content: 'AI đang phân tích độ phù hợp...', key: 'analyze_loading' });
             const response = await apiClient.post('/AiHelper/analyze-fit', {
                 maViTri: parseInt(selectedViTri),
@@ -191,8 +194,6 @@ const JobDetail = ({ isEmployer = false }) => {
             }, { headers: { Authorization: `Bearer ${token}` } });
 
             const resData = response.data || response;
-
-            // Đào sâu vào object để tìm kết quả (phòng trường hợp Backend bọc nhiều lớp 'data')
             let result = resData;
             while (result && result.diemPhuHop === undefined && result.DiemPhuHop === undefined && result.data) {
                 result = result.data;
@@ -242,7 +243,6 @@ const JobDetail = ({ isEmployer = false }) => {
         return 'Chưa cập nhật';
     };
 
-    // Hàm kiểm tra xem vị trí cụ thể này đã được ứng tuyển chưa
     const isPositionApplied = (maViTri) => {
         if (!maViTri || !myApplications || myApplications.length === 0) return false;
         return myApplications.some(app =>
@@ -301,7 +301,7 @@ const JobDetail = ({ isEmployer = false }) => {
         onError: () => message.error('Kết nối Google thất bại!')
     });
 
-    const handleSendApplication = async () => {
+   const handleSendApplication = async () => {
         if (selectedCv === 'upload' && !uploadedFile) return message.warning("Vui lòng chọn file CV!");
         if (!selectedCv && selectedCv !== 'upload') return message.warning("Vui lòng chọn một CV!");
         if (!selectedViTri) return message.warning("Vui lòng chọn vị trí làm việc!");
@@ -310,9 +310,9 @@ const JobDetail = ({ isEmployer = false }) => {
             const token = localStorage.getItem('token');
             let cvIdToSend = selectedCv;
 
-            // BƯỚC 1: Nếu chọn "Tải lên CV từ máy tính", tiến hành Upload file
+            // BƯỚC 1: Nếu chọn upload từ máy, tạo bản ghi CV đầy đủ trong Quản lý CV
             if (selectedCv === 'upload') {
-                message.loading({ content: 'Đang tải file CV lên hệ thống...', key: 'apply_loading' });
+                message.loading({ content: 'Đang tải và lưu CV vào hệ thống...', key: 'apply_loading' });
 
                 const formData = new FormData();
                 formData.append('file', uploadedFile);
@@ -321,28 +321,31 @@ const JobDetail = ({ isEmployer = false }) => {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
 
-                const uploadedUrl = uploadRes?.url || uploadRes?.data?.url || uploadRes;
+                const uploadedUrl = uploadRes?.url || uploadRes?.data?.url || uploadRes || "";
 
-                // BƯỚC 2: Lưu thông tin file vừa upload thành một bản ghi trong CSDL bảng CV
                 const decoded = parseJwt(token);
                 const userId = decoded?.maUser || decoded?.nameid || 1;
 
-                const createCvRes = await apiClient.post('/Cv', {
+                // 🌟 Gửi đầy đủ duLieuCv và customLayoutJson để CV xuất hiện trên trang Quản lý CV
+                const cvPayload = {
                     maUser: parseInt(userId),
-                    maMau: 1, // Mẫu mặc định cho CV upload
-                    maHex: "#1890ff",
+                    maMau: 1,
+                    maHex: extractedCvBundle?.settings?.themeColor || "#1890ff",
                     tieuDe: uploadedFile.name.replace(/\.[^/.]+$/, ""),
                     duongDan: uploadedUrl,
+                    duLieuCv: extractedCvBundle?.cvData ? JSON.stringify(extractedCvBundle.cvData) : "{}",
+                    customLayoutJson: extractedCvBundle?.layoutSchema ? JSON.stringify(extractedCvBundle.layoutSchema) : "{}",
+                    fontChu: extractedCvBundle?.settings?.fontFamily || '"Be Vietnam Pro", sans-serif',
+                    ngonNgu: extractedCvBundle?.settings?.language || "vi",
                     isPublic: true,
-                    isUploaded: true,
-                    fontChu: "Arial",
-                    ngonNgu: "vi"
-                });
+                    isUploaded: true
+                };
 
-                cvIdToSend = createCvRes?.maCv || createCvRes?.data?.maCv || createCvRes?.data?.id;
+                const createCvRes = await apiClient.post('/Cv', cvPayload);
+                cvIdToSend = createCvRes?.maCv || createCvRes?.data?.maCv || createCvRes?.data?.id || createCvRes?.id;
             }
 
-            // BƯỚC 3: Tạo đơn ứng tuyển với mã vị trí và maCv hợp lệ
+            // BƯỚC 2: Gửi đơn ứng tuyển
             const payload = {
                 maViTri: parseInt(selectedViTri),
                 maCv: parseInt(cvIdToSend),
@@ -359,7 +362,7 @@ const JobDetail = ({ isEmployer = false }) => {
 
             Modal.success({
                 title: 'Ứng tuyển thành công!',
-                content: 'Hồ sơ và file CV của bạn đã được gửi trực tiếp đến Nhà tuyển dụng.',
+                content: 'Hồ sơ CV đã được gửi tới Nhà tuyển dụng và lưu vào danh sách Quản lý CV của bạn.',
                 okText: 'Đã hiểu'
             });
 
@@ -371,9 +374,79 @@ const JobDetail = ({ isEmployer = false }) => {
         }
     };
 
+    const [extractedCvBundle, setExtractedCvBundle] = useState(null);
+
+    // KIỂM TRA CHỈ CHẤP NHẬN FILE PDF ĐƯỢC XUẤT TỪ JOBSNOW
     const uploadProps = {
-        beforeUpload: (file) => { setUploadedFile(file); setSelectedCv('upload'); return false; },
-        maxCount: 1, onRemove: () => setUploadedFile(null),
+        accept: ".pdf",
+        beforeUpload: async (file) => {
+            if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+                message.error('Vui lòng chỉ tải lên file định dạng PDF!');
+                return Upload.LIST_IGNORE;
+            }
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                let isValidJobsNow = false;
+                let parsedBundle = null;
+
+                try {
+                    const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+                    const infoDict = pdfDoc.getInfoDict();
+                    const jobsNowMeta = infoDict.get(PDFName.of('JobsNowCvData'));
+                    if (jobsNowMeta) {
+                        isValidJobsNow = true;
+                        try {
+                            const encodedStr = jobsNowMeta.asString();
+                            const jsonStr = decodeURIComponent(escape(window.atob(encodedStr)));
+                            parsedBundle = JSON.parse(jsonStr);
+                        } catch (parseErr) {
+                            console.warn("Lỗi decode metadata từ PDF:", parseErr);
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Lỗi đọc metadata PDF-lib:", e);
+                }
+
+                if (!isValidJobsNow) {
+                    const uint8 = new Uint8Array(arrayBuffer);
+                    const latin1Str = new TextDecoder('latin1').decode(uint8);
+                    if (latin1Str.includes('JobsNowCvData') || latin1Str.includes('JobsNow')) {
+                        isValidJobsNow = true;
+                        const match = latin1Str.match(/\/JobsNowCvData\s*\(([^)]+)\)/);
+                        if (match && match[1]) {
+                            try {
+                                const jsonStr = decodeURIComponent(escape(window.atob(match[1])));
+                                parsedBundle = JSON.parse(jsonStr);
+                            } catch (e) {}
+                        }
+                    }
+                }
+
+                if (!isValidJobsNow) {
+                    Modal.error({
+                        title: 'CV không hợp lệ!',
+                        content: 'Hệ thống chỉ chấp nhận CV định dạng PDF được tạo và tải về trực tiếp từ nền tảng JobsNow. Vui lòng tạo CV trên JobsNow hoặc sử dụng đúng file PDF đã tải về từ hệ thống.',
+                        okText: 'Đã hiểu'
+                    });
+                    return Upload.LIST_IGNORE;
+                }
+
+                setUploadedFile(file);
+                setExtractedCvBundle(parsedBundle); // Lưu trữ dữ liệu cấu trúc CV
+                setSelectedCv('upload');
+                message.success(`Đã xác thực thành công file CV JobsNow: ${file.name}`);
+                return false;
+            } catch (err) {
+                message.error('Lỗi khi kiểm tra file CV! Vui lòng thử lại.');
+                return Upload.LIST_IGNORE;
+            }
+        },
+        maxCount: 1,
+        onRemove: () => {
+            setUploadedFile(null);
+            setExtractedCvBundle(null);
+        },
     };
 
     if (loading) return <div style={{ textAlign: 'center', padding: '100px', background: '#f4f5f5', minHeight: '100vh' }}><Spin size="large" /></div>;
@@ -425,12 +498,28 @@ const JobDetail = ({ isEmployer = false }) => {
                                 return (
                                     <Card
                                         key={viTri.maViTri}
-                                        className="position-card" // 🌟 1. Bổ sung class này để CSS hover ăn vào Card
+                                        className="position-card"
+                                        style={{ marginBottom: 20, borderRadius: 12, border: '1px solid #e8e8e8' }}
+                                        styles={{
+                                            header: { padding: '16px 20px', height: 'auto', minHeight: '64px' }
+                                        }}
                                         title={
-                                            <Space size="small" style={{ padding: '4px 0' }}>
-                                                <Tag color="orange" style={{ fontSize: '13px', fontWeight: 'bold', border: 'none' }}>Vị trí #{index + 1}</Tag>
-                                                <span style={{ color: '#262626', fontSize: '18px', fontWeight: 'bold' }}>{viTri.tenViTri}</span>
-                                            </Space>
+                                            // 🌟 TỰ ĐỘNG XUỐNG DÒNG VÀ KHÔNG BỊ NÚT ỨNG TUYỂN ĐÈ LÊN
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', paddingRight: '12px' }}>
+                                                <Tag color="orange" style={{ fontSize: '13px', fontWeight: 'bold', border: 'none', margin: 0 }}>
+                                                    Vị trí #{index + 1}
+                                                </Tag>
+                                                <span style={{
+                                                    color: '#262626',
+                                                    fontSize: '17px',
+                                                    fontWeight: 'bold',
+                                                    whiteSpace: 'normal',
+                                                    wordBreak: 'break-word',
+                                                    lineHeight: '1.4'
+                                                }}>
+                                                    {viTri.tenViTri}
+                                                </span>
+                                            </div>
                                         }
                                         extra={
                                             <Button
@@ -442,8 +531,9 @@ const JobDetail = ({ isEmployer = false }) => {
                                                     backgroundColor: '#f5f5f5',
                                                     borderColor: '#d9d9d9',
                                                     color: '#8c8c8c',
-                                                    fontWeight: 'bold'
-                                                } : undefined}
+                                                    fontWeight: 'bold',
+                                                    flexShrink: 0
+                                                } : { flexShrink: 0 }}
                                                 onClick={() => handleApplySpecificPosition(viTri.maViTri)}
                                             >
                                                 {isEmployer ? 'Xem Phễu Ứng Viên' : (applied ? 'Đã ứng tuyển' : 'Ứng tuyển ngay')}
@@ -466,24 +556,27 @@ const JobDetail = ({ isEmployer = false }) => {
                                             </Text>
                                         </div>
 
+                                        {/* 🌟 MÔ TẢ CÔNG VIỆC: LOẠI BỎ THẺ <br> */}
                                         <div style={{ marginBottom: 20 }}>
                                             <Title level={5} style={{ color: '#1890ff', borderLeft: '3px solid #1890ff', paddingLeft: 8, fontSize: '15px', fontWeight: '700' }}>Mô tả công việc</Title>
                                             <Paragraph style={{ color: '#595959', whiteSpace: 'pre-wrap', lineHeight: '1.7', textAlign: 'justify', paddingLeft: 12 }}>
-                                                {viTri.moTaCongViec}
+                                                {formatContentText(viTri.moTaCongViec)}
                                             </Paragraph>
                                         </div>
 
+                                        {/* 🌟 YÊU CẦU ỨNG VIÊN: LOẠI BỎ THẺ <br> */}
                                         <div style={{ marginBottom: 20 }}>
                                             <Title level={5} style={{ color: '#1890ff', borderLeft: '3px solid #1890ff', paddingLeft: 8, fontSize: '15px', fontWeight: '700' }}>Yêu cầu ứng viên</Title>
                                             <Paragraph style={{ color: '#595959', whiteSpace: 'pre-wrap', lineHeight: '1.7', textAlign: 'justify', paddingLeft: 12 }}>
-                                                {viTri.yeuCauUngVien}
+                                                {formatContentText(viTri.yeuCauUngVien)}
                                             </Paragraph>
                                         </div>
 
+                                        {/* 🌟 QUYỀN LỢI ĐƯỢC HƯỞNG: LOẠI BỎ THẺ <br> */}
                                         <div>
                                             <Title level={5} style={{ color: '#1890ff', borderLeft: '3px solid #1890ff', paddingLeft: 8, fontSize: '15px', fontWeight: '700' }}>Quyền lợi được hưởng</Title>
                                             <Paragraph style={{ color: '#595959', whiteSpace: 'pre-wrap', lineHeight: '1.7', textAlign: 'justify', paddingLeft: 12 }}>
-                                                {viTri.quyenLoi}
+                                                {formatContentText(viTri.quyenLoi)}
                                             </Paragraph>
                                         </div>
                                     </Card>
@@ -493,7 +586,9 @@ const JobDetail = ({ isEmployer = false }) => {
                             <Card style={{ background: '#ffffff', borderColor: '#e8e8e8', borderRadius: 12 }}>
                                 <div style={{ marginBottom: 24 }}>
                                     <Title level={4} style={{ color: '#262626', borderLeft: '4px solid #1890ff', paddingLeft: 10 }}>Mô tả công việc</Title>
-                                    <Paragraph style={{ color: '#595959', whiteSpace: 'pre-wrap', lineHeight: '1.7' }}>{job.description || 'Chưa cập nhật'}</Paragraph>
+                                    <Paragraph style={{ color: '#595959', whiteSpace: 'pre-wrap', lineHeight: '1.7' }}>
+                                        {formatContentText(job.description)}
+                                    </Paragraph>
                                 </div>
                             </Card>
                         )}
@@ -535,7 +630,7 @@ const JobDetail = ({ isEmployer = false }) => {
                     </Col>
                 </Row>
 
-                {/* ================= MODAL ĐĂNG NHẬP ================= */}
+                {/* MODAL ĐĂNG NHẬP */}
                 <Modal
                     title="Đăng nhập để Ứng tuyển"
                     open={isLoginModalOpen}
@@ -578,7 +673,7 @@ const JobDetail = ({ isEmployer = false }) => {
                     </Form>
                 </Modal>
 
-                {/* ================= MODAL ỨNG TUYỂN ================= */}
+                {/* MODAL ỨNG TUYỂN */}
                 <Modal
                     title={<div style={{ marginBottom: 16 }}><div style={{ fontSize: '20px', fontWeight: 'bold', color: '#262626' }}>Ứng tuyển</div><div style={{ fontSize: '15px', color: '#595959', fontWeight: 'normal' }}>{job.title}</div></div>}
                     open={isApplyModalOpen} onCancel={() => setIsApplyModalOpen(false)}
@@ -606,9 +701,18 @@ const JobDetail = ({ isEmployer = false }) => {
                                     </div>
                                 ))
                             ) : (<Text style={{ color: '#8c8c8c', fontStyle: 'italic', marginBottom: 12 }}>Bạn chưa có hồ sơ CV nào lưu trên hệ thống.</Text>)}
+
+                            {/* KHU VỰC TẢI LÊN CV - BẮT BUỘC TỪ JOBSNOW */}
                             <div onClick={() => setSelectedCv('upload')} style={{ padding: '16px', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.3s', border: selectedCv === 'upload' ? '1px solid #1890ff' : '1px solid #e8e8e8', backgroundColor: selectedCv === 'upload' ? 'rgba(24, 144, 255, 0.05)' : '#ffffff' }}>
-                                <Radio value="upload" style={{ color: '#262626', fontWeight: 500, fontSize: '15px', marginBottom: 12 }}>Tải lên CV từ máy tính, chọn hoặc kéo thả</Radio>
-                                <div style={{ marginLeft: 24, paddingRight: 24 }}><Dragger {...uploadProps} style={{ background: '#fafafa', borderColor: '#d9d9d9' }}><p className="ant-upload-drag-icon"><CloudUploadOutlined style={{ color: '#1890ff' }} /></p><p className="ant-upload-text" style={{ color: '#262626', fontSize: '14px' }}>Hỗ trợ định dạng .doc, .docx, pdf có kích thước dưới 5MB</p></Dragger></div>
+                                <Radio value="upload" style={{ color: '#262626', fontWeight: 500, fontSize: '15px', marginBottom: 12 }}>Tải lên CV JobsNow từ máy tính</Radio>
+                                <div style={{ marginLeft: 24, paddingRight: 24 }}>
+                                    <Dragger {...uploadProps} style={{ background: '#fafafa', borderColor: '#d9d9d9' }}>
+                                        <p className="ant-upload-drag-icon"><CloudUploadOutlined style={{ color: '#1890ff' }} /></p>
+                                        <p className="ant-upload-text" style={{ color: '#262626', fontSize: '14px', fontWeight: '500' }}>
+                                            Chỉ hỗ trợ file PDF được tạo và tải về từ hệ thống JobsNow (dung lượng dưới 5MB)
+                                        </p>
+                                    </Dragger>
+                                </div>
                             </div>
                         </Radio.Group>
                     </Spin>
@@ -646,7 +750,6 @@ const JobDetail = ({ isEmployer = false }) => {
                             </Button>
                         </div>
 
-                        {/* HIỂN THỊ KẾT QUẢ TỪ AI */}
                         {aiMatchScore !== null && (
                             <div style={{ display: 'flex', gap: 16, alignItems: 'center', background: '#ffffff', padding: 12, borderRadius: 6, border: '1px solid #e8e8e8' }}>
                                 <Progress

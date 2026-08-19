@@ -68,7 +68,11 @@ const AdminReport = () => {
             setMetrics(data.metrics || data.Metrics || { newUsers: 0, activeJobs: 0, totalApplications: 0, totalRevenue: 0 });
             setPrevMetrics(data.prevMetrics || data.PrevMetrics || { newUsers: 0, totalApplications: 0, totalRevenue: 0 });
             setChartData(data.chartData || data.ChartData || []);
-            setPieData(data.pieData || data.PieData || { UserRoles: [], HotIndustries: [] });
+            const rawPie = data.pieData || data.PieData || {};
+            setPieData({
+                userRoles: rawPie.userRoles || rawPie.UserRoles || [],
+                hotIndustries: rawPie.hotIndustries || rawPie.HotIndustries || []
+            });
             setPackages(data.packages || data.Packages || []);
         } catch (error) {
             console.error("Lỗi báo cáo:", error);
@@ -113,30 +117,31 @@ const AdminReport = () => {
         return <Text type="secondary" style={{ fontSize: 12 }}>0%</Text>;
     };
 
+    // 🌟 1. HÀM KIỂM TRA CHUẨN XÁC GÓI ỨNG VIÊN HAY NHÀ TUYỂN DỤNG
     const checkIsCandidatePackage = (p) => {
-        const pName = p.tenGoi || p.TenGoi || '';
         const pTarget = p.doiTuongSuDung ?? p.DoiTuongSuDung ?? p.doiTuong ?? p.DoiTuong;
-        const nameLower = pName.toLowerCase();
+        const pName = (p.tenGoi || p.TenGoi || '').toLowerCase();
 
-        const isCandidatePackage =
-            pTarget === 1 ||
-            pTarget === '1' ||
-            pTarget === 'UV' ||
-            nameLower.includes('ứng viên') ||
-            nameLower.includes('uv') ||
-            nameLower.includes('cv') ||
-            nameLower.includes('tải pdf');
+        // 1. Kiểm tra theo trường DoiTuongSuDung trong CSDL (2: Ứng viên, 1: Nhà tuyển dụng)
+        if (pTarget === 2 || pTarget === '2' || pTarget === 'UV' || pTarget === 'UngVien' || pTarget === 'Ứng viên') {
+            return true;
+        }
+        if (pTarget === 1 || pTarget === '1' || pTarget === 'NTD' || pTarget === 'NhaTuyenDung' || pTarget === 'Nhà tuyển dụng') {
+            return false;
+        }
 
-        return isCandidatePackage && !nameLower.includes('đăng tin') && !nameLower.includes('mở cv');
+        // 2. Dự phòng nhận diện qua tên gói nếu trường trong DB bị null
+        const isCandidateName = pName.includes('ứng viên') || pName.includes('uv') || pName.includes('cv') || pName.includes('pdf') || pName.includes('sự nghiệp');
+        return isCandidateName;
     };
 
-    // 2. Lọc danh sách gói dịch vụ dựa trên đối tượng đã chọn (Ứng viên / NTD)
+    // 🌟 2. LỌC DANH SÁCH GÓI THEO ĐỐI TƯỢNG ĐANG CHỌN
     const availablePackages = packages.filter(p => {
-        if (!selectedRole) return true; // Nếu chọn "Tất cả đối tượng" -> Hiện toàn bộ gói
+        if (!selectedRole) return true; // Nếu chọn "Tất cả đối tượng" -> Hiển thị toàn bộ gói
         const isCandidate = checkIsCandidatePackage(p);
 
-        if (selectedRole === 2) return isCandidate;     // Lọc lấy gói Ứng viên (2)
-        if (selectedRole === 1) return !isCandidate;    // Lọc lấy gói Nhà tuyển dụng (1)
+        if (selectedRole === 2) return isCandidate;     // Lọc lấy gói Ứng viên (Role = 2)
+        if (selectedRole === 1) return !isCandidate;    // Lọc lấy gói Nhà tuyển dụng (Role = 1)
         return true;
     });
 
@@ -208,7 +213,7 @@ const AdminReport = () => {
                 </div>
 
                 <Space wrap className="report-filter-group">
-                    {/* LỌC THEO VAI TRÒ (GỌI HÀM handleRoleChange ĐỂ RESET GÓI) */}
+                    {/* LỌC THEO VAI TRÒ */}
                     <Select
                         placeholder="Tất cả đối tượng"
                         allowClear
@@ -339,19 +344,21 @@ const AdminReport = () => {
                     <Col xs={24} lg={8}>
                         <Card title={<Space><CrownOutlined /><b>Cấu trúc Người dùng</b></Space>}>
                             <div style={{ height: 320, width: '100%' }}>
-                                {(pieData.UserRoles || []).length > 0 ? (
+                                {/* 🌟 Lấy linh hoạt cả userRoles (chữ thường) và UserRoles (chữ hoa) */}
+                                {((pieData?.userRoles || pieData?.UserRoles || []).length > 0) ? (
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
                                             <Pie
-                                                data={pieData.UserRoles}
+                                                data={pieData.userRoles || pieData.UserRoles}
                                                 cx="50%"
                                                 cy="45%"
                                                 innerRadius={55}
                                                 outerRadius={90}
                                                 paddingAngle={5}
                                                 dataKey="value"
+                                                nameKey="name"
                                             >
-                                                {pieData.UserRoles.map((entry, index) => (
+                                                {(pieData.userRoles || pieData.UserRoles).map((entry, index) => (
                                                     <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                                                 ))}
                                             </Pie>

@@ -106,53 +106,63 @@ const VerifyEmail = () => {
 
     // XÁC THỰC MÃ OTP
     const handleVerifyOtp = async (values) => {
-        if (!values.otpCode || values.otpCode.length < 6) {
-            return message.warning('Vui lòng nhập đủ 6 chữ số mã OTP!');
-        }
+    if (!values.otpCode || values.otpCode.length < 6) {
+        return message.warning('Vui lòng nhập đủ 6 chữ số mã OTP!');
+    }
 
-        setIsVerifying(true);
-        try {
-            const res = await apiClient.post('/auth/verify-otp', {
-                email: userEmail,
-                otpCode: values.otpCode
-            });
+    setIsVerifying(true);
+    try {
+        const res = await apiClient.post('/auth/verify-otp', {
+            email: userEmail,
+            otpCode: values.otpCode
+        });
 
-            if (res.success || res.status === 200) {
-                // 🌟 2. CẬP NHẬT TOKEN MỚI VÀO LOCALSTORAGE
-                if (res.token) {
-                    localStorage.setItem('token', res.token);
-                }
+        const resData = res?.data !== undefined ? res.data : res;
 
-                Modal.success({
-                    title: 'Xác thực thành công!',
-                    content: 'Tài khoản của bạn đã được xác nhận Email chính chủ. Dữ liệu hệ thống đã được cập nhật.',
-                    okText: 'Hoàn tất',
-                    onOk: () => {
-                        // 🌟 3. ĐIỀU HƯỚNG THÔNG MINH THEO ROLE TRONG TOKEN MỚI
-                        try {
-                            const newDecoded = jwtDecode(res.token || token);
-                            const role = newDecoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"];
-
-                            if (role === "1") {
-                                window.location.href = '/employer/dashboard'; // Nhà tuyển dụng
-                            } else if (role === "0") {
-                                window.location.href = '/admin/dashboard'; // Admin
-                            } else {
-                                window.location.href = '/manage-cv'; // Ứng viên
-                            }
-                        } catch (e) {
-                            window.location.href = '/';
-                        }
-                    }
-                });
+        if (resData.success || res.status === 200) {
+            // Lưu token mới nếu Backend có trả về
+            if (resData.token) {
+                localStorage.setItem('token', resData.token);
             }
-        } catch (error) {
-            const errorMsg = error.response?.data?.message || 'Mã OTP không chính xác hoặc đã hết hạn!';
-            message.error(errorMsg);
-        } finally {
-            setIsVerifying(false);
+
+            Modal.success({
+                title: 'Xác thực thành công!',
+                content: 'Tài khoản của bạn đã được xác nhận Email chính chủ. Dữ liệu hệ thống đã được cập nhật.',
+                okText: 'Hoàn tất',
+                onOk: () => {
+                    try {
+                        const tokenToDecode = resData.token || localStorage.getItem('token');
+                        const newDecoded = jwtDecode(tokenToDecode);
+                        
+                        // Đọc linh hoạt cả claim dài và claim ngắn
+                        const role = String(
+                            newDecoded.role || 
+                            newDecoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] || 
+                            newDecoded.vaiTro || 
+                            userInfo?.role || 
+                            ""
+                        );
+
+                        if (role === "1") {
+                            window.location.href = '/employer/dashboard'; // Nhà tuyển dụng
+                        } else if (role === "0") {
+                            window.location.href = '/admin/dashboard'; // Admin
+                        } else {
+                            window.location.href = '/manage-cv'; // Ứng viên
+                        }
+                    } catch (e) {
+                        window.location.href = '/';
+                    }
+                }
+            });
         }
-    };
+    } catch (error) {
+        const errorMsg = error.response?.data?.message || error?.message || 'Mã OTP không chính xác hoặc đã hết hạn!';
+        message.error(errorMsg);
+    } finally {
+        setIsVerifying(false);
+    }
+};
 
     return (
         <div className="verify-email-container">

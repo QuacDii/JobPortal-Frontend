@@ -6,20 +6,35 @@ import {
     DeleteOutlined, 
     EnvironmentOutlined, 
     DollarOutlined, 
-    UserOutlined,
-    SendOutlined,
-    CalendarOutlined
+    UserOutlined, 
+    SendOutlined, 
+    CalendarOutlined 
 } from '@ant-design/icons';
 import apiClient from '../api/apiClient';
 
 const { Title, Text } = Typography;
 
+// 🌟 Giải mã an toàn JWT Token kể cả khi có ký tự tiếng Việt
 const parseJwt = (token) => {
+    if (!token) return null;
     try {
         const base64Url = token.split('.')[1];
         const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-        return JSON.parse(jsonPayload);
+        const jsonPayload = decodeURIComponent(
+            atob(base64)
+                .split('')
+                .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                .join('')
+        );
+        const decoded = JSON.parse(jsonPayload);
+        
+        return {
+            userId: decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"] || 
+                    decoded.nameid || 
+                    decoded.maUser || 
+                    decoded.id || 
+                    decoded.sub
+        };
     } catch (e) {
         return null;
     }
@@ -29,12 +44,11 @@ const SavedJobs = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [savedJobs, setSavedJobs] = useState([]);
+    const [bookmarkedIdsList, setBookmarkedIdsList] = useState([]);
 
     const token = localStorage.getItem('token');
-    const decoded = parseJwt(token || '');
-    const userId = decoded?.maUser || decoded?.nameid || decoded?.id;
-
-    const BLUE_PRIMARY = '#1890ff';
+    const userInfo = parseJwt(token || '');
+    const userId = userInfo?.userId;
 
     const fetchSavedJobs = async () => {
         if (!token || !userId) {
@@ -45,21 +59,45 @@ const SavedJobs = () => {
 
         try {
             setLoading(true);
-            // 1. Lấy danh sách ID vị trí đã lưu
+            
+            // 1. Lấy danh sách ID đã lưu từ API
             const res = await apiClient.get('/Jobs/bookmarked', {
-                headers: { Authorization: `Bearer ${token}`, maUser: parseInt(userId) }
+                headers: { 
+                    Authorization: `Bearer ${token}`, 
+                    maUser: parseInt(userId, 10) 
+                }
             });
-            const bookmarkedIds = res?.data?.data || res?.data || [];
 
-            if (Array.isArray(bookmarkedIds) && bookmarkedIds.length > 0) {
-                // 2. Lấy toàn bộ danh sách việc làm
+            const resData = res?.data !== undefined ? res.data : res;
+            
+            // Chuẩn hóa lấy danh sách ID vị trí và ID tin
+            const rawViTriIds = resData?.viTriIds || resData?.data || (Array.isArray(resData) ? resData : []);
+            const rawTinIds = resData?.maTinIds || [];
+
+            const numViTriIds = rawViTriIds.map(Number).filter(Boolean);
+            const numTinIds = rawTinIds.map(Number).filter(Boolean);
+
+            setBookmarkedIdsList(numViTriIds);
+
+            if (numViTriIds.length > 0 || numTinIds.length > 0) {
+                // 2. Lấy danh sách việc làm để lọc
                 const jobsRes = await apiClient.get('/Jobs/search');
-                const allJobs = jobsRes?.data?.data || jobsRes?.data || [];
+                const jobsData = jobsRes?.data !== undefined ? jobsRes.data : jobsRes;
+                const allJobs = Array.isArray(jobsData?.data) 
+                    ? jobsData.data 
+                    : Array.isArray(jobsData) 
+                        ? jobsData 
+                        : [];
 
-                // 3. Lọc ra các công việc có vị trí nằm trong bookmarkedIds
+                // 🌟 Lọc chuẩn xác với Number()
                 const filtered = allJobs.filter(job => {
+                    const maTinNum = Number(job.maTin || job.id);
+                    const isMatchMaTin = numTinIds.includes(maTinNum);
+
                     const vitris = job.viTris || [];
-                    return vitris.some(v => bookmarkedIds.includes(v.id || v.maViTri));
+                    const isMatchViTri = vitris.some(v => numViTriIds.includes(Number(v.id || v.maViTri)));
+
+                    return isMatchMaTin || isMatchViTri;
                 });
 
                 setSavedJobs(filtered);
@@ -67,7 +105,7 @@ const SavedJobs = () => {
                 setSavedJobs([]);
             }
         } catch (error) {
-            console.error(error);
+            console.error("Chi tiết lỗi tải tin đã lưu:", error);
             message.error("Lỗi khi tải danh sách việc làm yêu thích!");
         } finally {
             setLoading(false);
@@ -78,14 +116,17 @@ const SavedJobs = () => {
         fetchSavedJobs();
     }, [token, userId]);
 
-    // Bỏ lưu việc làm
-    const handleRemoveBookmark = async (maViTri) => {
+    // 🌟 Hàm xóa bookmark chuẩn xác
+    const handleRemoveBookmark = async (targetId) => {
         try {
-            await apiClient.post(`/Jobs/${maViTri}/bookmark`, null, {
-                headers: { Authorization: `Bearer ${token}`, maUser: parseInt(userId) }
+            await apiClient.post(`/Jobs/${targetId}/bookmark`, null, {
+                headers: { 
+                    Authorization: `Bearer ${token}`, 
+                    maUser: parseInt(userId, 10) 
+                }
             });
             message.success("Đã xóa khỏi danh sách yêu thích!");
-            fetchSavedJobs(); // Tải lại danh sách
+            fetchSavedJobs();
         } catch (error) {
             message.error("Không thể xóa việc làm!");
         }
@@ -113,7 +154,7 @@ const SavedJobs = () => {
                         </Text>
                     </div>
                     <Tag color="red" style={{ fontSize: '14px', padding: '4px 12px', borderRadius: '16px' }}>
-                        Đã lưu: <b>{savedJobs.length}</b> vị trí
+                        Đã lưu: <b>{savedJobs.length}</b> chiến dịch
                     </Tag>
                 </div>
 
@@ -122,7 +163,7 @@ const SavedJobs = () => {
                         <Empty 
                             description={<span style={{ color: '#595959', fontSize: '15px' }}>Bạn chưa lưu việc làm nào vào danh sách yêu thích.</span>} 
                         >
-                            <Button type="primary" style={{ borderRadius: '6px', marginTop: '10px' }} onClick={() => navigate('/tim-kiem-nganh-nghe')}>
+                            <Button type="primary" style={{ borderRadius: '6px', marginTop: '10px' }} onClick={() => navigate('/jobs')}>
                                 Khám phá việc làm ngay
                             </Button>
                         </Empty>
@@ -131,33 +172,69 @@ const SavedJobs = () => {
                     savedJobs.map(job => {
                         const vitris = job.viTris || [];
                         const vitriDau = vitris[0] || {};
-                        const maViTriId = vitriDau.id || vitriDau.maViTri;
+                        
+                        // 🌟 TÌM CHÍNH XÁC ID VỊ TRÍ ĐÃ LƯU ĐỂ TRUYỀN VÀO HÀM XÓA (Tránh bug xóa nhầm vị trí)
+                        const matchedSavedViTri = vitris.find(v => bookmarkedIdsList.includes(Number(v.id || v.maViTri)));
+                        const targetDeleteId = matchedSavedViTri 
+                            ? (matchedSavedViTri.id || matchedSavedViTri.maViTri) 
+                            : (vitriDau.id || vitriDau.maViTri || job.maTin);
 
                         return (
                             <Card
                                 key={job.maTin}
-                                style={{ marginBottom: '16px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0' }}
+                                style={{ marginBottom: '16px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0', overflow: 'hidden' }}
                                 styles={{ body: { padding: '20px' } }}
                             >
-                                <Row justify="space-between" align="top" gutter={16}>
-                                    <Col flex="auto" style={{ display: 'flex', gap: '16px' }}>
+                                <Row justify="space-between" align="top" gutter={20} wrap={false}>
+                                    
+                                    {/* CỘT TRÁI */}
+                                    <Col flex="1" style={{ minWidth: 0, display: 'flex', gap: '16px' }}>
                                         <Avatar 
                                             shape="square" 
                                             size={68} 
                                             src={job.logo || null} 
                                             icon={<UserOutlined />}
-                                            style={{ backgroundColor: '#f0f2f5', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                                            style={{ backgroundColor: '#f0f2f5', border: '1px solid #e2e8f0', borderRadius: '8px', flexShrink: 0 }}
                                         />
-                                        <div style={{ flex: 1 }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
                                             <div 
                                                 onClick={() => navigate(`/job/${job.maTin}`)}
                                                 style={{ cursor: 'pointer' }}
                                             >
-                                                <Title level={4} style={{ margin: '0 0 4px 0', color: '#1e293b', fontWeight: 700, fontSize: '17px' }}>
+                                                <Title 
+                                                    level={4} 
+                                                    title={job.tieuDeChienDich}
+                                                    style={{ 
+                                                        margin: '0 0 4px 0', 
+                                                        color: '#1e293b', 
+                                                        fontWeight: 700, 
+                                                        fontSize: '17px',
+                                                        lineHeight: 1.4,
+                                                        display: '-webkit-box',
+                                                        WebkitLineClamp: 2,
+                                                        WebkitBoxOrient: 'vertical',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        wordBreak: 'break-word'
+                                                    }}
+                                                >
                                                     {job.tieuDeChienDich}
                                                 </Title>
                                             </div>
-                                            <Text strong style={{ color: '#475569', fontSize: '14px', display: 'block' }}>{job.companyName}</Text>
+                                            <Text 
+                                                strong 
+                                                title={job.companyName}
+                                                style={{ 
+                                                    color: '#475569', 
+                                                    fontSize: '14px', 
+                                                    display: 'block',
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis'
+                                                }}
+                                            >
+                                                {job.companyName}
+                                            </Text>
 
                                             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', color: '#64748b', fontSize: '13px', marginTop: '8px' }}>
                                                 <span><DollarOutlined style={{ color: '#52c41a' }} /> <strong style={{ color: '#10b981' }}>{vitriDau.salaryRange || vitriDau.luong || 'Thỏa thuận'}</strong></span>
@@ -165,17 +242,33 @@ const SavedJobs = () => {
                                                 {job.deadline && <span><CalendarOutlined /> Hạn nộp: {new Date(job.deadline).toLocaleDateString('vi-VN')}</span>}
                                             </div>
 
+                                            {/* Tag vị trí tuyển dụng */}
                                             <div style={{ marginTop: '12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                                {vitris.map((v, i) => (
-                                                    <Tag key={i} color="blue" style={{ borderRadius: '4px' }}>
-                                                        {v.title || v.tenViTri}
-                                                    </Tag>
-                                                ))}
+                                                {vitris.map((v, i) => {
+                                                    const tagTitle = v.title || v.tenViTri;
+                                                    return (
+                                                        <Tag 
+                                                            key={i} 
+                                                            color="blue" 
+                                                            title={tagTitle}
+                                                            style={{ 
+                                                                borderRadius: '4px',
+                                                                maxWidth: '100%',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                whiteSpace: 'nowrap'
+                                                            }}
+                                                        >
+                                                            {tagTitle}
+                                                        </Tag>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     </Col>
 
-                                    <Col style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
+                                    {/* CỘT PHẢI */}
+                                    <Col flex="0 0 auto" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
                                         <Button 
                                             type="primary" 
                                             icon={<SendOutlined />}
@@ -188,7 +281,7 @@ const SavedJobs = () => {
                                         <Popconfirm
                                             title="Bỏ lưu việc làm này?"
                                             description="Bạn có chắc muốn xóa việc làm này khỏi danh sách yêu thích?"
-                                            onConfirm={() => handleRemoveBookmark(maViTriId)}
+                                            onConfirm={() => handleRemoveBookmark(targetDeleteId)}
                                             okText="Xóa"
                                             cancelText="Hủy"
                                             okButtonProps={{ danger: true }}

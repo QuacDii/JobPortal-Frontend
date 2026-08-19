@@ -330,7 +330,7 @@ const Home = () => {
                                 Các doanh nghiệp hàng đầu đang mở cơ hội việc làm hấp dẫn
                             </Text>
                         </div>
-                        <Button type="link" onClick={() => navigate('/jobs')} style={{ color: '#fa8c16', fontWeight: 'bold' }}>
+                        <Button type="link" onClick={() => navigate('/jobs?loaiCongTy=pro')} style={{ color: '#fa8c16', fontWeight: 'bold' }}>
                             Xem tất cả VIP <RightOutlined />
                         </Button>
                     </div>
@@ -349,7 +349,7 @@ const Home = () => {
                                         <Card
                                             hoverable
                                             className="vip-card"
-                                            style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}
+                                            style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
                                             styles={{ body: { padding: '20px', display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' } }}
                                             onClick={() => navigate(`/job/${campaign.maTin || campaign.id}`)}
                                         >
@@ -358,7 +358,7 @@ const Home = () => {
                                             {/* Header Card (Logo + Tiêu đề + Tên Công ty) */}
                                             <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                                                 <Avatar shape="square" size={56} src={campaign.logo} style={{ border: '1px solid #e2e8f0', background: '#fff', flexShrink: 0 }} />
-                                                <div style={{ flex: 1, paddingRight: 20 }}>
+                                                <div style={{ flex: 1, minWidth: 0, paddingRight: 32 }}>
                                                     <Title 
                                                         level={5} 
                                                         title={campaign.tieuDeChienDich || campaign.title}
@@ -367,7 +367,7 @@ const Home = () => {
                                                             color: '#0f172a', 
                                                             fontSize: 16, 
                                                             lineHeight: 1.4,
-                                                            height: '45px', // Cố định chiều cao 2 dòng
+                                                            height: '45px',
                                                             display: '-webkit-box',
                                                             WebkitLineClamp: 2,
                                                             WebkitBoxOrient: 'vertical',
@@ -449,14 +449,14 @@ const Home = () => {
                                     <Card
                                         hoverable
                                         className="regular-card"
-                                        style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}
+                                        style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
                                         styles={{ body: { padding: '20px', display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' } }}
                                         onClick={() => navigate(`/job/${campaign.maTin || campaign.id}`)}
                                     >
                                         {/* Header Card */}
                                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
                                             <Avatar shape="square" size={52} src={campaign.logo} style={{ border: '1px solid #f0f0f0', background: '#fff', flexShrink: 0 }} />
-                                            <div style={{ flex: 1, paddingRight: 28 }}>
+                                            <div style={{ flex: 1, minWidth: 0, paddingRight: 32 }}>
                                                 <Title 
                                                     level={5} 
                                                     title={campaign.tieuDeChienDich || campaign.title}
@@ -466,7 +466,7 @@ const Home = () => {
                                                         color: '#111827', 
                                                         fontWeight: '700',
                                                         lineHeight: 1.4,
-                                                        height: '45px', // Cố định chiều cao 2 dòng
+                                                        height: '45px',
                                                         display: '-webkit-box',
                                                         WebkitLineClamp: 2,
                                                         WebkitBoxOrient: 'vertical',
@@ -494,7 +494,7 @@ const Home = () => {
                                         </div>
 
                                         {/* Nút Bookmark */}
-                                        <div style={{ position: 'absolute', top: 18, right: 18 }}>
+                                        <div style={{ position: 'absolute', top: 18, right: 18, zIndex: 2 }}>
                                             {isBookmarked ? (
                                                 <HeartFilled className="bookmark-icon bookmarked" onClick={(e) => { e.stopPropagation(); handleBookmark(maViTriDauTien); }} />
                                             ) : (
@@ -502,17 +502,35 @@ const Home = () => {
                                             )}
                                         </div>
 
-                                        {/* Footer Card (Tự động ghim đáy) */}
+                                        {/* Footer Card (Tự động ghim đáy và chống tràn Tag) */}
                                         <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px dashed #f0f0f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
                                             <Text style={{ color: '#1677ff', fontSize: 13, fontWeight: '600' }}>
                                                 <PushpinOutlined style={{ marginRight: 4 }} /> Đang mở {campaign.viTris?.length || 0} vị trí tuyển dụng
                                             </Text>
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                                {campaign.viTris?.slice(0, 2).map(vt => (
-                                                    <Tag key={vt.id || vt.maViTri} style={{ background: '#e6f4ff', borderColor: '#91caff', color: '#0958d9', margin: 0 }}>
-                                                        {vt.title || vt.tenViTri}
-                                                    </Tag>
-                                                ))}
+                                                {campaign.viTris?.slice(0, 2).map(vt => {
+                                                    const tagText = vt.title || vt.tenViTri;
+                                                    return (
+                                                        <Tag 
+                                                            key={vt.id || vt.maViTri} 
+                                                            title={tagText}
+                                                            style={{ 
+                                                                background: '#e6f4ff', 
+                                                                borderColor: '#91caff', 
+                                                                color: '#0958d9', 
+                                                                margin: 0,
+                                                                maxWidth: '100%',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                whiteSpace: 'nowrap',
+                                                                display: 'inline-block',
+                                                                borderRadius: 4
+                                                            }}
+                                                        >
+                                                            {tagText}
+                                                        </Tag>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     </Card>

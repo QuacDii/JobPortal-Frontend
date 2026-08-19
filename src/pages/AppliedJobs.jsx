@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Row, Col, Card, Tag, Button, Switch, Avatar, Spin, message, Typography, Empty, Badge, Modal, Space } from 'antd';
-import { 
-    BellOutlined, 
-    CheckCircleOutlined, 
-    FileTextOutlined, 
-    CalendarOutlined, 
+import {
+    BellOutlined,
+    CheckCircleOutlined,
+    FileTextOutlined,
+    CalendarOutlined,
     CheckCircleFilled,
     DollarOutlined,
     UserOutlined,
@@ -36,6 +36,15 @@ const getUserInfoFromToken = (token) => {
     }
 };
 
+const getRemindedListFromStorage = () => {
+    try {
+        const stored = localStorage.getItem('reminded_applications');
+        return stored ? JSON.parse(stored) : [];
+    } catch {
+        return [];
+    }
+};
+
 const AppliedJobs = ({ user }) => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
@@ -48,12 +57,13 @@ const AppliedJobs = ({ user }) => {
     const [isJobAlertModalOpen, setIsJobAlertModalOpen] = useState(false);
     const [cvList, setCvList] = useState([]);
     const [liveAvatar, setLiveAvatar] = useState(null);
-    
+
     // State quản lý loading cho từng nút Nhắc NTD
     const [remindingId, setRemindingId] = useState(null);
 
     const token = localStorage.getItem('token');
     const userInfo = getUserInfoFromToken(token);
+    const [remindedList, setRemindedList] = useState(getRemindedListFromStorage());
     const userId = userInfo?.userId;
     const isVipUser = userInfo?.isVip || false;
     const userName = userInfo?.userName || user?.hoTen || 'Ứng viên';
@@ -116,31 +126,31 @@ const AppliedJobs = ({ user }) => {
         }
     };
 
-    // 👉 HÀM MỚI: Xử lý chức năng Nhắc Nhở Nhà Tuyển Dụng
+    // Xử lý chức năng Nhắc Nhở Nhà Tuyển Dụng
     const handleRemindEmployer = async (app) => {
-        if (!app.ngayNop) return;
-
-        const applyDate = new Date(app.ngayNop);
-        const today = new Date();
-        const diffTime = Math.abs(today - applyDate);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        // Kiểm tra điều kiện 7 ngày
-        if (diffDays < 7) {
-            message.warning(`Bạn chỉ có thể gửi nhắc nhở sau 7 ngày kể từ lúc ứng tuyển (Đã nộp ${diffDays} ngày trước).`);
+        // Kiểm tra xem mã đơn này đã từng nhắc chưa
+        if (remindedList.includes(app.maDon)) {
+            message.info("Bạn đã gửi nhắc nhở cho đơn này rồi!");
             return;
         }
 
+        if (!app.ngayNop) return;
+
         try {
             setRemindingId(app.maDon);
-            // Giả định gọi API thông báo nhắc nhở (Bạn có thể điều chỉnh endpoint theo Backend thực tế)
             await apiClient.post(`/JobApplication/remind-employer/${app.maDon}`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+
             message.success('Đã gửi thông báo nhắc nhở lịch sự đến Nhà tuyển dụng thành công!');
+
+            // 🌟 Lưu mã đơn vào localStorage để không cho bấm lần thứ 2
+            const updated = [...remindedList, app.maDon];
+            setRemindedList(updated);
+            localStorage.setItem('reminded_applications', JSON.stringify(updated));
+
         } catch (error) {
-            console.error(error);
-            message.success('Đã gửi thông báo nhắc nhở lịch sự đến Nhà tuyển dụng thành công!'); // Tạm thời Fake success nếu chưa có API Backend
+            message.error(error.response?.data?.message || 'Lỗi khi gửi nhắc nhở!');
         } finally {
             setRemindingId(null);
         }
@@ -171,17 +181,17 @@ const AppliedJobs = ({ user }) => {
     return (
         <div style={{ background: '#f5f7fa', minHeight: '100vh', padding: '30px 40px' }}>
             <Row gutter={[24, 24]} style={{ maxWidth: '1300px', margin: '0 auto' }}>
-                
+
                 <Col xs={24} lg={16}>
                     <Title level={3} style={{ marginBottom: '20px', color: '#0f1e36', fontWeight: 700 }}>
                         Việc làm đã ứng tuyển
                     </Title>
 
-                    <div style={{ 
-                        backgroundColor: BLUE_LIGHT_BG, 
-                        border: `1px solid ${BLUE_BORDER}`, 
-                        borderRadius: '8px', 
-                        padding: '16px', 
+                    <div style={{
+                        backgroundColor: BLUE_LIGHT_BG,
+                        border: `1px solid ${BLUE_BORDER}`,
+                        borderRadius: '8px',
+                        padding: '16px',
                         marginBottom: '24px',
                         display: 'flex',
                         alignItems: 'center',
@@ -197,7 +207,7 @@ const AppliedJobs = ({ user }) => {
 
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
                         {filterTabs.map(tab => (
-                            <div 
+                            <div
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
                                 style={{
@@ -217,43 +227,28 @@ const AppliedJobs = ({ user }) => {
                         ))}
                     </div>
 
-                    <Card style={{ marginBottom: '24px', borderRadius: '8px', textAlign: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }} title={<span style={{fontSize:'13px', color:'#8c8c8c', fontWeight:600}}>QUY TRÌNH ỨNG TUYỂN</span>} styles={{ body: { padding: '12px 24px' } }}>
-                        <Row justify="space-between" align="middle" style={{ padding: '10px 0' }}>
-                            <Col span={4}><Avatar size={32} style={{backgroundColor: BLUE_PRIMARY}}>1</Avatar><div style={{fontSize:'12px', marginTop:4}}>Gửi hồ sơ</div></Col>
-                            <Col span={1}><div style={{height:'2px', backgroundColor:'#d9d9d9'}}></div></Col>
-                            <Col span={4}><Avatar size={32} style={{backgroundColor: '#d9d9d9', color:'#595959'}}>2</Avatar><div style={{fontSize:'12px', marginTop:4}}>Tiếp nhận</div></Col>
-                            <Col span={1}><div style={{height:'2px', backgroundColor:'#d9d9d9'}}></div></Col>
-                            <Col span={4}><Avatar size={32} style={{backgroundColor: '#d9d9d9', color:'#595959'}}>3</Avatar><div style={{fontSize:'12px', marginTop:4}}>Xem hồ sơ</div></Col>
-                            <Col span={1}><div style={{height:'2px', backgroundColor:'#d9d9d9'}}></div></Col>
-                            <Col span={4}><Avatar size={32} style={{backgroundColor: '#d9d9d9', color:'#595959'}}>4</Avatar><div style={{fontSize:'12px', marginTop:4}}>Xử lý</div></Col>
-                            <Col span={1}><div style={{height:'2px', backgroundColor:'#d9d9d9'}}></div></Col>
-                            <Col span={4}><Avatar size={32} style={{backgroundColor: '#d9d9d9', color:'#595959'}}>5</Avatar><div style={{fontSize:'12px', marginTop:4}}>Phản hồi</div></Col>
-                        </Row>
-                    </Card>
-
                     {filteredApplications.length === 0 ? (
                         <Card style={{ borderRadius: '8px', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}><Empty description="Không tìm thấy việc làm nào trong danh mục này." /></Card>
                     ) : (
                         filteredApplications.map(app => (
-                            <Card 
-                                key={app.maDon} 
+                            <Card
+                                key={app.maDon}
                                 style={{ marginBottom: '16px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
                                 styles={{ body: { padding: '20px' } }}
                             >
                                 <Row justify="space-between" align="top">
                                     <Col style={{ display: 'flex', gap: '16px' }}>
-                                        <Avatar 
-                                            shape="square" 
-                                            size={64} 
-                                            src={app.logo || null} 
+                                        <Avatar
+                                            shape="square"
+                                            size={64}
+                                            src={app.logo || null}
                                             icon={<UserOutlined />}
                                             style={{ backgroundColor: '#f0f2f5', border: '1px solid #f0f0f0', color: '#bfbfbf', borderRadius: '8px' }}
                                         />
                                         <div>
-                                            {/* 👉 ĐÃ SỬA: Bấm vào tên để đến trang Job Detail */}
-                                            <div 
+                                            <div
                                                 style={{ display: 'inline-block' }}
-                                                onClick={() => navigate(`/job-detail/${app.maViTri || app.maTin}`)}
+                                                onClick={() => navigate(`/job/${app.maTin || app.maTinTuyenDung || app.maViTri}`)}
                                                 onMouseEnter={(e) => e.currentTarget.style.color = BLUE_PRIMARY}
                                                 onMouseLeave={(e) => e.currentTarget.style.color = '#262626'}
                                             >
@@ -263,19 +258,13 @@ const AppliedJobs = ({ user }) => {
                                             </div>
 
                                             <Text strong style={{ color: '#595959', display: 'block', margin: '4px 0' }}>{app.tenCongTy}</Text>
-                                            
+
                                             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', color: '#8c8c8c', fontSize: '13px', marginTop: '6px' }}>
                                                 <span><CalendarOutlined /> Ứng tuyển: {app.ngayNop ? new Date(app.ngayNop).toLocaleDateString('vi-VN') : 'Đang cập nhật'}</span>
                                                 <span>
-                                                    <FileTextOutlined /> CV: 
-                                                    {/* 👉 ĐÃ SỬA: Bấm vào tên CV để sang trang Xem CV (Tab mới) */}
-                                                    <span 
-                                                        style={{ color: BLUE_PRIMARY, textDecoration: 'underline', cursor: 'pointer', marginLeft: '4px' }}
-                                                        onClick={() => window.open(`/xem-cv/${app.maCV}`, '_blank')}
-                                                    >
-                                                        {app.tieuDeCV || 'Hồ sơ của tôi'}
-                                                    </span>
+                                                    <FileTextOutlined /> CV: <strong style={{ color: '#595959', marginLeft: '4px' }}>{app.tieuDeCV || app.tieuDeCv || 'Hồ sơ của tôi'}</strong>
                                                 </span>
+
                                                 <span><DollarOutlined /> Lương: {app.luong || 'Thỏa thuận'}</span>
                                             </div>
 
@@ -292,18 +281,31 @@ const AppliedJobs = ({ user }) => {
                                         {app.trangThai === 1 && <Tag color="blue">Nhà tuyển dụng đã xem</Tag>}
                                         {app.trangThai === 2 && <Tag color="green">Đạt yêu cầu</Tag>}
                                         {app.trangThai === 3 && <Tag color="red">Chưa phù hợp</Tag>}
-
-                                        {/* 👉 ĐÃ SỬA: Xóa nút nhắn tin và Thêm hàm cho nút Nhắc NTD */}
+                                        
                                         <div style={{ display: 'flex', gap: '8px', marginTop: '15px' }}>
-                                            <Button 
-                                                size="small" 
-                                                icon={<BellOutlined />} 
-                                                loading={remindingId === app.maDon}
-                                                onClick={() => handleRemindEmployer(app)}
-                                                style={{ borderColor: BLUE_PRIMARY, color: BLUE_PRIMARY }}
-                                            >
-                                                Nhắc NTD
-                                            </Button>
+                                            {(() => {
+                                                const isReminded = remindedList.includes(app.maDon);
+                                                return (
+                                                    <Button
+                                                        size="small"
+                                                        icon={<BellOutlined />}
+                                                        loading={remindingId === app.maDon}
+                                                        disabled={isReminded}
+                                                        onClick={() => handleRemindEmployer(app)}
+                                                        style={isReminded ? {
+                                                            backgroundColor: '#f5f5f5',
+                                                            borderColor: '#d9d9d9',
+                                                            color: '#bfbfbf',
+                                                            cursor: 'not-allowed'
+                                                        } : {
+                                                            borderColor: BLUE_PRIMARY,
+                                                            color: BLUE_PRIMARY
+                                                        }}
+                                                    >
+                                                        {isReminded ? 'Đã nhắc NTD' : 'Nhắc NTD'}
+                                                    </Button>
+                                                );
+                                            })()}
                                         </div>
                                     </Col>
                                 </Row>

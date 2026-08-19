@@ -103,8 +103,11 @@ const cvDictionary = {
     "Kỹ năng": { vi: "Kỹ năng", en: "Skills" },
     "Chuyên ngành:": { vi: "Chuyên ngành:", en: "Major:" },
     "Sở thích": { vi: "Sở thích", en: "Hobbies" },
+    "Tiêu đề:": { vi: "Tiêu đề:", en: "Title:" },
+    "Nhập nội dung": { vi: "Nhập nội dung", en: "Write here" },
     "Mục tiêu nghề nghiệp": { vi: "Mục tiêu nghề nghiệp", en: "Career Objective" },
     "Kinh nghiệm làm việc": { vi: "Kinh nghiệm làm việc", en: "Work Experience" },
+    "Thông tin cá nhân": { vi: "Thông tin cá nhân", en: "Personal Information" },
     "Danh hiệu và giải thưởng": { vi: "Danh hiệu và giải thưởng", en: "Honors & Awards" },
     "Chứng chỉ": { vi: "Chứng chỉ", en: "Certificates" },
     "Hoạt động": { vi: "Hoạt động", en: "Activities" },
@@ -139,7 +142,7 @@ const cvDictionary = {
     "Mô tả hoạt động": { vi: "Mô tả hoạt động", en: "Describe your activities" },
     "Vị trí của bạn trong dự án": { vi: "Vị trí của bạn trong dự án", en: "Your role in the project" },
     "Tên dự án": { vi: "Tên dự án", en: "Project Name" },
-    "Mô tả ngắn gọn về dự án, mục tiêu, vai trò của bạn, các công nghệ sử dung và những thành tựu bạn đã đạt được trong dự án": { vi: "Mô tả ngắn gọn về dự án, mục tiêu, vai trò của bạn, các công nghệ sử dung và những thành tựu bạn đã đạt được trong dự án", en: "Briefly describe the project, goals, your role, technologies used and achievements" },
+    "Mô tả ngắn gọn về dự án, mục tiêu, vai trò của bạn, các công nghệ sử dụng và những thành tựu bạn đã đạt được trong dự án": { vi: "Mô tả ngắn gọn về dự án, mục tiêu, vai trò của bạn, các công nghệ sử dụng và những thành tựu bạn đã đạt được trong dự án", en: "Briefly describe the project, goals, your role, technologies used and achievements" },
     "Người giới thiệu": { vi: "Người giới thiệu", en: "References" },
     "Thông tin thêm": { vi: "Thông tin thêm", en: "Additional Information" },
     "Tên người giới thiệu": { vi: "Tên người giới thiệu", en: "Reference Name" },
@@ -168,11 +171,191 @@ const translateLayoutTree = (node, targetLang) => {
     return newNode;
 };
 
+export const transformSectionForColumn = (section, targetColId, passedLang = null) => {
+    if (!section || !section.id) return section;
+
+    const store = useCvStore.getState();
+    const currentSchema = store.layoutSchema || store.schema || {};
+
+    // 1. Kiểm tra chính xác xem có phải cột trái không
+    const isLeftCol = (colId) => {
+        if (!colId) return false;
+        const lower = colId.toLowerCase();
+        return lower.includes('left') || lower.includes('col-1') || lower.includes('sidebar') || lower.includes('col-4-left');
+    };
+    const isLeft = isLeftCol(targetColId);
+
+    const activeLang = (
+        passedLang ||
+        store.language ||
+        store.currentLang ||
+        store.layoutSettings?.language ||
+        (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('lang') : null) ||
+        'vi'
+    ).toLowerCase();
+
+    const isEn = activeLang === 'en' || activeLang === 'english';
+    const t = (vi, en) => (isEn ? en : vi);
+
+    const newSection = JSON.parse(JSON.stringify(section));
+    const id = newSection.id;
+
+    // 🌟 2. XỬ LÝ AN TOÀN & LINH HOẠT CHO HEADER / AVATAR / DANH THIẾP
+    if (id === 'section-avatar-profile' || id === 'section-business-card' || id === 'section-contact-info') {
+        const hasNegativeMargin = newSection.styles?.marginLeft && String(newSection.styles.marginLeft).startsWith('-');
+
+        if (hasNegativeMargin) {
+            let targetPadding = 0;
+            const findColPadding = (node) => {
+                if (node?.id === targetColId && node.styles?.padding) {
+                    const parts = node.styles.padding.trim().split(/\s+/);
+                    // Lấy padding ngang (nếu là "0px 25px" thì lấy 25, nếu là "20px" thì lấy 20)
+                    const horiz = parts.length >= 2 ? parts[1] : parts[0];
+                    targetPadding = parseFloat(horiz) || 0;
+                }
+                if (node?.children) node.children.forEach(findColPadding);
+            };
+            findColPadding(currentSchema);
+
+            if (targetPadding > 0) {
+                newSection.styles.marginLeft = `-${targetPadding}px`;
+                newSection.styles.marginRight = `-${targetPadding}px`;
+            } else {
+                delete newSection.styles.marginLeft;
+                delete newSection.styles.marginRight;
+            }
+        }
+
+        return newSection;
+    }
+
+    // 3. Trích xuất Text tiêu đề
+    const titleDictionary = {
+        'section-summary': { vi: 'Mục tiêu nghề nghiệp', en: 'Career Objective' },
+        'section-education': { vi: 'Học vấn', en: 'Education' },
+        'section-experience': { vi: 'Kinh nghiệm làm việc', en: 'Work Experience' },
+        'section-skills': { vi: 'Kỹ năng', en: 'Skills' },
+        'section-hobbies': { vi: 'Sở thích', en: 'Hobbies' },
+        'section-projects': { vi: 'Dự án', en: 'Projects' },
+        'section-activities': { vi: 'Hoạt động', en: 'Activities' },
+        'section-awards': { vi: 'Danh hiệu và giải thưởng', en: 'Honors & Awards' },
+        'section-certificates': { vi: 'Chứng chỉ', en: 'Certificates' },
+        'section-references': { vi: 'Người giới thiệu', en: 'References' },
+        'section-additional': { vi: 'Thông tin thêm', en: 'Additional Information' }
+    };
+
+    let titleText = titleDictionary[id] ? t(titleDictionary[id].vi, titleDictionary[id].en) : 'Section';
+
+    // 4. Học kiểu dáng Tiêu đề và Card Wrapper từ cột đích
+    let sampleHeading = null;
+    let sampleCardStyles = null;
+    const excludeIds = ['section-avatar-profile', 'section-business-card', 'section-contact-info', id];
+
+    const findSample = (node) => {
+        if (!node) return;
+        if (node.id === targetColId && node.children && node.children.length > 0) {
+            const validSec = node.children.find(c => c && c.id && !excludeIds.includes(c.id) && c.children && c.children.length > 0);
+            if (validSec) {
+                if (validSec.children[0] && validSec.children[0].type !== 'Image') {
+                    sampleHeading = JSON.parse(JSON.stringify(validSec.children[0]));
+                }
+                // Kiểm tra xem các khối ở cột đích có bọc ô vuông/ô xanh không
+                const secondChild = validSec.children[1];
+                if (secondChild && secondChild.type === 'Container' && (secondChild.styles?.backgroundColor || secondChild.styles?.background)) {
+                    sampleCardStyles = JSON.parse(JSON.stringify(secondChild.styles));
+                }
+            }
+        }
+        if (!sampleHeading && node.children) node.children.forEach(findSample);
+    };
+    findSample(currentSchema);
+
+    // Tái tạo Tiêu đề chuẩn theo cột đích
+    let formattedHeading;
+    if (sampleHeading) {
+        const replaceHeadingContent = (n) => {
+            if (!n) return;
+            if (n.type === 'Text' && n.content && n.content !== '•' && n.content !== '-' && n.content !== '|') {
+                n.content = (sampleHeading.styles?.textTransform === 'uppercase' || n.styles?.textTransform === 'uppercase')
+                    ? titleText.toUpperCase()
+                    : titleText;
+            }
+            if (n.children) n.children.forEach(replaceHeadingContent);
+        };
+        replaceHeadingContent(sampleHeading);
+        formattedHeading = sampleHeading;
+    } else {
+        formattedHeading = newSection.children[0];
+    }
+
+    // 🌟 5. BÓC TÁCH (UNWRAP) VỎ BỌC NỀN XANH
+    let contentNode = (newSection.children && newSection.children[1]) ? newSection.children[1] : null;
+
+    // Nếu nội dung đang bị bọc bởi Container nền xanh/card -> Bóc lấy nội dung con bên trong
+    if (contentNode && contentNode.type === 'Container' && contentNode.children && contentNode.children.length === 1) {
+        const hasCardBg = contentNode.styles?.backgroundColor || contentNode.styles?.background;
+        if (hasCardBg && contentNode.styles?.backgroundColor !== 'transparent') {
+            contentNode = contentNode.children[0];
+        }
+    }
+
+    // 🌟 6. XỬ LÝ THEO CỘT ĐÍCH
+    if (isLeft) {
+        // KHI SANG CỘT TRÁI: Xóa triệt để màu nền, padding và bo góc thừa
+        if (contentNode && contentNode.styles) {
+            delete contentNode.styles.backgroundColor;
+            delete contentNode.styles.background;
+            delete contentNode.styles.padding;
+            delete contentNode.styles.borderRadius;
+        }
+    } else {
+        // KHI SANG CỘT PHẢI: Nếu cột phải có ô xanh, tự động bọc lại
+        if (sampleCardStyles) {
+            contentNode = {
+                type: "Container",
+                styles: { ...sampleCardStyles, width: "100%", boxSizing: "border-box" },
+                children: [contentNode]
+            };
+        } else {
+            // Dự phòng cho mẫu có timeline card xanh
+            const schemaStr = JSON.stringify(currentSchema);
+            if (schemaStr.includes('#e6f0fa') || schemaStr.includes('borderRadius": "20px"')) {
+                contentNode = {
+                    type: "Container",
+                    styles: { backgroundColor: "#e6f0fa", borderRadius: "20px", padding: "18px 22px", width: "100%", boxSizing: "border-box" },
+                    children: [contentNode]
+                };
+            }
+        }
+    }
+
+    // 7. Đồng bộ màu chữ theo màu nền của cột
+    const syncTextColor = (node, toLeft) => {
+        if (!node) return;
+        if (node.styles) {
+            if (toLeft) {
+                if (!node.styles.color || !node.styles.color.includes('var(')) {
+                    node.styles.color = (node.styles.fontWeight === 'bold' || node.styles.fontWeight === '600') ? '#1e293b' : '#64748b';
+                }
+            } else {
+                if (node.styles.color && (node.styles.color.includes('#fff') || node.styles.color.includes('255, 255, 255'))) {
+                    node.styles.color = '#1e293b';
+                }
+            }
+        }
+        if (node.children) node.children.forEach(c => syncTextColor(c, toLeft));
+        if (node.itemTemplate) syncTextColor(node.itemTemplate, toLeft);
+    };
+    syncTextColor(contentNode, isLeft);
+
+    newSection.children = [formattedHeading, contentNode];
+    return newSection;
+};
+
 const CvBuilder = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // 🌟 GIAO DIỆN SÁNG (LIGHT MODE)
     const themeColorsUI = {
         bgMain: '#f4f5f5',
         bgHeader: '#ffffff',
@@ -198,7 +381,7 @@ const CvBuilder = () => {
     const isVipUser = userInfo?.isVip || false;
 
     const [isPremium, setIsPremium] = useState(isVipUser);
-    const [aiBalance, setAiBalance] = useState(0); // 🌟 LƯỢT SỬ DỤNG AI CÒN LẠI
+    const [aiBalance, setAiBalance] = useState(0);
 
     const [cvTitle, setCvTitle] = useState('CV chưa đặt tên');
     const [pageLoading, setPageLoading] = useState(false);
@@ -224,21 +407,17 @@ const CvBuilder = () => {
     const layoutSchema = useCvStore(state => state.layoutSchema || state.schema);
     const currentSchema = useCvStore(state => state.layoutSchema || state.schema);
 
-    // 1. Khai báo State isDirty & Ref lưu snapshot dữ liệu ban đầu
     const [isDirty, setIsDirty] = useState(false);
     const initialDataRef = useRef(null);
 
-    // Lấy thêm Settings & Schema từ Store để theo dõi toàn bộ thay đổi (Màu, Font, Bố cục, Nội dung)
     const layoutSettings = useCvStore(state => state.layoutSettings);
 
-    // 2. Lưu snapshot toàn bộ trạng thái ban đầu ngay khi load xong CV
     useEffect(() => {
         if (!pageLoading && currentData && !initialDataRef.current) {
             initialDataRef.current = JSON.stringify({ currentData, currentSchema, layoutSettings });
         }
     }, [pageLoading, currentData, currentSchema, layoutSettings]);
 
-    // 3. Đánh dấu isDirty tức thì khi BẤT KỲ dữ liệu nào (Nội dung, Bố cục, Màu/Font, Lịch sử) thay đổi
     useEffect(() => {
         if (initialDataRef.current) {
             const currentSnapshot = JSON.stringify({ currentData, currentSchema, layoutSettings });
@@ -247,7 +426,6 @@ const CvBuilder = () => {
         }
     }, [currentData, currentSchema, layoutSettings, pastHistory]);
 
-    // 4. Bắt sự kiện F5 / Tắt Tab / Đóng trình duyệt
     useEffect(() => {
         const handleBeforeUnload = (e) => {
             if (isDirty) {
@@ -259,14 +437,12 @@ const CvBuilder = () => {
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [isDirty]);
 
-    // 5. BẮT TẤT CẢ CLICK RỜI KHỎI TRANG (Header, Navbar, Link, Dropdown, Avatar...)
     useEffect(() => {
         const handleGlobalClick = (e) => {
             if (!isDirty) return;
 
             const target = e.target;
 
-            // Tránh chặn click bên trong khung chỉnh sửa CV hoặc các Popup/Modal/Message thông báo
             if (
                 target.closest('.cv-builder-wrapper') ||
                 target.closest('.ant-modal-root') ||
@@ -276,7 +452,6 @@ const CvBuilder = () => {
                 return;
             }
 
-            // Kiểm tra xem click có nằm trên Header, Dropdown menu, thẻ <a> hoặc nút chuyển trang không
             const isLink = target.closest('a');
             const isNavItem = target.closest('header, .app-header, .navbar, .ant-dropdown, .ant-dropdown-menu-item, .ant-menu-item');
             const isButtonNav = target.closest('button, [role="button"], li');
@@ -295,11 +470,10 @@ const CvBuilder = () => {
                     cancelText: 'Ở lại chỉnh sửa',
                     okButtonProps: { danger: true },
                     onOk: () => {
-                        setIsDirty(false); // Tắt cờ chưa lưu
+                        setIsDirty(false);
                         if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
                             navigate(href);
                         } else {
-                            // Nếu click vào Menu/Dropdown có hàm navigate riêng, mô phỏng lại click sau khi đã tắt isDirty
                             setTimeout(() => {
                                 target.click();
                             }, 50);
@@ -318,7 +492,6 @@ const CvBuilder = () => {
         };
     }, [isDirty, navigate]);
 
-    // 6. Chặn nút Mũi tên Back/Forward của Trình duyệt
     useEffect(() => {
         const handlePopState = () => {
             if (isDirty) {
@@ -339,7 +512,6 @@ const CvBuilder = () => {
         };
     }, [isDirty]);
 
-    // 7. Hàm xử lý khi bấm nút Mũi tên Quay lại ở Header góc trái
     const handleGoBack = () => {
         if (isDirty) {
             Modal.confirm({
@@ -358,14 +530,23 @@ const CvBuilder = () => {
             navigate('/manage-cv');
         }
     };
-    // 🌟 1. LẤY SỐ LƯỢT AI CÒN LẠI TỪ API BALANCE
+
+    const [hasRemoveWatermark, setHasRemoveWatermark] = useState(false);
+
     const fetchAiBalance = () => {
         if (token) {
             apiClient.get('/Service/balance')
                 .then(res => {
-                    const balData = res.data !== undefined ? res.data : res;
-                    const aiTurns = balData?.soLuotAiConLai ?? balData?.luotAiConLai ?? balData?.luotAi ?? 0;
+                    const balData = res?.data !== undefined ? res.data : res;
+                    const aiTurns = balData?.soLuotAiConLai ?? balData?.luotAiConLai ?? 0;
+                    const isStillVip = balData?.ngayHetHanGoi && new Date(balData.ngayHetHanGoi) > new Date();
+                    const privileges = balData?.cacDacQuyen || [];
+
                     setAiBalance(aiTurns);
+                    setIsPremium(Boolean(isStillVip));
+
+                    const canHideWatermark = Boolean(isStillVip) || privileges.includes('UV_REMOVE_WATERMARK');
+                    setHasRemoveWatermark(canHideWatermark);
                 })
                 .catch(err => console.error("Lỗi lấy số lượt AI:", err));
         }
@@ -513,7 +694,21 @@ const CvBuilder = () => {
         findHeading(schema);
 
         if (!headingTemplate) {
-            headingTemplate = { "type": "Container", "styles": { "display": "flex", "alignItems": "center", "marginBottom": "24px" }, "children": [{ "type": "Text", "content": "TIÊU ĐỀ", "styles": { "backgroundColor": "var(--heading-bg)", "color": "#ffffff", "padding": "8px 24px", "borderRadius": "20px", "fontWeight": "bold", "fontSize": "15px", "whiteSpace": "nowrap" } }, { "type": "Container", "styles": { "flexGrow": "1", "height": "1px", "backgroundColor": "var(--heading-line)", "marginLeft": "15px", "opacity": "0.3" } }] };
+            headingTemplate = {
+                type: "Container",
+                styles: { display: "flex", alignItems: "center", marginBottom: "24px" },
+                children: [
+                    {
+                        type: "Text",
+                        content: "TIÊU ĐỀ",
+                        styles: { backgroundColor: "var(--heading-bg)", color: "#ffffff", padding: "8px 24px", borderRadius: "20px", fontWeight: "bold", fontSize: "15px", whiteSpace: "nowrap" }
+                    },
+                    {
+                        type: "Container",
+                        styles: { flexGrow: "1", height: "1px", backgroundColor: "var(--heading-line)", marginLeft: "15px", opacity: "0.3" }
+                    }
+                ]
+            };
         }
 
         const applyHeadingTitle = (root, title) => {
@@ -526,83 +721,324 @@ const CvBuilder = () => {
         let title = "";
 
         if (id === 'section-summary') {
-            title = "Mục tiêu nghề nghiệp";
-            contentChildren = [{ "type": "RichText", "dataPath": "summary", "placeholder": "Mục tiêu nghề nghiệp của bạn, bao gồm mục tiêu ngắn hạn và dài hạn", "styles": { "textAlign": "justify", "fontSize": "13.5px", "border": "none", "outline": "none", "width": "100%" } }];
+            title = translateText("Mục tiêu nghề nghiệp", lang);
+            contentChildren = [
+                {
+                    type: "RichText",
+                    dataPath: "summary",
+                    placeholder: translateText("Mục tiêu nghề nghiệp của bạn, bao gồm mục tiêu ngắn hạn và dài hạn", lang),
+                    styles: { textAlign: "justify", fontSize: "13.5px", border: "none", outline: "none", width: "100%" }
+                }
+            ];
         } else if (id === 'section-education') {
-            title = "Học vấn";
-            contentChildren = [{
-                "type": "LoopContainer", "dataPath": "education", "styles": { "display": "flex", "flexDirection": "column", "gap": "16px" },
-                "itemTemplate": {
-                    "type": "Container", "styles": { "display": "flex", "flexDirection": "row", "gap": "20px" }, "children": [
-                        { "type": "Container", "styles": { "width": "20%", "flexShrink": "0" }, "children": [{ "type": "Container", "styles": { "display": "flex", "gap": "4px", "fontSize": "14px", "whiteSpace": "nowrap" }, "children": [{ "type": "Text", "dataPath": "startDate", "placeholder": "Bắt đầu" }, { "type": "Text", "content": "-" }, { "type": "Text", "dataPath": "endDate", "placeholder": "Kết thúc" }] }] },
-                        { "type": "Container", "styles": { "flex": "1", "display": "flex", "flexDirection": "column" }, "children": [{ "type": "Text", "dataPath": "school", "placeholder": "Tên trường học", "styles": { "fontWeight": "bold", "fontSize": "14px", "marginBottom": "6px" } }, { "type": "Container", "styles": { "display": "flex", "gap": "6px", "marginBottom": "6px", "alignItems": "baseline" }, "children": [{ "type": "Text", "content": "Chuyên ngành:", "styles": { "fontWeight": "bold", "whiteSpace": "nowrap", "flexShrink": "0" } }, { "type": "Text", "dataPath": "major", "placeholder": "Ngành học / Môn học", "styles": { "fontWeight": "bold" } }] }, { "type": "RichText", "dataPath": "description", "placeholder": "Mô tả quá trình học tập hoặc thành tích của bạn", "styles": { "fontSize": "13.5px", "border": "none", "outline": "none" } }] }
-                    ]
+            title = translateText("Học vấn", lang);
+            contentChildren = [
+                {
+                    type: "LoopContainer",
+                    dataPath: "education",
+                    styles: { display: "flex", flexDirection: "column", gap: "16px" },
+                    itemTemplate: {
+                        type: "Container",
+                        styles: { display: "flex", flexDirection: "row", gap: "20px" },
+                        children: [
+                            {
+                                type: "Container",
+                                styles: { width: "20%", flexShrink: "0" },
+                                children: [
+                                    {
+                                        type: "Container",
+                                        styles: { display: "flex", gap: "4px", fontSize: "14px", whiteSpace: "nowrap" },
+                                        children: [
+                                            { type: "Text", dataPath: "startDate", placeholder: translateText("Bắt đầu", lang) },
+                                            { type: "Text", content: "-" },
+                                            { type: "Text", dataPath: "endDate", placeholder: translateText("Kết thúc", lang) }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                type: "Container",
+                                styles: { flex: "1", display: "flex", flexDirection: "column" },
+                                children: [
+                                    { type: "Text", dataPath: "school", placeholder: translateText("Tên trường học", lang), styles: { fontWeight: "bold", fontSize: "14px", marginBottom: "6px" } },
+                                    {
+                                        type: "Container",
+                                        styles: { display: "flex", gap: "6px", marginBottom: "6px", alignItems: "baseline" },
+                                        children: [
+                                            { type: "Text", content: translateText("Chuyên ngành:", lang), styles: { fontWeight: "bold", whiteSpace: "nowrap", flexShrink: "0" } },
+                                            { type: "Text", dataPath: "major", placeholder: translateText("Ngành học / Môn học", lang), styles: { fontWeight: "bold" } }
+                                        ]
+                                    },
+                                    { type: "RichText", dataPath: "description", placeholder: translateText("Mô tả quá trình học tập hoặc thành tích của bạn", lang), styles: { fontSize: "13.5px", border: "none", outline: "none" } }
+                                ]
+                            }
+                        ]
+                    }
                 }
-            }];
+            ];
         } else if (id === 'section-experience') {
-            title = "Kinh nghiệm làm việc";
-            contentChildren = [{
-                "type": "LoopContainer", "dataPath": "experience", "styles": { "display": "flex", "flexDirection": "column", "gap": "20px" },
-                "itemTemplate": {
-                    "type": "Container", "styles": { "display": "flex", "flexDirection": "row", "gap": "20px" }, "children": [
-                        { "type": "Container", "styles": { "width": "20%", "flexShrink": "0" }, "children": [{ "type": "Container", "styles": { "display": "flex", "gap": "4px", "fontSize": "14px", "whiteSpace": "nowrap" }, "children": [{ "type": "Text", "dataPath": "startDate", "placeholder": "Bắt đầu" }, { "type": "Text", "content": "-" }, { "type": "Text", "dataPath": "endDate", "placeholder": "Kết thúc" }] }] },
-                        { "type": "Container", "styles": { "flex": "1", "display": "flex", "flexDirection": "column" }, "children": [{ "type": "Text", "dataPath": "companyName", "placeholder": "Tên công ty", "styles": { "fontWeight": "bold", "fontSize": "14px", "marginBottom": "6px" } }, { "type": "Text", "dataPath": "title", "placeholder": "Vị trí công việc", "styles": { "fontWeight": "bold", "marginBottom": "8px" } }, { "type": "RichText", "dataPath": "description", "placeholder": "Mô tả kinh nghiệm làm việc của bạn", "styles": { "fontSize": "13.5px", "border": "none", "outline": "none" } }] }
-                    ]
+            title = translateText("Kinh nghiệm làm việc", lang);
+            contentChildren = [
+                {
+                    type: "LoopContainer",
+                    dataPath: "experience",
+                    styles: { display: "flex", flexDirection: "column", gap: "20px" },
+                    itemTemplate: {
+                        type: "Container",
+                        styles: { display: "flex", flexDirection: "row", gap: "20px" },
+                        children: [
+                            {
+                                type: "Container",
+                                styles: { width: "20%", flexShrink: "0" },
+                                children: [
+                                    {
+                                        type: "Container",
+                                        styles: { display: "flex", gap: "4px", fontSize: "14px", whiteSpace: "nowrap" },
+                                        children: [
+                                            { type: "Text", dataPath: "startDate", placeholder: translateText("Bắt đầu", lang) },
+                                            { type: "Text", content: "-" },
+                                            { type: "Text", dataPath: "endDate", placeholder: translateText("Kết thúc", lang) }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                type: "Container",
+                                styles: { flex: "1", display: "flex", flexDirection: "column" },
+                                children: [
+                                    { type: "Text", dataPath: "companyName", placeholder: translateText("Tên công ty", lang), styles: { fontWeight: "bold", fontSize: "14px", marginBottom: "6px" } },
+                                    { type: "Text", dataPath: "title", placeholder: translateText("Vị trí công việc", lang), styles: { fontWeight: "bold", marginBottom: "8px" } },
+                                    { type: "RichText", dataPath: "description", placeholder: translateText("Mô tả kinh nghiệm làm việc của bạn", lang), styles: { fontSize: "13.5px", border: "none", outline: "none" } }
+                                ]
+                            }
+                        ]
+                    }
                 }
-            }];
+            ];
         } else if (id === 'section-projects') {
-            title = "Dự án";
-            contentChildren = [{ "type": "LoopContainer", "dataPath": "projects", "styles": { "display": "flex", "flexDirection": "column", "gap": "20px" }, "itemTemplate": { "type": "Container", "styles": { "display": "flex", "flexDirection": "column" }, "children": [{ "type": "Container", "styles": { "display": "flex", "justifyContent": "space-between", "alignItems": "flex-start", "marginBottom": "4px" }, "children": [{ "type": "Text", "dataPath": "role", "placeholder": "Vai trò trong dự án", "styles": { "fontWeight": "bold", "fontSize": "15px" } }, { "type": "Container", "styles": { "display": "flex", "gap": "4px", "fontWeight": "bold", "fontSize": "14px", "opacity": "0.8", "whiteSpace": "nowrap" }, "children": [{ "type": "Text", "dataPath": "startDate", "placeholder": "Bắt đầu" }, { "type": "Text", "content": "-" }, { "type": "Text", "dataPath": "endDate", "placeholder": "Kết thúc" }] }] }, { "type": "Text", "dataPath": "projectName", "placeholder": "Tên dự án", "styles": { "fontSize": "14.5px", "marginBottom": "8px", "opacity": "0.9", "fontWeight": "bold" } }, { "type": "RichText", "dataPath": "description", "placeholder": "Mô tả dự án...", "styles": { "fontSize": "13.5px", "border": "none", "outline": "none" } }] } }];
+            title = translateText("Dự án", lang);
+            contentChildren = [
+                {
+                    type: "LoopContainer",
+                    dataPath: "projects",
+                    styles: { display: "flex", flexDirection: "column", gap: "20px" },
+                    itemTemplate: {
+                        type: "Container",
+                        styles: { display: "flex", flexDirection: "column" },
+                        children: [
+                            {
+                                type: "Container",
+                                styles: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" },
+                                children: [
+                                    { type: "Text", dataPath: "role", placeholder: translateText("Vị trí của bạn trong dự án", lang), styles: { fontWeight: "bold", fontSize: "15px" } },
+                                    {
+                                        type: "Container",
+                                        styles: { display: "flex", gap: "4px", fontWeight: "bold", fontSize: "14px", opacity: "0.8", whiteSpace: "nowrap" },
+                                        children: [
+                                            { type: "Text", dataPath: "startDate", placeholder: translateText("Bắt đầu", lang) },
+                                            { type: "Text", content: "-" },
+                                            { type: "Text", dataPath: "endDate", placeholder: translateText("Kết thúc", lang) }
+                                        ]
+                                    }
+                                ]
+                            },
+                            { type: "Text", dataPath: "projectName", placeholder: translateText("Tên dự án", lang), styles: { fontSize: "14.5px", marginBottom: "8px", opacity: "0.9", fontWeight: "bold" } },
+                            { type: "RichText", dataPath: "description", placeholder: translateText("Mô tả ngắn gọn về dự án, mục tiêu, vai trò của bạn, các công nghệ sử dụng và những thành tựu bạn đã đạt được trong dự án", lang), styles: { fontSize: "13.5px", border: "none", outline: "none" } }
+                        ]
+                    }
+                }
+            ];
         } else if (id === 'section-awards') {
-            title = "Danh hiệu và giải thưởng";
-            contentChildren = [{ "type": "LoopContainer", "dataPath": "awards", "styles": { "display": "flex", "flexDirection": "column", "gap": "16px" }, "itemTemplate": { "type": "Container", "styles": { "display": "flex", "flexDirection": "row", "gap": "20px" }, "children": [{ "type": "Container", "styles": { "width": "20%", "flexShrink": "0" }, "children": [{ "type": "Text", "dataPath": "time", "placeholder": "Năm", "styles": { "fontSize": "14px", "fontWeight": "bold" } }] }, { "type": "Container", "styles": { "flex": "1" }, "children": [{ "type": "Text", "dataPath": "name", "placeholder": "Tên giải thưởng", "styles": { "fontSize": "14px" } }] }] } }];
+            title = translateText("Danh hiệu và giải thưởng", lang);
+            contentChildren = [
+                {
+                    type: "LoopContainer",
+                    dataPath: "awards",
+                    styles: { display: "flex", flexDirection: "column", gap: "16px" },
+                    itemTemplate: {
+                        type: "Container",
+                        styles: { display: "flex", flexDirection: "row", gap: "20px" },
+                        children: [
+                            {
+                                type: "Container",
+                                styles: { width: "20%", flexShrink: "0" },
+                                children: [{ type: "Text", dataPath: "time", placeholder: translateText("Thời gian", lang), styles: { fontSize: "14px", fontWeight: "bold" } }]
+                            },
+                            {
+                                type: "Container",
+                                styles: { flex: "1" },
+                                children: [{ type: "Text", dataPath: "name", placeholder: translateText("Tên giải thưởng", lang), styles: { fontSize: "14px" } }]
+                            }
+                        ]
+                    }
+                }
+            ];
         } else if (id === 'section-certificates') {
-            title = "Chứng chỉ";
-            contentChildren = [{ "type": "LoopContainer", "dataPath": "certificates", "styles": { "display": "flex", "flexDirection": "column", "gap": "16px" }, "itemTemplate": { "type": "Container", "styles": { "display": "flex", "flexDirection": "row", "gap": "20px" }, "children": [{ "type": "Container", "styles": { "width": "20%", "flexShrink": "0" }, "children": [{ "type": "Text", "dataPath": "time", "placeholder": "Năm", "styles": { "fontSize": "14px", "fontWeight": "bold" } }] }, { "type": "Container", "styles": { "flex": "1" }, "children": [{ "type": "Text", "dataPath": "name", "placeholder": "Tên chứng chỉ", "styles": { "fontSize": "14px" } }] }] } }];
+            title = translateText("Chứng chỉ", lang);
+            contentChildren = [
+                {
+                    type: "LoopContainer",
+                    dataPath: "certificates",
+                    styles: { display: "flex", flexDirection: "column", gap: "16px" },
+                    itemTemplate: {
+                        type: "Container",
+                        styles: { display: "flex", flexDirection: "row", gap: "20px" },
+                        children: [
+                            {
+                                type: "Container",
+                                styles: { width: "20%", flexShrink: "0" },
+                                children: [{ type: "Text", dataPath: "time", placeholder: translateText("Thời gian", lang), styles: { fontSize: "14px", fontWeight: "bold" } }]
+                            },
+                            {
+                                type: "Container",
+                                styles: { flex: "1" },
+                                children: [{ type: "Text", dataPath: "name", placeholder: translateText("Tên chứng chỉ", lang), styles: { fontSize: "14px" } }]
+                            }
+                        ]
+                    }
+                }
+            ];
         } else if (id === 'section-activities') {
-            title = "Hoạt động";
-            contentChildren = [{ "type": "LoopContainer", "dataPath": "activities", "styles": { "display": "flex", "flexDirection": "column", "gap": "20px" }, "itemTemplate": { "type": "Container", "styles": { "display": "flex", "flexDirection": "column" }, "children": [{ "type": "Container", "styles": { "display": "flex", "justifyContent": "space-between", "alignItems": "flex-start", "marginBottom": "4px" }, "children": [{ "type": "Text", "dataPath": "role", "placeholder": "Vị trí của bạn", "styles": { "fontWeight": "bold", "fontSize": "15px" } }, { "type": "Container", "styles": { "display": "flex", "gap": "4px", "fontWeight": "bold", "fontSize": "14px", "opacity": "0.8", "whiteSpace": "nowrap" }, "children": [{ "type": "Text", "dataPath": "startDate", "placeholder": "Bắt đầu" }, { "type": "Text", "content": " - " }, { "type": "Text", "dataPath": "endDate", "placeholder": "Kết thúc" }] }] }, { "type": "Text", "dataPath": "organization", "placeholder": "Tên tổ chức", "styles": { "fontSize": "14.5px", "marginBottom": "8px", "opacity": "0.9", "fontWeight": "bold" } }, { "type": "RichText", "dataPath": "description", "placeholder": "Mô tả hoạt động...", "styles": { "fontSize": "13.5px", "border": "none", "outline": "none" } }] } }];
+            title = translateText("Hoạt động", lang);
+            contentChildren = [
+                {
+                    type: "LoopContainer",
+                    dataPath: "activities",
+                    styles: { display: "flex", flexDirection: "column", gap: "20px" },
+                    itemTemplate: {
+                        type: "Container",
+                        styles: { display: "flex", flexDirection: "column" },
+                        children: [
+                            {
+                                type: "Container",
+                                styles: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" },
+                                children: [
+                                    { type: "Text", dataPath: "role", placeholder: translateText("Vị trí của bạn", lang), styles: { fontWeight: "bold", fontSize: "15px" } },
+                                    {
+                                        type: "Container",
+                                        styles: { display: "flex", gap: "4px", fontWeight: "bold", fontSize: "14px", opacity: "0.8", whiteSpace: "nowrap" },
+                                        children: [
+                                            { type: "Text", dataPath: "startDate", placeholder: translateText("Bắt đầu", lang) },
+                                            { type: "Text", content: " - " },
+                                            { type: "Text", dataPath: "endDate", placeholder: translateText("Kết thúc", lang) }
+                                        ]
+                                    }
+                                ]
+                            },
+                            { type: "Text", dataPath: "organization", placeholder: translateText("Tên tổ chức", lang), styles: { fontSize: "14.5px", marginBottom: "8px", opacity: "0.9", fontWeight: "bold" } },
+                            { type: "RichText", dataPath: "description", placeholder: translateText("Mô tả hoạt động", lang), styles: { fontSize: "13.5px", border: "none", outline: "none" } }
+                        ]
+                    }
+                }
+            ];
         } else if (id === 'section-hobbies') {
-            title = "Sở thích";
-            contentChildren = [{ "type": "LoopContainer", "dataPath": "hobbies", "styles": { "display": "flex", "flexDirection": "column", "gap": "8px" }, "itemTemplate": { "type": "Container", "styles": { "display": "flex", "alignItems": "center", "gap": "8px" }, "children": [{ "type": "Text", "content": "•", "styles": { "fontWeight": "bold", "fontSize": "14px" } }, { "type": "Text", "dataPath": "name", "placeholder": "Tên sở thích", "styles": { "fontSize": "13.5px" } }] } }];
+            title = translateText("Sở thích", lang);
+            contentChildren = [
+                {
+                    type: "LoopContainer",
+                    dataPath: "hobbies",
+                    styles: { display: "flex", flexDirection: "column", gap: "8px" },
+                    itemTemplate: {
+                        type: "Container",
+                        styles: { display: "flex", alignItems: "center", gap: "8px" },
+                        children: [
+                            { type: "Text", content: "•", styles: { fontWeight: "bold", fontSize: "14px" } },
+                            { type: "Text", dataPath: "name", placeholder: translateText("Tên sở thích", lang), styles: { fontSize: "13.5px" } }
+                        ]
+                    }
+                }
+            ];
         } else if (id === 'section-skills') {
-            title = "Kỹ năng";
-            contentChildren = [{ "type": "LoopContainer", "dataPath": "skills", "styles": { "display": "flex", "flexDirection": "column", "gap": "8px" }, "itemTemplate": { "type": "Container", "styles": { "display": "flex", "alignItems": "center", "gap": "8px" }, "children": [{ "type": "Text", "content": "•", "styles": { "fontWeight": "bold", "fontSize": "14px" } }, { "type": "Text", "dataPath": "name", "placeholder": "Tên kỹ năng", "styles": { "fontSize": "13.5px" } }] } }];
+            title = translateText("Kỹ năng", lang);
+            contentChildren = [
+                {
+                    type: "LoopContainer",
+                    dataPath: "skills",
+                    styles: { display: "flex", flexDirection: "column", gap: "8px" },
+                    itemTemplate: {
+                        type: "Container",
+                        styles: { display: "flex", alignItems: "center", gap: "8px" },
+                        children: [
+                            { type: "Text", content: "•", styles: { fontWeight: "bold", fontSize: "14px" } },
+                            { type: "Text", dataPath: "name", placeholder: translateText("Tên kỹ năng", lang), styles: { fontSize: "13.5px" } }
+                        ]
+                    }
+                }
+            ];
         } else if (id === 'section-references') {
-            title = "Người tham chiếu";
-            contentChildren = [{ "type": "LoopContainer", "dataPath": "references", "styles": { "display": "flex", "flexDirection": "column", "gap": "16px", "width": "100%" }, "itemTemplate": { "type": "Container", "styles": { "display": "flex", "flexDirection": "column", "gap": "4px" }, "children": [{ "type": "Text", "dataPath": "name", "placeholder": "Tên người tham chiếu", "styles": { "fontWeight": "bold", "fontSize": "14px" } }, { "type": "Text", "dataPath": "position", "placeholder": "Vị trí / Tên công ty", "styles": { "fontSize": "13.5px", "opacity": "0.9" } }, { "type": "Text", "dataPath": "contact", "placeholder": "Số điện thoại / Email", "styles": { "fontSize": "13.5px", "opacity": "0.9" } }] } }];
+            title = translateText("Người giới thiệu", lang);
+            contentChildren = [
+                {
+                    type: "LoopContainer",
+                    dataPath: "references",
+                    styles: { display: "flex", flexDirection: "column", gap: "16px", width: "100%" },
+                    itemTemplate: {
+                        type: "Container",
+                        styles: { display: "flex", flexDirection: "column", gap: "4px" },
+                        children: [
+                            { type: "Text", dataPath: "name", placeholder: translateText("Tên người giới thiệu", lang), styles: { fontWeight: "bold", fontSize: "14px" } },
+                            { type: "Text", dataPath: "position", placeholder: translateText("Vị trí / Tên công ty", lang), styles: { fontSize: "13.5px", opacity: "0.9" } },
+                            { type: "Text", dataPath: "contact", placeholder: translateText("Số điện thoại / Email", lang), styles: { fontSize: "13.5px", opacity: "0.9" } }
+                        ]
+                    }
+                }
+            ];
         } else if (id === 'section-additional') {
-            title = "Thông tin thêm";
-            contentChildren = [{ "type": "RichText", "dataPath": "additionalInfo", "placeholder": "Điền các thông tin thêm của bạn (nếu có)...", "styles": { "fontSize": "13.5px", "border": "none", "outline": "none", "width": "100%" } }];
+            title = translateText("Thông tin thêm", lang);
+            contentChildren = [
+                {
+                    type: "RichText",
+                    dataPath: "additionalInfo",
+                    placeholder: translateText("Điền các thông tin thêm của bạn (nếu có)...", lang),
+                    styles: { fontSize: "13.5px", border: "none", outline: "none", width: "100%" }
+                }
+            ];
         } else return null;
 
         applyHeadingTitle(headingTemplate, title);
-        return { "type": "Container", "id": id, "styles": b, "children": [headingTemplate, ...contentChildren] };
+        return { type: "Container", id: id, styles: b, children: [headingTemplate, ...contentChildren] };
     };
 
-    // 🌟 2. KIỂM TRA ĐIỀU KIỆN SỬ DỤNG AI: CÓ THỂ DÙNG NẾU LÀ VIP HOẶC CÒN LƯỢT AI (> 0)
-    const canUseAi = isPremium || aiBalance > 0;
+    const canUseAi = aiBalance > 0 || aiBalance === -1;
 
     const handleGenerateSuggestion = async () => {
         if (!canUseAi) {
-            return message.warning("Bạn đã hết lượt sử dụng AI. Vui lòng nâng cấp tài khoản hoặc mua thêm lượt AI!");
+            return message.warning("Bạn đã hết lượt sử dụng AI. Vui lòng nâng cấp tài khoản hoặc mua thêm lượt!");
         }
 
-        if (!aiIndustry || !aiDescription) { message.warning("Vui lòng nhập Ngành nghề và Mô tả kinh nghiệm!"); return; }
-        setIsGenerating(true); setAiResult('');
+        if (!aiIndustry || !aiDescription) {
+            message.warning("Vui lòng nhập Ngành nghề và Mô tả kinh nghiệm!");
+            return;
+        }
+
+        setIsGenerating(true);
+        setAiResult('');
         try {
-            const response = await apiClient.post('/AiHelper/generate-cv-tips', { industry: aiIndustry, description: aiDescription });
-            const responseData = response.data || response;
-            if (responseData && responseData.data) setAiResult(responseData.data);
-            else if (typeof responseData === 'string' && responseData.trim() !== '') setAiResult(responseData);
-            else message.error("Không nhận được phản hồi hợp lệ từ AI.");
+            const response = await apiClient.post('/AiHelper/generate-cv-tips', {
+                industry: aiIndustry,
+                description: aiDescription
+            });
 
-            // Trừ bớt 1 lượt AI khả dụng sau khi dùng
-            setAiBalance(prev => Math.max(0, prev - 1));
-        } catch (error) { message.error("Lỗi khi tạo gợi ý. Vui lòng thử lại!"); }
-        finally { setIsGenerating(false); }
+            const responseData = response?.data !== undefined ? response.data : response;
+            const resultText = responseData?.data || (typeof responseData === 'string' ? responseData : '');
+
+            if (resultText && resultText.trim() !== '') {
+                setAiResult(resultText);
+
+                // Chỉ giảm lượt trên giao diện nếu KHÔNG PHẢI là gói vô hạn (-1)
+                if (aiBalance > 0) {
+                    setAiBalance(prev => Math.max(0, prev - 1));
+                }
+            } else {
+                message.error("Không nhận được phản hồi hợp lệ từ AI.");
+            }
+        } catch (error) {
+            const errorMsg = error.response?.data?.message || "Lỗi khi tạo gợi ý. Vui lòng thử lại!";
+            message.error(errorMsg);
+        } finally {
+            setIsGenerating(false);
+        }
     };
-
     const handleAutoFill = () => {
         if (!aiResult) return;
         let parsedSummary = ''; let parsedExperience = '';
@@ -678,26 +1114,46 @@ const CvBuilder = () => {
                     const actualCv = res?.data ? res.data : res;
 
                     if (actualCv) {
-                        if (actualCv.tieuDe) setCvTitle(actualCv.tieuDe);
+                        if (actualCv.tieuDe || actualCv.TieuDe) {
+                            setCvTitle(actualCv.tieuDe || actualCv.TieuDe);
+                        }
                         if (actualCv.maHex || actualCv.MaHex) {
                             updateLayoutSetting('themeColor', actualCv.maHex || actualCv.MaHex);
                         }
+
                         const layoutJson = actualCv.customLayoutJson
                             ? (typeof actualCv.customLayoutJson === 'string' ? JSON.parse(actualCv.customLayoutJson) : actualCv.customLayoutJson)
                             : null;
 
-                        const jsonString = JSON.stringify(layoutJson || {});
-                        const isEn = jsonString.includes('Work Experience') || jsonString.includes('Target Position') || jsonString.includes('Education');
-
-                        const dbLang = actualCv.ngonNgu || actualCv.NgonNgu;
-                        const finalLang = (dbLang || (isEn ? 'en' : 'vi')).toLowerCase();
-
-                        setLang(finalLang);
-                        setSearchParams(prev => { prev.set('lang', finalLang); return prev; }, { replace: true });
-
                         const contentData = actualCv.duLieuCv
                             ? (typeof actualCv.duLieuCv === 'string' ? JSON.parse(actualCv.duLieuCv) : actualCv.duLieuCv)
                             : null;
+
+                        // 🌟 1. QUÉT TRỰC TIẾP CÁC TIÊU ĐỀ TIẾNG ANH TRONG LAYOUT ĐANG CÓ
+                        const layoutStr = JSON.stringify(layoutJson || {});
+                        const isLayoutEnglish =
+                            layoutStr.includes('Career Objective') ||
+                            layoutStr.includes('Work Experience') ||
+                            layoutStr.includes('Education') ||
+                            layoutStr.includes('Target Position') ||
+                            layoutStr.includes('Honors & Awards') ||
+                            layoutStr.includes('Certificates') ||
+                            layoutStr.includes('Activities');
+
+                        // 🌟 2. ĐỌC GIÁ TRỊ TỪ CSDL VÀ CHUẨN HÓA
+                        const rawDbLang = String(actualCv.ngonNgu || actualCv.NgonNgu || actualCv.language || '').toLowerCase().trim();
+                        const isDbEnglish = rawDbLang === 'en' || rawDbLang.includes('anh') || rawDbLang.includes('english');
+
+                        // 🌟 3. NẾU BẢN THÂN LAYOUT LÀ TIẾNG ANH HOẶC DB LƯU TIẾNG ANH -> SET 'en'
+                        let finalLang = (isLayoutEnglish || isDbEnglish) ? 'en' : 'vi';
+
+                        // Đồng bộ State, URL và Store
+                        setLang(finalLang);
+                        setSearchParams(prev => {
+                            prev.set('lang', finalLang);
+                            return prev;
+                        }, { replace: true });
+                        updateLayoutSetting('language', finalLang);
 
                         setInitialData(importedLayout || layoutJson, importedContent || contentData);
                     }
@@ -738,8 +1194,17 @@ const CvBuilder = () => {
                                 const jsonString = JSON.stringify(templateLayout);
                                 const isEn = jsonString.includes('Work Experience') || jsonString.includes('Target Position') || jsonString.includes('Education');
 
-                                const dbLangTemplate = actualTemplate?.ngonNgu || actualTemplate?.NgonNgu;
-                                const targetLang = (searchParams.get('lang') || dbLangTemplate || (isEn ? 'en' : 'vi')).toLowerCase();
+                                const rawTemplateLang = actualTemplate?.ngonNgu || actualTemplate?.NgonNgu || '';
+                                const cleanTemplateLang = String(rawTemplateLang).toLowerCase().trim();
+
+                                let targetLang = searchParams.get('lang');
+                                if (!targetLang) {
+                                    if (cleanTemplateLang === 'en' || cleanTemplateLang.includes('anh') || cleanTemplateLang.includes('english') || isEn) {
+                                        targetLang = 'en';
+                                    } else {
+                                        targetLang = 'vi';
+                                    }
+                                }
 
                                 setLang(targetLang);
                                 setSearchParams(prev => { prev.set('lang', targetLang); return prev; }, { replace: true });
@@ -753,9 +1218,16 @@ const CvBuilder = () => {
                                     try {
                                         let parsedDummy = typeof dummyDataStr === 'string' ? JSON.parse(dummyDataStr.replace(/^\uFEFF/, '').trim()) : dummyDataStr;
                                         initialContent = (parsedDummy.vi && parsedDummy.en) ? (parsedDummy[targetLang] || parsedDummy.vi) : parsedDummy;
-                                        initialContent.personalInfo = { ...initialContent.personalInfo, fullName: userInfo?.fullName || initialContent.personalInfo?.fullName || '', email: userInfo?.email || initialContent.personalInfo?.email || '' };
+                                        initialContent.personalInfo = {
+                                            ...initialContent.personalInfo,
+                                            fullName: userInfo?.fullName || initialContent.personalInfo?.fullName || '',
+                                            email: userInfo?.email || initialContent.personalInfo?.email || ''
+                                        };
 
-                                        const emptyKeys = ['projects', 'activities', 'awards', 'certificates', 'hobbies'].filter(key => !initialContent[key] || (Array.isArray(initialContent[key]) && initialContent[key].length === 0)).map(key => `section-${key}`);
+                                        const emptyKeys = ['projects', 'activities', 'awards', 'certificates', 'hobbies']
+                                            .filter(key => !initialContent[key] || (Array.isArray(initialContent[key]) && initialContent[key].length === 0))
+                                            .map(key => `section-${key}`);
+
                                         const cleanLayout = (node) => {
                                             if (Array.isArray(node)) return node.map(cleanLayout).filter(item => item !== null);
                                             else if (typeof node === 'object' && node !== null) {
@@ -788,12 +1260,23 @@ const CvBuilder = () => {
 
     const handleLanguageToggle = (selectedLang) => {
         setLang(selectedLang);
-        setSearchParams({ templateId, source, lang: selectedLang, ...(colorParam && { color: colorParam }) });
-        const currentLayout = useCvStore.getState().layoutSchema;
+
+        // BẢO TOÀN TẤT CẢ PARAM HIỆN CÓ TRÊN URL
+        setSearchParams(prev => {
+            prev.set('lang', selectedLang);
+            return prev;
+        }, { replace: true });
+
+        const store = useCvStore.getState();
+        const currentLayout = store.layoutSchema || store.schema;
+        const currentContent = store.cvData;
+
+        // Dịch tiêu đề trong layout nhưng GIỮ NGUYÊN 100% dữ liệu đã nhập (currentContent)
         if (currentLayout) {
             const translatedLayout = translateLayoutTree(currentLayout, selectedLang);
-            setInitialData(translatedLayout, cvData);
+            setInitialData(translatedLayout, currentContent);
         }
+
         message.success(`Đã chuyển đổi cấu trúc ngôn ngữ: ${selectedLang === 'vi' ? 'Tiếng Việt' : 'Tiếng Anh'}`);
     };
 
@@ -853,91 +1336,126 @@ const CvBuilder = () => {
         }
     };
 
-    const handleSaveCV = () => {
-        if (!token || !userId) { message.warning('Vui lòng đăng nhập tài khoản!'); navigate('/login'); return; }
-
-        const executeSave = async (isSaveAsCopy = false) => {
-            const hideLoading = message.loading(isSaveAsCopy ? 'Đang tạo bản CV mới...' : 'Đang xử lý lưu hồ sơ...', 0);
-
-            const cvPageElement = document.querySelector('.workspace-area .cv-preview-page');
-            let uploadedImageUrl = cvData.personalInfo.avatar || "";
-
-            try {
-                if (cvPageElement) {
-                    cvPageElement.classList.add('is-exporting');
-                    const canvas = await html2canvas(cvPageElement, { useCORS: true, scale: 2, logging: false });
-                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-                    const formData = new FormData();
-                    formData.append('file', blob, 'cv_screenshot.png');
-                    const uploadRes = await apiClient.post('/Upload/image', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-                    uploadedImageUrl = uploadRes?.url || uploadRes?.data?.url || uploadRes;
-                }
-
-                const layoutJsonData = useCvStore.getState().layoutSchema;
-                const contentDataToSave = useCvStore.getState().cvData;
-
-                const payload = {
-                    maCv: (cvId && !isSaveAsCopy) ? parseInt(cvId) : null,
-                    maUser: parseInt(userId),
-                    maMau: parseInt(templateId),
-                    maHex: themeColor,
-                    tieuDe: isSaveAsCopy ? `${cvTitle} (Bản sao)` : cvTitle,
-                    duLieuCv: JSON.stringify(contentDataToSave),
-                    customLayoutJson: JSON.stringify(layoutJsonData),
-                    isPublic: true,
-                    duongDan: uploadedImageUrl,
-                    fontChu: fontFamily,
-                    ngonNgu: lang
-                };
-
-                await apiClient.post('/Cv', payload);
-                setIsDirty(false);
-                hideLoading();
-                message.success(isSaveAsCopy ? 'Đã tạo thành công một bản CV mới!' : 'Lưu hồ sơ thành công!');
-                navigate('/manage-cv');
-
-            } catch (err) {
-                hideLoading();
-                const errorMessage = err.response?.data?.message || err.data?.message || '';
-
-                if (errorMessage.toLowerCase().includes('đã được nộp') || errorMessage.toLowerCase().includes('không thể sửa')) {
-                    Modal.confirm({
-                        title: 'Tạo bản sao CV',
-                        icon: <ExclamationCircleOutlined style={{ color: '#faad14' }} />,
-                        content: 'CV này đã được nộp cho Nhà tuyển dụng nên không thể ghi đè (để đảm bảo tính minh bạch). Bạn có muốn lưu các chỉnh sửa vừa rồi thành một bản CV mới không?',
-                        okText: 'Lưu thành bản mới',
-                        cancelText: 'Hủy bỏ',
-                        okButtonProps: { style: { backgroundColor: '#1890ff', borderColor: '#1890ff' } },
-                        onOk: () => {
-                            executeSave(true);
-                        }
-                    });
-                } else {
-                    message.error(errorMessage || 'Lỗi hệ thống khi lưu dữ liệu CV!');
-                }
-            } finally {
-                if (cvPageElement) {
-                    cvPageElement.classList.remove('is-exporting');
-                }
+    const handleSaveCV = async () => {
+        try {
+            // 1. Kiểm tra đăng nhập
+            if (!token || !userId) {
+                message.warning('Vui lòng đăng nhập tài khoản để lưu CV!');
+                navigate('/login');
+                return;
             }
-        };
 
-        const emptyRequiredFields = document.querySelectorAll('.has-empty-required');
+            const store = useCvStore.getState();
+            const currentCvData = store.cvData || {};
+            const currentLayout = store.layoutSchema || store.schema;
 
-        if (emptyRequiredFields.length > 0) {
-            Modal.confirm({
-                title: 'Cảnh báo: Thiếu thông tin bắt buộc',
-                icon: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
-                content: 'Bạn đang để trống một số thông tin liên hệ bắt buộc (các ô bị viền đỏ nét đứt). Bạn có chắc chắn muốn tiếp tục lưu CV không?',
-                okText: 'Vẫn lưu CV',
-                cancelText: 'Quay lại sửa',
-                okButtonProps: { danger: true },
-                onOk: () => {
-                    executeSave();
+            const executeSave = async (isSaveAsCopy = false) => {
+                const hideLoading = message.loading(isSaveAsCopy ? 'Đang tạo bản CV mới...' : 'Đang lưu hồ sơ CV...', 0);
+                const cvPageElement = document.querySelector('.workspace-area .cv-preview-page');
+                let uploadedImageUrl = currentCvData.personalInfo?.avatar || "";
+
+                try {
+                    // 2. Chụp ảnh preview (Tự động bỏ qua nếu lỗi CORS để không làm gián đoạn việc lưu)
+                    if (cvPageElement) {
+                        try {
+                            cvPageElement.classList.add('is-exporting');
+                            const canvas = await html2canvas(cvPageElement, {
+                                useCORS: true,
+                                allowTaint: true,
+                                scale: 1.5,
+                                logging: false
+                            });
+                            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                            if (blob) {
+                                const formData = new FormData();
+                                formData.append('file', blob, 'cv_screenshot.png');
+                                const uploadRes = await apiClient.post('/Upload/image', formData, {
+                                    headers: { 'Content-Type': 'multipart/form-data' }
+                                });
+                                uploadedImageUrl = uploadRes?.url || uploadRes?.data?.url || uploadRes || uploadedImageUrl;
+                            }
+                        } catch (imgErr) {
+                            console.warn("Bỏ qua lỗi chụp ảnh preview CV:", imgErr);
+                        } finally {
+                            cvPageElement.classList.remove('is-exporting');
+                        }
+                    }
+
+                    // 3. Chuẩn hóa ID an toàn (Tránh NaN)
+                    const parsedCvId = (cvId && !isSaveAsCopy && !isNaN(parseInt(cvId))) ? parseInt(cvId) : null;
+                    const parsedUserId = !isNaN(parseInt(userId)) ? parseInt(userId) : userId;
+                    const parsedTemplateId = (!isNaN(parseInt(templateId))) ? parseInt(templateId) : 1;
+
+                    const payload = {
+                        maCv: parsedCvId,
+                        maUser: parsedUserId,
+                        maMau: parsedTemplateId,
+                        maHex: themeColor || '#1890ff',
+                        tieuDe: isSaveAsCopy ? `${cvTitle} (Bản sao)` : (cvTitle || 'CV_Moi'),
+                        duLieuCv: JSON.stringify(currentCvData),
+                        customLayoutJson: JSON.stringify(currentLayout),
+                        isPublic: true,
+                        duongDan: uploadedImageUrl,
+                        fontChu: fontFamily || '"Be Vietnam Pro", sans-serif',
+                        ngonNgu: lang || 'vi'
+                    };
+
+                    // 4. Gửi API lưu dữ liệu CV
+                    await apiClient.post('/Cv', payload);
+
+                    setIsDirty(false);
+                    hideLoading();
+                    message.success(isSaveAsCopy ? 'Đã tạo thành công một bản CV mới!' : 'Lưu hồ sơ CV thành công!');
+                    navigate('/manage-cv');
+
+                } catch (err) {
+                    hideLoading();
+                    console.error("Lỗi khi gọi API lưu CV:", err);
+                    const errorMessage = err.response?.data?.message || err.data?.message || '';
+
+                    if (errorMessage.toLowerCase().includes('đã được nộp') || errorMessage.toLowerCase().includes('không thể sửa')) {
+                        Modal.confirm({
+                            title: 'Tạo bản sao CV',
+                            icon: <ExclamationCircleOutlined style={{ color: '#faad14' }} />,
+                            content: 'CV này đã nộp cho Nhà tuyển dụng nên không thể ghi đè. Bạn có muốn lưu thành một bản CV mới?',
+                            okText: 'Lưu thành bản mới',
+                            cancelText: 'Hủy bỏ',
+                            okButtonProps: { style: { backgroundColor: '#1890ff', borderColor: '#1890ff' } },
+                            onOk: () => {
+                                executeSave(true);
+                            }
+                        });
+                    } else {
+                        message.error(errorMessage || 'Lỗi hệ thống khi lưu dữ liệu CV!');
+                    }
                 }
-            });
-        } else {
-            executeSave();
+            };
+
+            // 5. Kiểm tra thông tin bắt buộc
+            const personal = currentCvData.personalInfo || {};
+            const isPhoneEmpty = !personal.phone || !personal.phone.trim();
+            const isEmailEmpty = !personal.email || !personal.email.trim();
+            const hasEmptyRequired = isPhoneEmpty || isEmailEmpty;
+
+            if (hasEmptyRequired) {
+                Modal.confirm({
+                    title: 'Cảnh báo: Thiếu thông tin bắt buộc',
+                    icon: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
+                    content: 'Bạn đang để trống số điện thoại hoặc email liên hệ. Bạn có chắc chắn muốn tiếp tục lưu CV không?',
+                    okText: 'Vẫn lưu CV',
+                    cancelText: 'Quay lại sửa',
+                    okButtonProps: { danger: true },
+                    onOk: () => {
+                        executeSave();
+                    }
+                });
+            } else {
+                executeSave();
+            }
+
+        } catch (globalErr) {
+            console.error("Lỗi xử lý lưu CV:", globalErr);
+            message.error("Có lỗi xảy ra trong quá trình chuẩn bị dữ liệu lưu CV!");
         }
     };
 
@@ -1202,7 +1720,7 @@ const CvBuilder = () => {
                                 { id: 'section-certificates', label: 'Chứng chỉ' },
                                 { id: 'section-activities', label: 'Hoạt động' },
                                 { id: 'section-hobbies', label: 'Sở thích' },
-                                { id: 'section-references', label: 'Người tham chiếu' },
+                                { id: 'section-references', label: 'Người giới thiệu' },
                                 { id: 'section-additional', label: 'Thông tin thêm' }
                             ];
 
@@ -1314,6 +1832,12 @@ const CvBuilder = () => {
                                 }
 
                                 if (draggedNode && targetColId) {
+                                    //TỰ ĐỘNG CHUYỂN ĐỔI BỐ CỤC KHỐI THEO CỘT ĐÍCH (TRÁI HOẶC PHẢI)
+                                    draggedNode = transformSectionForColumn(draggedNode, targetColId, lang);
+                                    if (lang === 'en') {
+                                        draggedNode = translateLayoutTree(draggedNode, 'en');
+                                    }
+
                                     const findColAndInsert = (parent) => {
                                         if (parent?.id === targetColId) {
                                             if (!parent.children) parent.children = [];
@@ -1477,7 +2001,7 @@ const CvBuilder = () => {
                         {activeMenu === 'tips' && (
                             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', boxSizing: 'border-box' }}>
 
-                                {/* 🌟 KHỐI HIỂN THỊ LƯỢT AI CÒN LẠI */}
+                                {/* KHỐI HIỂN THỊ LƯỢT AI CÒN LẠI */}
                                 <div style={{ marginBottom: '16px', padding: '12px 14px', borderRadius: '8px', background: 'rgba(24, 144, 255, 0.08)', border: '1px solid rgba(24, 144, 255, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <ThunderboltFilled style={{ color: '#1890ff', fontSize: '18px' }} />
@@ -1512,7 +2036,7 @@ const CvBuilder = () => {
                                     </div>
                                 ) : (
 
-                                    /* TRẠNG THÁI 2: ĐỦ ĐIỀU KIỆN (CÓ LƯỢT HOẶC LÀ VIP) - HIỂN THỊ CÔNG CỤ AI */
+                                    /* TRẠNG THÁI 2: ĐỦ ĐIỀU KIỆN - HIỂN THỊ CÔNG CỤ AI */
                                     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', boxSizing: 'border-box' }}>
                                         <div style={{ marginBottom: '20px' }}>
                                             <span className="custom-form-label" style={{ display: 'block', marginBottom: '8px', color: themeColorsUI.textSub }}>NGÀNH NGHỀ / VỊ TRÍ</span>
@@ -1606,7 +2130,7 @@ const CvBuilder = () => {
                                 background: backgroundStyle && backgroundStyle !== 'none' ? backgroundStyle : '#ffffff'
                             }}
                         >
-                            {!isVipUser && (
+                            {!hasRemoveWatermark && !isPremium && (
                                 <div className="no-print watermark-jobsnow">
                                     Tạo bởi <strong>JobsNow.vn</strong>
                                 </div>

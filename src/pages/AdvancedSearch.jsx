@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Input, Select, Radio, Checkbox, Button, Spin, Tag, message, Empty } from 'antd';
+import { Input, Select, Radio, Checkbox, Button, Spin, message, Empty } from 'antd';
 import {
     SearchOutlined,
     EnvironmentOutlined,
@@ -16,10 +16,27 @@ import './css/AdvancedSearch.css';
 
 const { Option } = Select;
 
-const parseJwt = (token) => {
+// 🌟 1. HÀM GIẢI MÃ TOKEN AN TOÀN VỚI KÝ TỰ TIẾNG VIỆT (UNICODE)
+const getUserInfoFromToken = (token) => {
+    if (!token) return null;
     try {
-        return JSON.parse(atob(token.split('.')[1]));
-    } catch (e) {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+            atob(base64)
+                .split('')
+                .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                .join('')
+        );
+        const decoded = JSON.parse(jsonPayload);
+        return {
+            userId: decoded.nameid || 
+                    decoded.maUser || 
+                    decoded.id || 
+                    decoded.sub || 
+                    decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"]
+        };
+    } catch (error) {
         return null;
     }
 };
@@ -35,7 +52,11 @@ const AdvancedSearch = () => {
     const [thanhPhos, setThanhPhos] = useState([]);
     const [phuongXas, setPhuongXas] = useState([]);
     const [expandedCategories, setExpandedCategories] = useState([]);
-    const [bookmarkedIds, setBookmarkedIds] = useState([]);
+    
+    // 🌟 2. QUẢN LÝ CẢ ID VỊ TRÍ VÀ ID CHIẾN DỊCH ĐÃ LƯU
+    const [bookmarkedViTriIds, setBookmarkedViTriIds] = useState([]);
+    const [bookmarkedMaTinIds, setBookmarkedMaTinIds] = useState([]);
+    
     const [showAllCategories, setShowAllCategories] = useState(false);
 
     // Quản lý danh sách ID ngành cha & con độc lập
@@ -45,9 +66,9 @@ const AdvancedSearch = () => {
     // State Bộ lọc chung
     const [filters, setFilters] = useState({
         keyword: searchParams.get('keyword') || '',
-        maTP: searchParams.get('maTP') ? parseInt(searchParams.get('maTP')) : null,
-        maPhuong: searchParams.get('maPhuong') ? parseInt(searchParams.get('maPhuong')) : null,
-        loaiCongTy: 'all',
+        maTP: searchParams.get('maTP') ? parseInt(searchParams.get('maTP'), 10) : null,
+        maPhuong: searchParams.get('maPhuong') ? parseInt(searchParams.get('maPhuong'), 10) : null,
+        loaiCongTy: searchParams.get('loaiCongTy') || 'all',
         mucLuongRadio: 'all',
         tuLuong: '',
         denLuong: '',
@@ -55,7 +76,6 @@ const AdvancedSearch = () => {
         capBac: []
     });
 
-    // Helper bóc tách ID an toàn từ Object API
     const getParentId = (cat) => cat.maNganh || cat.maNganhCha;
     const getChildrenList = (cat) => cat.danhSachCon || cat.nganhNgheCons || cat.children || [];
     const getChildId = (sub) => sub.maNganh || sub.maNganhCon;
@@ -71,7 +91,6 @@ const AdvancedSearch = () => {
                 const treeData = Array.isArray(data) ? data : [];
                 setNganhTree(treeData);
 
-                // Tự động đọc tham số URL từ trang chủ
                 const paramMaNganh = searchParams.get('maNganh');
                 const paramLoaiNganh = searchParams.get('loaiNganh');
 
@@ -79,10 +98,9 @@ const AdvancedSearch = () => {
                 let initCon = [];
 
                 if (paramMaNganh) {
-                    const parsedIds = paramMaNganh.split(',').map(x => parseInt(x.trim())).filter(x => !isNaN(x));
+                    const parsedIds = paramMaNganh.split(',').map(x => parseInt(x.trim(), 10)).filter(x => !isNaN(x));
                     if (paramLoaiNganh === 'cha') {
                         initCha = parsedIds;
-                        // Nếu truyền mã ngành cha từ URL -> tự động chọn toàn bộ ngành con của cha đó
                         treeData.forEach(cat => {
                             if (parsedIds.includes(getParentId(cat))) {
                                 const childIds = getChildrenList(cat).map(c => getChildId(c));
@@ -104,14 +122,20 @@ const AdvancedSearch = () => {
             fetchPhuongXa(filters.maTP);
         }
 
+        // 🌟 LẤY CHÍNH XÁC USER ID TỪ TOKEN
         const token = localStorage.getItem('token');
         if (token) {
-            const decoded = parseJwt(token);
-            const userId = decoded?.maUser || decoded?.nameid || 1;
+            const userInfo = getUserInfoFromToken(token);
+            const userId = userInfo?.userId || 1;
+
             apiClient.get('/Jobs/bookmarked', {
-                headers: { Authorization: `Bearer ${token}`, maUser: parseInt(userId) }
+                headers: { Authorization: `Bearer ${token}`, maUser: parseInt(userId, 10) }
             }).then(res => {
-                setBookmarkedIds(res?.data?.data || res?.data || []);
+                const raw = res?.data !== undefined ? res.data : res;
+                const vIds = raw?.viTriIds || raw?.data || (Array.isArray(raw) ? raw : []);
+                const tIds = raw?.maTinIds || [];
+                setBookmarkedViTriIds(vIds.map(Number));
+                setBookmarkedMaTinIds(tIds.map(Number));
             }).catch(err => console.error("Lỗi lấy bài đã lưu", err));
         }
     }, []);
@@ -136,21 +160,23 @@ const AdvancedSearch = () => {
         );
     };
 
-    // Thực thi tìm kiếm
     const executeSearch = async (currentFilters, chaIds = selectedChaIds, conIds = selectedConIds) => {
         setLoading(true);
         try {
             const allSelectedNganh = [...new Set([...chaIds, ...conIds])];
 
+            const parsedTuLuong = currentFilters.tuLuong ? parseFloat(currentFilters.tuLuong) : undefined;
+            const parsedDenLuong = currentFilters.denLuong ? parseFloat(currentFilters.denLuong) : undefined;
+
             const params = {
-                keyword: currentFilters.keyword || undefined,
+                keyword: currentFilters.keyword?.trim() || undefined,
                 maTP: currentFilters.maTP && currentFilters.maTP !== 'all' ? currentFilters.maTP : undefined,
                 maPhuong: currentFilters.maPhuong && currentFilters.maPhuong !== 'all' ? currentFilters.maPhuong : undefined,
                 maNganh: allSelectedNganh.length > 0 ? allSelectedNganh.join(',') : undefined,
                 isPromoted: currentFilters.loaiCongTy === 'pro' ? true : undefined,
                 mucLuongRadio: currentFilters.mucLuongRadio !== 'all' ? currentFilters.mucLuongRadio : undefined,
-                tuLuong: currentFilters.tuLuong || undefined,
-                denLuong: currentFilters.denLuong || undefined,
+                tuLuong: !isNaN(parsedTuLuong) ? parsedTuLuong : undefined,
+                denLuong: !isNaN(parsedDenLuong) ? parsedDenLuong : undefined,
                 kinhNghiem: currentFilters.kinhNghiem.length > 0 ? currentFilters.kinhNghiem.join(',') : undefined,
                 capBac: currentFilters.capBac.length > 0 ? currentFilters.capBac.join(',') : undefined
             };
@@ -164,6 +190,9 @@ const AdvancedSearch = () => {
             if (params.maTP) urlParams.set('maTP', params.maTP);
             if (params.maPhuong) urlParams.set('maPhuong', params.maPhuong);
             if (params.maNganh) urlParams.set('maNganh', params.maNganh);
+            if (currentFilters.loaiCongTy && currentFilters.loaiCongTy !== 'all') {
+                urlParams.set('loaiCongTy', currentFilters.loaiCongTy);
+            }
             setSearchParams(urlParams);
         } catch (error) {
             console.error("Lỗi tìm kiếm", error);
@@ -173,7 +202,6 @@ const AdvancedSearch = () => {
         }
     };
 
-    // 🌟 LOGIC MỚI: Bật/tắt chọn Ngành cha (Tự động chọn/bỏ chọn TẤT CẢ ngành con)
     const handleToggleParent = (cat) => {
         const pId = getParentId(cat);
         const children = getChildrenList(cat);
@@ -185,11 +213,9 @@ const AdvancedSearch = () => {
         let newConIds = [];
 
         if (isParentSelected) {
-            // Bỏ chọn ngành cha -> Bỏ chọn luôn toàn bộ ngành con của ngành này
             newChaIds = selectedChaIds.filter(id => id !== pId);
             newConIds = selectedConIds.filter(id => !childIds.includes(id));
         } else {
-            // Chọn ngành cha -> Chọn ngành cha VÀ chọn TẤT CẢ ngành con của ngành này
             newChaIds = [...new Set([...selectedChaIds, pId])];
             newConIds = [...new Set([...selectedConIds, ...childIds])];
         }
@@ -199,7 +225,6 @@ const AdvancedSearch = () => {
         executeSearch(filters, newChaIds, newConIds);
     };
 
-    // 🌟 LOGIC MỚI: Bật/tắt chọn Ngành con lẻ
     const handleToggleChild = (cat, sub) => {
         const pId = getParentId(cat);
         const cId = getChildId(sub);
@@ -210,21 +235,17 @@ const AdvancedSearch = () => {
 
         let newConIds = [];
         if (isChildSelected) {
-            // Bỏ chọn 1 ngành con lẻ
             newConIds = selectedConIds.filter(id => id !== cId);
         } else {
-            // Chọn 1 ngành con lẻ
             newConIds = [...new Set([...selectedConIds, cId])];
         }
 
-        // Tự động kiểm tra: Nếu tất cả ngành con của ngành cha này đều được chọn -> Tick chọn ngành cha
         const allChildrenSelected = childIds.length > 0 && childIds.every(id => newConIds.includes(id));
 
         let newChaIds = [...selectedChaIds];
         if (allChildrenSelected) {
             if (!newChaIds.includes(pId)) newChaIds.push(pId);
         } else {
-            // Nếu bỏ 1 ngành con lẻ -> Bỏ tick checkbox ngành cha
             newChaIds = newChaIds.filter(id => id !== pId);
         }
 
@@ -249,28 +270,35 @@ const AdvancedSearch = () => {
         setSelectedChaIds([]);
         setSelectedConIds([]);
         setFilters(resetState);
-        setSearchParams({}); // Xóa sạch query param trên URL
+        setSearchParams({});
         executeSearch(resetState, [], []);
     };
 
-    const toggleBookmark = async (maViTri) => {
+    // 🌟 3. TOGGLE BOOKMARK ĐỒNG BỘ CẢ VỊ TRÍ LẪN CHIẾN DỊCH
+    const toggleBookmark = async (maViTri, maTin) => {
         const token = localStorage.getItem('token');
         if (!token) return message.warning("Vui lòng đăng nhập để lưu bài!");
 
-        const decoded = parseJwt(token);
-        const userId = decoded?.maUser || decoded?.nameid || 1;
+        const userInfo = getUserInfoFromToken(token);
+        const userId = userInfo?.userId || 1;
 
         try {
             const res = await apiClient.post(`/Jobs/${maViTri}/bookmark`, null, {
-                headers: { Authorization: `Bearer ${token}`, maUser: parseInt(userId) }
+                headers: { Authorization: `Bearer ${token}`, maUser: parseInt(userId, 10) }
             });
-            const isBookmarked = res?.isBookmarked !== undefined ? res.isBookmarked : res?.data?.isBookmarked;
+            const result = res?.data !== undefined ? res.data : res;
+            const isBookmarked = result?.isBookmarked;
+
+            const targetViTriId = Number(maViTri);
+            const targetTinId = Number(maTin);
 
             if (isBookmarked) {
-                setBookmarkedIds(prev => [...prev, maViTri]);
+                setBookmarkedViTriIds(prev => [...new Set([...prev, targetViTriId])]);
+                if (targetTinId) setBookmarkedMaTinIds(prev => [...new Set([...prev, targetTinId])]);
                 message.success("Đã lưu tin tuyển dụng!");
             } else {
-                setBookmarkedIds(prev => prev.filter(id => id !== maViTri));
+                setBookmarkedViTriIds(prev => prev.filter(id => id !== targetViTriId));
+                if (targetTinId) setBookmarkedMaTinIds(prev => prev.filter(id => id !== targetTinId));
                 message.info("Đã bỏ lưu tin!");
             }
         } catch (err) {
@@ -353,7 +381,6 @@ const AdvancedSearch = () => {
                         <FilterOutlined style={{ color: '#1677ff' }} /> Lọc nâng cao
                     </div>
 
-                    {/* DANH MỤC NGHỀ PHÂN CẤP */}
                     <div className="filter-group">
                         <div className="filter-group-title">Theo danh mục nghề</div>
                         <div className="category-tree-list">
@@ -363,7 +390,6 @@ const AdvancedSearch = () => {
                                 const isParentChecked = selectedChaIds.includes(pId);
                                 const hasChildSelected = children.some(c => selectedConIds.includes(getChildId(c)));
 
-                                // Tự động mở khung ngành con nếu đang chọn ngành cha hoặc có chọn ngành con lẻ
                                 const isExpanded = expandedCategories.includes(pId) || isParentChecked || hasChildSelected;
 
                                 return (
@@ -424,7 +450,6 @@ const AdvancedSearch = () => {
 
                     <div className="filter-divider"></div>
 
-                    {/* LOẠI CÔNG TY */}
                     <div className="filter-group">
                         <div className="filter-group-title">Loại công ty</div>
                         <Radio.Group
@@ -444,7 +469,6 @@ const AdvancedSearch = () => {
 
                     <div className="filter-divider"></div>
 
-                    {/* MỨC LƯƠNG */}
                     <div className="filter-group">
                         <div className="filter-group-title">Mức lương</div>
                         <Radio.Group
@@ -491,7 +515,6 @@ const AdvancedSearch = () => {
 
                     <div className="filter-divider"></div>
 
-                    {/* KINH NGHIỆM */}
                     <div className="filter-group">
                         <div className="filter-group-title">Kinh nghiệm</div>
                         <Checkbox.Group
@@ -517,7 +540,6 @@ const AdvancedSearch = () => {
 
                     <div className="filter-divider"></div>
 
-                    {/* CẤP BẬC */}
                     <div className="filter-group">
                         <div className="filter-group-title">Cấp bậc</div>
                         <Checkbox.Group
@@ -541,7 +563,6 @@ const AdvancedSearch = () => {
                         </Checkbox.Group>
                     </div>
 
-                    {/* NÚT XÓA LỌC */}
                     <div className="filter-actions-footer">
                         <Button type="text" className="btn-reset-filter" onClick={handleResetFilters}>
                             <ReloadOutlined /> Xóa lọc
@@ -560,8 +581,16 @@ const AdvancedSearch = () => {
                             {jobs.map((job) => {
                                 const vitris = job.viTris || [];
                                 const vitriDau = vitris.length > 0 ? vitris[0] : {};
-                                const maViTriId = vitriDau.id || vitriDau.maViTri;
-                                const isBookmarked = bookmarkedIds.includes(maViTriId);
+                                
+                                const allViTriIds = vitris.map(v => Number(v.id || v.maViTri)).filter(Boolean);
+                                if (job.maViTri) allViTriIds.push(Number(job.maViTri));
+
+                                // 🌟 4. NHẬN DIỆN ĐÃ LƯU THEO CẢ ID CHIẾN DỊCH LẪN ID VỊ TRÍ CON
+                                const isTinBookmarked = bookmarkedMaTinIds.includes(Number(job.maTin));
+                                const bookmarkedViTriId = allViTriIds.find(id => bookmarkedViTriIds.includes(id));
+                                const isBookmarked = isTinBookmarked || Boolean(bookmarkedViTriId);
+
+                                const targetBookmarkId = bookmarkedViTriId || allViTriIds[0] || job.maViTri;
 
                                 const allCapBacs = [...new Set(vitris.map(v => v.capBac).filter(Boolean))];
                                 const allKinhNghiems = [...new Set(vitris.map(v => v.kinhNghiem).filter(Boolean))];
@@ -605,7 +634,7 @@ const AdvancedSearch = () => {
                                                     className="heart-icon-btn"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        toggleBookmark(maViTriId);
+                                                        toggleBookmark(targetBookmarkId, job.maTin);
                                                     }}
                                                 >
                                                     {isBookmarked ? (

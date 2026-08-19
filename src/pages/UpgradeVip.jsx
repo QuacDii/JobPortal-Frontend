@@ -12,9 +12,9 @@ import {
     RocketOutlined,
     SafetyCertificateOutlined,
     FireOutlined,
-    CalendarOutlined,
     ClockCircleOutlined,
-    CloseCircleOutlined
+    CloseCircleOutlined,
+    LoadingOutlined
 } from '@ant-design/icons';
 import { jwtDecode } from 'jwt-decode';
 import apiClient from '../api/apiClient';
@@ -27,9 +27,6 @@ const UpgradeVip = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [vipPackages, setVipPackages] = useState([]);
     const [isLoadingPackages, setIsLoadingPackages] = useState(true);
-
-    // GIAO DIỆN SÁNG ĐỒNG BỘ VỚI THƯ VIỆN CV
-    const isDarkMode = false;
 
     // STATE QUẢN LÝ POPUP MOMO FALLBACK
     const [isMomoModalVisible, setIsMomoModalVisible] = useState(false);
@@ -78,11 +75,9 @@ const UpgradeVip = () => {
                     ngayHetHanGoi: balData?.ngayHetHanGoi || null,
                     ngayMua: balData?.ngayMua || null,
                     soDuVi: Number(balData?.soDuVi) || 0,
-                    // 🌟 Lấy danh sách các gói đã mua
                     danhSachGoiDaMua: balData?.danhSachGoiDaMua || []
                 });
             }
-
         } catch (error) {
             console.error("LỖI TẢI DỮ LIỆU:", error);
         } finally {
@@ -128,7 +123,6 @@ const UpgradeVip = () => {
 
             const giaThucTe = (pkg.giaKhuyenMai && pkg.giaKhuyenMai > 0) ? pkg.giaKhuyenMai : pkg.giaTien;
 
-            // XỬ LÝ LUỒNG THANH TOÁN VNPAY
             if (paymentMethod === 'VNPAY') {
                 const response = await apiClient.post('/Payment/create-vnpay-url', {
                     maUser: parseInt(maUser),
@@ -143,15 +137,12 @@ const UpgradeVip = () => {
                 } else {
                     throw new Error("Không nhận được URL thanh toán VNPay từ server");
                 }
-            }
-            // XỬ LÝ LUỒNG THANH TOÁN MOMO
-            else if (paymentMethod === 'MOMO') {
+            } else if (paymentMethod === 'MOMO') {
                 const response = await apiClient.post(`/Payment/create?maUser=${maUser}&soTien=${giaThucTe}&maGoi=${pkg.maGoi}`);
                 const responseData = response.data || response;
 
                 if (responseData && responseData.url) {
                     let orderId = new Date().getTime().toString();
-
                     try {
                         const urlObj = new URL(responseData.url);
                         if (urlObj.searchParams.get('orderId')) {
@@ -169,7 +160,6 @@ const UpgradeVip = () => {
                     throw new Error("Không nhận được URL thanh toán MoMo từ server");
                 }
             }
-
         } catch (error) {
             console.error(error);
             message.error({ content: 'Lỗi khởi tạo thanh toán. Vui lòng thử lại!', key: 'payment', duration: 2 });
@@ -192,14 +182,10 @@ const UpgradeVip = () => {
 
             await apiClient.post('/Payment/confirm-fallback', fallbackRequestData);
 
-            // 🌟 PHÁT SỰ KIỆN CẬP NHẬT TRẠNG THÁI VIP REAL-TIME CHO TOÀN BỘ APP
             window.dispatchEvent(new Event('update_vip_status'));
-
             message.success("Xác nhận giao dịch thành công!");
             setIsMomoModalVisible(false);
-
             window.location.href = `/payment-success?orderId=${currentOrderData.orderId}`;
-
         } catch (error) {
             console.error("Fallback Error:", error);
             message.error("Lỗi khi xác nhận giao dịch dự phòng!");
@@ -216,7 +202,6 @@ const UpgradeVip = () => {
 
     const isVipActive = userBalanceInfo.ngayHetHanGoi && new Date(userBalanceInfo.ngayHetHanGoi) > new Date();
 
-    // BẢNG MÀU CHUẨN SÁNG ĐỒNG BỘ VỚI THƯ VIỆN CV
     const themeColors = {
         bgColor: '#f4f5f5',
         textColor: '#333333',
@@ -251,7 +236,6 @@ const UpgradeVip = () => {
             </div>
 
             {/* KHỐI TRẠNG THÁI GÓI HIỆN TẠI & HẠN SỬ DỤNG */}
-            {/* KHỐI TRẠNG THÁI GÓI HIỆN TẠI & HẠN SỬ DỤNG */}
             <Row justify="center" style={{ marginBottom: '40px' }}>
                 <Col xs={24} md={18} lg={16}>
                     <Card
@@ -267,8 +251,6 @@ const UpgradeVip = () => {
                             <Col xs={24} sm={14}>
                                 <Space direction="vertical" size={6} style={{ width: '100%' }}>
                                     <Text style={{ color: themeColors.subTextColor, fontSize: '13px', fontWeight: 600 }}>TRẠNG THÁI HIỆN TẠI</Text>
-
-                                    {/* 🌟 HIỂN THỊ DANH SÁCH CÁC GÓI ĐÃ MUA DẠNG TAG */}
                                     {userBalanceInfo.danhSachGoiDaMua.length > 0 ? (
                                         <Space wrap size={[6, 6]}>
                                             {userBalanceInfo.danhSachGoiDaMua.map((item, index) => (
@@ -348,8 +330,8 @@ const UpgradeVip = () => {
                                     <RocketOutlined style={{ fontSize: '24px', color: '#faad14' }} />
                                 </div>
                                 <div>
-                                    <Title level={5} style={{ color: themeColors.textColor, margin: '0 0 4px 0', fontWeight: '700' }}>Ưu tiên hiển thị với NTD</Title>
-                                    <Text style={{ color: themeColors.subTextColor, lineHeight: '1.5' }}>Hồ sơ của bạn sẽ được đánh dấu VIP và ưu tiên đề xuất lên Top đầu khi Nhà tuyển dụng tìm kiếm ứng viên.</Text>
+                                    <Title level={5} style={{ color: themeColors.textColor, margin: '0 0 4px 0', fontWeight: '700' }}>Mở khóa các CV VIP</Title>
+                                    <Text style={{ color: themeColors.subTextColor, lineHeight: '1.5' }}>Các mẫu CV Vip sẽ được mở khóa giúp sự lựa chọn của ứng viên đa dạng hơn.</Text>
                                 </div>
                             </div>
                         </Space>
@@ -364,7 +346,7 @@ const UpgradeVip = () => {
 
                     {isLoadingPackages ? (
                         <div style={{ textAlign: 'center', padding: '60px 0' }}>
-                            <Spin size="large" indicator={<Spin style={{ fontSize: 36, color: '#1890ff' }} spin />} />
+                            <Spin indicator={<LoadingOutlined style={{ fontSize: 36, color: '#1890ff' }} spin />} />
                             <p style={{ marginTop: '16px', color: themeColors.subTextColor }}>Đang tải bảng giá gói dịch vụ...</p>
                         </div>
                     ) : vipPackages.length === 0 ? (
@@ -436,7 +418,7 @@ const UpgradeVip = () => {
                                                                 {sl > 0 ? <b style={{ color: '#1890ff' }}>: {sl} lượt</b> : (sl === -1 ? <b style={{ color: '#1890ff' }}> (Vô hạn)</b> : '')}
                                                             </Text>
                                                         </div>
-                                                    )
+                                                    );
                                                 })
                                             ) : (
                                                 <Text style={{ color: themeColors.subTextColor }} italic>Đầy đủ đặc quyền VIP ứng viên</Text>

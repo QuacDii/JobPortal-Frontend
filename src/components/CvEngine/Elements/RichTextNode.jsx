@@ -1,11 +1,34 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import useCvStore from '../../../store/useCvStore';
 import get from 'lodash/get';
 
-const RichTextNode = ({ dataPath, placeholder, styles, dataScope }) => {
+const fontOptions = [
+  { label: 'Be Vietnam Pro', value: '"Be Vietnam Pro", sans-serif' },
+  { label: 'Roboto', value: 'Roboto, sans-serif' },
+  { label: 'Arial', value: 'Arial, sans-serif' },
+  { label: 'Nunito', value: 'Nunito, sans-serif' },
+  { label: 'Open Sans', value: '"Open Sans", sans-serif' },
+  { label: 'Inter', value: '"Inter", sans-serif' },
+  { label: 'Montserrat', value: '"Montserrat", sans-serif' },
+  { label: 'Quicksand', value: '"Quicksand", sans-serif' },
+  { label: 'Poppins', value: '"Poppins", sans-serif' },
+  { label: 'Lora', value: '"Lora", serif' },
+  { label: 'Merriweather', value: '"Merriweather", serif' },
+  { label: 'Times New Roman', value: '"Times New Roman", Times, serif' }
+];
+
+const fontSizeOptions = [
+  'Mặc định', '10px', '11px', '12px', '13px', '14px', '15px', '16px', '17px', '18px', '20px', '22px', '24px', '28px', '32px'
+];
+
+const RichTextNode = ({ dataPath, placeholder, styles, dataScope, isRequired = false }) => {
   const updateCvDataPath = useCvStore((state) => state.updateCvDataPath);
 
-  // 1. Tính toán chính xác tuyệt đối đường dẫn mảng lặp
+  const layoutSettings = useCvStore((state) => state.layoutSettings);
+  const globalFont = layoutSettings?.fontFamily || '"Be Vietnam Pro", sans-serif';
+  const globalFontSize = layoutSettings?.fontSize ? `${layoutSettings.fontSize}px` : '14px';
+
   let finalPath = dataPath;
   if (dataScope && dataScope.parentPath !== undefined) {
     finalPath = `${dataScope.parentPath}[${dataScope.index}].${dataPath}`;
@@ -15,76 +38,347 @@ const RichTextNode = ({ dataPath, placeholder, styles, dataScope }) => {
   const htmlContent = typeof rawContent === 'string' ? rawContent : '';
 
   const editorRef = useRef(null);
+  const savedRangeRef = useRef(null);
+  const isComposingRef = useRef(false);
+  const [showToolbar, setShowToolbar] = useState(false);
+  const [toolbarCoords, setToolbarCoords] = useState({ top: -9999, left: -9999 });
 
-  const checkIsEmpty = (html) => !html || html === '<br>' || html.trim() === '';
+  const [currentFontSize, setCurrentFontSize] = useState(globalFontSize);
+  const [currentFontFamily, setCurrentFontFamily] = useState(globalFont);
+  const [currentColor, setCurrentColor] = useState('#000000');
 
-  // KIỂM TRA CHẾ ĐỘ XEM / XUẤT PDF (/xem-cv HOẶC .is-exporting)
+  useEffect(() => {
+    setCurrentFontFamily(globalFont);
+    setCurrentFontSize(globalFontSize);
+  }, [globalFont, globalFontSize]);
+
+  const checkIsEmpty = (html) => !html || html === '<br>' || html.trim() === '' || html === '<p><br></p>';
+
   const isExportMode = typeof window !== 'undefined' && (
-    document.querySelector('.is-exporting') !== null || 
+    document.querySelector('.is-exporting') !== null ||
     window.location.pathname.includes('/xem-cv')
   );
 
+  const updateCoords = () => {
+    if (editorRef.current && showToolbar) {
+      const rect = editorRef.current.getBoundingClientRect();
+      setToolbarCoords({ top: rect.top + window.scrollY - 50, left: rect.left + window.scrollX });
+    }
+  };
+
+  useLayoutEffect(() => {
+    updateCoords();
+    window.addEventListener('resize', updateCoords);
+    window.addEventListener('scroll', updateCoords, true);
+    return () => {
+      window.removeEventListener('resize', updateCoords);
+      window.removeEventListener('scroll', updateCoords, true);
+    };
+  }, [showToolbar]);
+
   useEffect(() => {
     if (editorRef.current && !isExportMode) {
-      const isCurrentlyFocused = document.activeElement === editorRef.current;
-      
-      if (!isCurrentlyFocused && editorRef.current.innerHTML !== htmlContent) {
-        editorRef.current.innerHTML = htmlContent;
-        
-        if (checkIsEmpty(htmlContent)) {
-           editorRef.current.classList.add('is-rich-empty');
-        } else {
-           editorRef.current.classList.remove('is-rich-empty');
+      if (document.activeElement !== editorRef.current && !isComposingRef.current) {
+        if (editorRef.current.innerHTML !== htmlContent) {
+          editorRef.current.innerHTML = htmlContent || '';
         }
       }
     }
   }, [htmlContent, isExportMode]);
 
-  const handleInput = (e) => {
-    const text = e.target.innerHTML;
-    if (checkIsEmpty(text)) {
-      e.target.classList.add('is-rich-empty');
-    } else {
-      e.target.classList.remove('is-rich-empty');
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (showToolbar && editorRef.current && !editorRef.current.contains(e.target) && !e.target.closest('.cv-floating-bubble-toolbar')) {
+        setShowToolbar(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showToolbar]);
+
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      savedRangeRef.current = sel.getRangeAt(0);
     }
   };
 
-  const handleBlur = (e) => {
-    if (editorRef.current) {
-      const newValue = editorRef.current.innerHTML;
-      if (checkIsEmpty(newValue)) {
-        updateCvDataPath(finalPath, '');
-        e.target.classList.add('is-rich-empty');
+  const detectActualStyles = () => {
+    saveSelection();
+    if (!editorRef.current) return;
+
+    const sel = window.getSelection();
+    let targetNode = editorRef.current;
+    if (sel && sel.anchorNode) {
+      targetNode = sel.anchorNode.nodeType === 3 ? sel.anchorNode.parentElement : sel.anchorNode;
+    }
+
+    if (targetNode) {
+      const computed = window.getComputedStyle(targetNode);
+      const computedFont = (computed.fontFamily || '').replace(/['"]/g, '').toLowerCase();
+
+      const foundFont = fontOptions.find(f => {
+        const cleanLabel = f.label.toLowerCase();
+        return computedFont.includes(cleanLabel);
+      });
+
+      if (foundFont) {
+        setCurrentFontFamily(foundFont.value);
       } else {
-        updateCvDataPath(finalPath, newValue);
-        e.target.classList.remove('is-rich-empty');
+        setCurrentFontFamily(globalFont);
+      }
+
+      if (computed.fontSize) {
+        const px = Math.round(parseFloat(computed.fontSize));
+        setCurrentFontSize(`${px}px`);
+      } else {
+        setCurrentFontSize(globalFontSize);
       }
     }
   };
 
-  // TRƯỜNG HỢP 1: Ở TRANG XEM / XUẤT PDF -> KHÔNG BẬT CLASS VIỀN ĐỎ & NẾU RỖNG THÌ ĐỂ TRẮNG
+  const handleFocus = () => {
+    setShowToolbar(true);
+    setTimeout(detectActualStyles, 20);
+  };
+
+  const applyFormat = (cmd, value = null) => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+
+    const sel = window.getSelection();
+    if (savedRangeRef.current) {
+      sel.removeAllRanges();
+      sel.addRange(savedRangeRef.current);
+    }
+
+    const isCollapsed = !sel || sel.isCollapsed || sel.rangeCount === 0;
+
+    if (isCollapsed) {
+      const range = document.createRange();
+      range.selectNodeContents(editorRef.current);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    if (cmd === 'fontName') {
+      setCurrentFontFamily(value);
+      document.execCommand('styleWithCSS', false, true);
+      document.execCommand('fontName', false, value);
+      if (isCollapsed) {
+        editorRef.current.style.fontFamily = value;
+      }
+    } else if (cmd === 'fontSize') {
+      if (value === 'Mặc định') {
+        setCurrentFontSize(globalFontSize);
+        editorRef.current.style.fontSize = '';
+        const fontTags = editorRef.current.querySelectorAll('font, span');
+        fontTags.forEach(f => {
+          f.style.fontSize = '';
+          f.removeAttribute('size');
+        });
+      } else {
+        setCurrentFontSize(value);
+        document.execCommand('styleWithCSS', false, false);
+        document.execCommand('fontSize', false, '7');
+        const fontTags = editorRef.current.querySelectorAll(
+          'font[size="7"], font[size="+7"], span[style*="xxx-large"], span[style*="48px"]'
+        );
+        fontTags.forEach(f => {
+          f.removeAttribute('size');
+          f.style.fontSize = value;
+        });
+        if (isCollapsed) {
+          editorRef.current.style.fontSize = value;
+        }
+      }
+    } else {
+      document.execCommand('styleWithCSS', false, true);
+      document.execCommand(cmd, false, value);
+    }
+
+    if (isCollapsed) {
+      sel.collapseToEnd();
+    }
+
+    const newValue = editorRef.current.innerHTML;
+    updateCvDataPath(finalPath, checkIsEmpty(newValue) ? '' : newValue);
+    saveSelection();
+  };
+  const handleInput = (e) => {
+    isComposingRef.current = true;
+    const text = e.currentTarget.innerHTML;
+    updateCvDataPath(finalPath, checkIsEmpty(text) ? '' : text);
+    setTimeout(() => { isComposingRef.current = false; }, 50);
+  };
+
   if (isExportMode) {
     return (
-      <div 
+      <div
         style={{ ...styles, outline: 'none' }}
         dangerouslySetInnerHTML={{ __html: checkIsEmpty(htmlContent) ? '' : htmlContent }}
       />
     );
   }
 
-  // TRƯỜNG HỢP 2: Ở TRANG CV BUILDER -> GIỮ NGUYÊN TÍNH NĂNG NẮN CHỈNH
+  const isEmpty = checkIsEmpty(htmlContent);
+  const reqClass = (isRequired && isEmpty) ? 'is-empty-required' : '';
+
+  const toolbarHtml = showToolbar ? createPortal(
+    <div
+      className="cv-floating-bubble-toolbar no-print"
+      style={{ top: toolbarCoords.top, left: toolbarCoords.left, position: 'absolute', zIndex: 2147483647 }}
+      onMouseDown={(e) => {
+        if (e.target.tagName !== 'SELECT' && e.target.tagName !== 'INPUT') e.preventDefault();
+        e.stopPropagation();
+      }}
+    >
+      {/* Dropdown Cỡ chữ */}
+      <select
+        value={currentFontSize}
+        onChange={(e) => applyFormat('fontSize', e.target.value)}
+        className="toolbar-select font-size-select"
+        title="Cỡ chữ"
+      >
+        {fontSizeOptions.map(sz => (
+          <option key={sz} value={sz}>{sz}</option>
+        ))}
+        {!fontSizeOptions.includes(currentFontSize) && (
+          <option value={currentFontSize}>{currentFontSize}</option>
+        )}
+      </select>
+
+      {/* Dropdown Font chữ */}
+      <select
+        value={currentFontFamily}
+        onChange={(e) => applyFormat('fontName', e.target.value)}
+        className="toolbar-select font-family-select"
+        title="Phông chữ"
+      >
+        {fontOptions.map(font => (
+          <option key={font.label} value={font.value} style={{ fontFamily: font.value }}>{font.label}</option>
+        ))}
+        {!fontOptions.some(f => f.value === currentFontFamily) && (
+          <option value={currentFontFamily}>{currentFontFamily.replace(/['",]/g, '').split(' ')[0]}</option>
+        )}
+      </select>
+
+      <div className="toolbar-divider" />
+
+      {/* Chọn màu chữ */}
+      <label className="toolbar-color-wrapper" title="Màu chữ">
+        <input type="color" value={currentColor} onChange={(e) => { setCurrentColor(e.target.value); applyFormat('foreColor', e.target.value); }} />
+        <span className="color-preview-circle" style={{ backgroundColor: currentColor }} />
+      </label>
+
+      <div className="toolbar-divider" />
+
+      {/* In đậm / In nghiêng / Gạch chân */}
+      <div className="toolbar-group">
+        <span className="toolbar-btn" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); applyFormat('bold'); }} title="In đậm (Ctrl+B)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+            <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+          </svg>
+        </span>
+        <span className="toolbar-btn" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); applyFormat('italic'); }} title="In nghiêng (Ctrl+I)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="4" x2="10" y2="4"></line>
+            <line x1="14" y1="20" x2="5" y2="20"></line>
+            <line x1="15" y1="4" x2="9" y2="20"></line>
+          </svg>
+        </span>
+        <span className="toolbar-btn" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); applyFormat('underline'); }} title="Gạch chân (Ctrl+U)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 3v7a6 6 0 0 0 12 0V3"></path>
+            <line x1="4" y1="21" x2="20" y2="21"></line>
+          </svg>
+        </span>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      {/* Danh sách */}
+      <div className="toolbar-group">
+        <span className="toolbar-btn" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); applyFormat('insertOrderedList'); }} title="Danh sách số">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="10" y1="6" x2="21" y2="6"></line>
+            <line x1="10" y1="12" x2="21" y2="12"></line>
+            <line x1="10" y1="18" x2="21" y2="18"></line>
+            <path d="M4 6h1v4"></path>
+            <path d="M4 10h2"></path>
+            <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path>
+          </svg>
+        </span>
+        <span className="toolbar-btn" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); applyFormat('insertUnorderedList'); }} title="Danh sách chấm">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="9" y1="6" x2="20" y2="6"></line>
+            <line x1="9" y1="12" x2="20" y2="12"></line>
+            <line x1="9" y1="18" x2="20" y2="18"></line>
+            <circle cx="4" cy="6" r="1.5" fill="currentColor"></circle>
+            <circle cx="4" cy="12" r="1.5" fill="currentColor"></circle>
+            <circle cx="4" cy="18" r="1.5" fill="currentColor"></circle>
+          </svg>
+        </span>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      {/* Căn lề */}
+      <div className="toolbar-group">
+        <span className="toolbar-btn" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); applyFormat('justifyLeft'); }} title="Căn trái">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="17" y1="10" x2="3" y2="10"></line>
+            <line x1="21" y1="6" x2="3" y2="6"></line>
+            <line x1="21" y1="14" x2="3" y2="14"></line>
+            <line x1="17" y1="18" x2="3" y2="18"></line>
+          </svg>
+        </span>
+        <span className="toolbar-btn" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); applyFormat('justifyCenter'); }} title="Căn giữa">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="10" x2="6" y2="10"></line>
+            <line x1="21" y1="6" x2="3" y2="6"></line>
+            <line x1="21" y1="14" x2="3" y2="14"></line>
+            <line x1="18" y1="18" x2="6" y2="18"></line>
+          </svg>
+        </span>
+        <span className="toolbar-btn" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); applyFormat('justifyRight'); }} title="Căn phải">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="21" y1="10" x2="7" y2="10"></line>
+            <line x1="21" y1="6" x2="3" y2="6"></line>
+            <line x1="21" y1="14" x2="3" y2="14"></line>
+            <line x1="21" y1="18" x2="7" y2="18"></line>
+          </svg>
+        </span>
+        <span className="toolbar-btn" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); applyFormat('justifyFull'); }} title="Căn đều hai bên">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="21" y1="6" x2="3" y2="6"></line>
+            <line x1="21" y1="10" x2="3" y2="10"></line>
+            <line x1="21" y1="14" x2="3" y2="14"></line>
+            <line x1="21" y1="18" x2="3" y2="18"></line>
+          </svg>
+        </span>
+      </div>
+    </div>,
+    document.body
+  ) : null;
+
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div style={{ position: 'relative', width: '100%', margin: '4px 0' }}>
+      {toolbarHtml}
+
       <div
         ref={editorRef}
         contentEditable={true}
         suppressContentEditableWarning={true}
+        onFocus={handleFocus}
+        onClick={handleFocus}
+        onKeyUp={detectActualStyles}
+        onMouseUp={detectActualStyles}
         onInput={handleInput}
-        onBlur={handleBlur}
-        className={`rich-text-editor ${checkIsEmpty(htmlContent) ? 'is-rich-empty' : ''}`}
+        className={`rich-text-editor ${showToolbar ? 'is-focused' : ''} ${reqClass}`}
         style={{ ...styles, outline: 'none' }}
         data-placeholder={placeholder || 'Nhập mô tả chi tiết tại đây...'}
-        dangerouslySetInnerHTML={{ __html: htmlContent }}
       />
 
       <style>{`
@@ -92,30 +386,136 @@ const RichTextNode = ({ dataPath, placeholder, styles, dataScope }) => {
           position: relative;
           width: 100%;
           word-break: break-word;
-          min-height: 20px;
+          min-height: 28px;
           border-radius: 4px;
-          padding: 6px;
-          border: 1px solid transparent;
-          transition: all 0.2s ease;
+          padding: 6px 10px;
+          border: 1px dashed transparent;
+          transition: all 0.15s ease-in-out;
+          background: transparent;
         }
-
-        .rich-text-editor.is-rich-empty {
-          border: 1px dashed #ff4d4f !important;
-          min-height: 60px;
-          display: block;
+        .rich-text-editor:hover { border-color: #cbd5e1; }
+        .rich-text-editor.is-focused, .rich-text-editor:focus {
+          border: 1.5px solid #22c55e !important;
+          background: transparent !important;
         }
-
-        .rich-text-editor.is-rich-empty::before {
+        .rich-text-editor.is-empty-required {
+          border: 1.5px dashed #ff4d4f !important;
+          background: rgba(255, 77, 79, 0.04);
+        }
+        .rich-text-editor:empty::before {
           content: attr(data-placeholder);
-          color: #8c8c8c;
-          opacity: 0.6;
+          color: #94a3b8;
+          opacity: 0.8;
           pointer-events: none;
           position: absolute;
-          left: 6px;
+          left: 10px;
           top: 6px;
           font-style: italic;
           display: block;
           width: 90%;
+        }
+
+        /* GIAO DIỆN THANH CÔNG CỤ HIỆN ĐẠI (GLASSMORPHISM) */
+        .cv-floating-bubble-toolbar {
+          display: flex;
+          align-items: center;
+          gap: 3px;
+          padding: 4px 8px;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.12), 0 4px 10px -2px rgba(0, 0, 0, 0.06);
+          animation: popToolbar 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+          white-space: nowrap;
+          user-select: none;
+        }
+        @keyframes popToolbar {
+          from { opacity: 0; transform: translateY(6px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .toolbar-group {
+          display: flex;
+          align-items: center;
+          gap: 2px;
+        }
+
+        .toolbar-select {
+          border: 1px solid transparent;
+          border-radius: 6px;
+          padding: 5px 8px;
+          font-size: 13px;
+          font-weight: 500;
+          color: #334155;
+          background: #f8fafc;
+          cursor: pointer;
+          outline: none;
+          transition: all 0.15s ease;
+        }
+        .toolbar-select:hover {
+          background: #f1f5f9;
+          color: #0f172a;
+        }
+        .font-size-select { width: 85px; }
+        .font-family-select { max-width: 135px; }
+
+        .toolbar-divider {
+          width: 1px;
+          height: 18px;
+          background: #e2e8f0;
+          margin: 0 3px;
+        }
+
+        .toolbar-btn {
+          border: none;
+          background: transparent;
+          color: #475569;
+          width: 28px;
+          height: 28px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .toolbar-btn:hover {
+          background: #f1f5f9;
+          color: #0284c7;
+        }
+        .toolbar-btn:active {
+          background: #e2e8f0;
+          transform: scale(0.95);
+        }
+
+        .toolbar-color-wrapper {
+          position: relative;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          padding: 3px;
+          border-radius: 6px;
+          transition: background 0.15s;
+        }
+        .toolbar-color-wrapper:hover { background: #f1f5f9; }
+        .toolbar-color-wrapper input[type="color"] {
+          position: absolute;
+          opacity: 0;
+          width: 0;
+          height: 0;
+          pointer-events: none;
+        }
+        .color-preview-circle {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          border: 2px solid #ffffff;
+          box-shadow: 0 0 0 1px #cbd5e1;
+          display: block;
+          transition: transform 0.15s ease;
+        }
+        .toolbar-color-wrapper:hover .color-preview-circle {
+          transform: scale(1.12);
         }
       `}</style>
     </div>

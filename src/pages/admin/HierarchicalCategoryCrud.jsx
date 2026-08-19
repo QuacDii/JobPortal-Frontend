@@ -21,7 +21,7 @@ const HierarchicalCategoryCrud = ({ title = 'Ngành nghề', apiUrl = '/NganhNgh
     // STATES BỘ LỌC
     const [searchText, setSearchText] = useState(''); 
     const [filterLevel, setFilterLevel] = useState('all'); // 'all', 'cha', 'con'
-    const [selectedParentFilter, setSelectedParentFilter] = useState(null); // null hoặc maNganhCha
+    const [selectedParentFilter, setSelectedParentFilter] = useState(null); 
 
     // STATES MODAL
     const [categoryType, setCategoryType] = useState('cha');
@@ -105,7 +105,7 @@ const HierarchicalCategoryCrud = ({ title = 'Ngành nghề', apiUrl = '/NganhNgh
         }
     };
 
-    // 🌟 LOGIC BÓC TÁCH & LỌC DỮ LIỆU CẤP CHA / CẤP CON
+    // LOGIC BÓC TÁCH & LỌC DỮ LIỆU CẤP CHA / CẤP CON
     const getFilteredData = () => {
         const kw = searchText.toLowerCase().trim();
 
@@ -124,7 +124,7 @@ const HierarchicalCategoryCrud = ({ title = 'Ngành nghề', apiUrl = '/NganhNgh
                 }));
         }
 
-        // 2. Chỉ lọc NGÀNH CON (Làm phẳng danh sách để xem dễ dàng)
+        // 2. Chỉ lọc NGÀNH CON
         if (filterLevel === 'con') {
             const flatCons = [];
             data.forEach(cha => {

@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
 import './css/JobAlertManager.css';
 import { Typography, Select, Input, Button, Switch, Popconfirm, Spin, message, Row, Col, Empty, Modal } from 'antd';
-import { BellFilled, PlusOutlined, DeleteOutlined, CheckCircleFilled } from '@ant-design/icons';
+import { BellFilled, PlusOutlined, DeleteOutlined, CheckCircleFilled, SendOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
+// Trích xuất userId và email từ Token
 const getUserInfoFromToken = (token) => {
     if (!token) return null;
     try {
@@ -15,7 +16,8 @@ const getUserInfoFromToken = (token) => {
         const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
         const decoded = JSON.parse(jsonPayload);
         return {
-            userId: decoded.nameid || decoded.maUser || decoded.id || decoded.sub
+            userId: decoded.nameid || decoded.maUser || decoded.id || decoded.sub,
+            email: decoded.email || decoded.emailaddress || ''
         };
     } catch (error) {
         return null;
@@ -30,16 +32,39 @@ const JobAlertManager = ({ currentUser }) => {
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [keyword, setKeyword] = useState('');
     const [submitting, setSubmitting] = useState(false);
-    const [newEmailInput, setNewEmailInput] = useState('');
+    const [demoSending, setDemoSending] = useState(false);
 
     const token = localStorage.getItem('token');
     const userInfo = getUserInfoFromToken(token);
     const userId = userInfo?.userId;
 
-    // 1. Lấy danh sách Ngành nghề con
+    const [activeEmail, setActiveEmail] = useState(currentUser?.email || userInfo?.email || '');
+    const [isVerified, setIsVerified] = useState(currentUser?.isEmailVerified ?? currentUser?.emailConfirmed ?? false);
+
+    // Đồng bộ thông tin profile mới nhất từ API
+    useEffect(() => {
+        const fetchUserProfile = async () => {
+            if (token) {
+                try {
+                    const res = await apiClient.get(`/User/profile/${userId}`);
+                    const profile = res.data !== undefined ? res.data : res;
+                    if (profile) {
+                        if (profile.email || profile.Email) {
+                            setActiveEmail(profile.email || profile.Email);
+                        }
+                        const verifiedStatus = profile.isEmailVerified ?? profile.emailConfirmed ?? profile.EmailConfirmed ?? false;
+                        setIsVerified(verifiedStatus);
+                    }
+                } catch (err) {
+                    console.error("Lỗi lấy thông tin profile:", err);
+                }
+            }
+        };
+        fetchUserProfile();
+    }, [token]);
+
     const fetchCategories = async () => {
         try {
-            // 🌟 Đã sửa Route -> /NganhNghe/danh-sach
             const res = await apiClient.get('/NganhNghe/danh-sach');
             const data = res.data !== undefined ? res.data : res;
             setCategoriesList(Array.isArray(data) ? data : []);
@@ -48,7 +73,6 @@ const JobAlertManager = ({ currentUser }) => {
         }
     };
 
-    // 2. Lấy danh sách Job Alerts của User
     const fetchMyAlerts = async () => {
         if (!userId) return setLoading(false);
         setLoading(true);
@@ -69,7 +93,30 @@ const JobAlertManager = ({ currentUser }) => {
         fetchMyAlerts();
     }, []);
 
-    // 3. Thực thi lưu Job Alert gửi sang Backend
+   const handleDemoSendAlert = async () => {
+        if (!userId) {
+            message.warning("Vui lòng đăng nhập!");
+            return;
+        }
+
+        try {
+            setDemoSending(true);
+            const res = await apiClient.post(`/JobAlerts/demo-send/${userId}`);
+            
+            const result = (res && res.data !== undefined) ? res.data : res;
+
+            if (result?.success) {
+                message.success(result.message || 'Đã gửi email demo thành công! Hãy kiểm tra hộp thư.');
+            } else {
+                message.info(result?.message || 'Không có việc làm phù hợp để gửi.');
+            }
+        } catch (err) {
+            message.error(err.response?.data?.message || err.message || 'Lỗi khi kích hoạt demo gửi mail!');
+        } finally {
+            setDemoSending(false);
+        }
+    };
+
     const executeAddAlert = async () => {
         if (!selectedCategory) {
             message.warning("Vui lòng chọn ngành nghề!");
@@ -78,7 +125,6 @@ const JobAlertManager = ({ currentUser }) => {
 
         try {
             setSubmitting(true);
-            // 🌟 Đã sửa: Gửi maNganhCon thay cho maNganh
             await apiClient.post('/JobAlerts', {
                 maUser: parseInt(userId),
                 maNganhCon: selectedCategory,
@@ -98,32 +144,69 @@ const JobAlertManager = ({ currentUser }) => {
     };
 
     const handleAddAlert = async () => {
-        const userEmail = currentUser?.email || '';
-        if (userEmail.includes('@facebook.com') || !userEmail) {
-            Modal.confirm({
-                title: 'Cần có Email chính thức',
-                content: (
-                    <div>
-                        <p>Email hiện tại của bạn là email tạm thời từ Facebook nên không thể nhận thư. Vui lòng nhập Email chính thức để bật Job Alerts:</p>
-                        <Input 
-                            placeholder="Nhập email thực tế của bạn (VD: nguyenvana@gmail.com)" 
-                            onChange={(e) => setNewEmailInput(e.target.value)}
-                            style={{ marginTop: 12 }}
-                        />
-                    </div>
-                ),
-                okText: 'Lưu Email & Tiếp tục',
-                cancelText: 'Hủy',
-                onOk: async () => {
-                    await apiClient.put('/User/update-email', { newEmail: newEmailInput });
-                    message.success('Cập nhật Email thành công!');
-                    executeAddAlert();
-                }
-            });
-            return;
-        }
+        try {
+            const res = await apiClient.get(`/User/profile/${userId}`);
+            const profile = res.data !== undefined ? res.data : res;
 
-        executeAddAlert();
+            const latestEmail = profile?.email || profile?.Email || '';
+            const latestVerified = profile?.isEmailVerified ?? profile?.emailConfirmed ?? profile?.EmailConfirmed ?? false;
+
+            setActiveEmail(latestEmail);
+            setIsVerified(latestVerified);
+
+            // 1. Kiểm tra email tạm từ Facebook
+            const isFacebookTempEmail = latestEmail.includes('@facebook.com') || latestEmail.includes('fb_temp_') || !latestEmail;
+
+            if (isFacebookTempEmail) {
+                let inputEmailValue = '';
+                Modal.confirm({
+                    title: 'Cần có Email chính thức',
+                    content: (
+                        <div>
+                            <p>Email hiện tại của bạn là email tạm thời từ Facebook nên không thể nhận thư. Vui lòng nhập Email chính thức để bật Job Alerts:</p>
+                            <Input
+                                placeholder="Nhập email thực tế của bạn (VD: nguyenvana@gmail.com)"
+                                onChange={(e) => { inputEmailValue = e.target.value; }}
+                                style={{ marginTop: 12 }}
+                            />
+                        </div>
+                    ),
+                    okText: 'Lưu Email & Tiếp tục',
+                    cancelText: 'Hủy',
+                    onOk: async () => {
+                        if (!inputEmailValue || !inputEmailValue.includes('@')) {
+                            message.error('Vui lòng nhập định dạng email hợp lệ!');
+                            return Promise.reject();
+                        }
+                        try {
+                            await apiClient.put('/User/update-email', { newEmail: inputEmailValue });
+                            setActiveEmail(inputEmailValue);
+                            message.success('Cập nhật Email thành công!');
+                            executeAddAlert();
+                        } catch (err) {
+                            message.error(err.response?.data?.message || 'Lỗi khi cập nhật email!');
+                        }
+                    }
+                });
+                return;
+            }
+
+            // 2. Kiểm tra xác thực email
+            if (!latestVerified) {
+                Modal.warning({
+                    title: 'Chưa xác thực Email',
+                    content: 'Tài khoản của bạn chưa xác thực email. Vui lòng kiểm tra hộp thư đến để xác thực tài khoản trước khi bật tính năng nhận thông báo việc làm!',
+                    okText: 'Đã hiểu'
+                });
+                return;
+            }
+
+            // Nếu qua hết các bước, tiến hành thêm Alert
+            executeAddAlert();
+        } catch (e) {
+            console.error("Lỗi khi kiểm tra profile:", e);
+            message.error("Không thể xác minh thông tin tài khoản lúc này!");
+        }
     };
 
     const handleToggleAlert = async (id, currentStatus) => {
@@ -148,21 +231,33 @@ const JobAlertManager = ({ currentUser }) => {
 
     return (
         <div className="job-alert-modal-container">
-            <div className="job-alert-header">
-                <div className="job-alert-icon-wrapper">
-                    <BellFilled />
+            <div className="job-alert-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div className="job-alert-icon-wrapper">
+                        <BellFilled />
+                    </div>
+                    <div>
+                        <Title level={4} style={{ margin: '0 0 4px 0', color: '#262626', fontWeight: 700 }}>
+                            Cài đặt Job Alerts
+                        </Title>
+                        <Text style={{ color: '#8c8c8c', fontSize: '13.5px' }}>
+                            Hệ thống sẽ gửi email tự động các việc làm phù hợp nhất cho bạn hàng ngày
+                        </Text>
+                    </div>
                 </div>
-                <div>
-                    <Title level={4} style={{ margin: '0 0 4px 0', color: '#262626', fontWeight: 700 }}>
-                        Cài đặt Job Alerts
-                    </Title>
-                    <Text style={{ color: '#8c8c8c', fontSize: '13.5px' }}>
-                        Hệ thống sẽ gửi email tự động các việc làm phù hợp nhất cho bạn hàng ngày
-                    </Text>
-                </div>
+
+                <Button
+                    type="dashed"
+                    icon={<SendOutlined />}
+                    loading={demoSending}
+                    onClick={handleDemoSendAlert}
+                    style={{ borderColor: '#00b14f', color: '#00b14f', fontWeight: 600 }}
+                >
+                    Demo gửi mail ngay
+                </Button>
             </div>
 
-            <div className="job-alert-add-box">
+            <div className="job-alert-add-box" style={{ marginTop: '16px' }}>
                 <Text style={{ color: '#595959', fontSize: '13.5px', fontWeight: 600, display: 'block', marginBottom: '12px' }}>
                     Thêm ngành nghề quan tâm
                 </Text>
@@ -176,7 +271,9 @@ const JobAlertManager = ({ currentUser }) => {
                             allowClear
                         >
                             {categoriesList.map(cat => (
-                                <Option key={cat.maNganh} value={cat.maNganh}>{cat.tenNganh}</Option>
+                                <Option key={cat.maNganhCon || cat.maNganh} value={cat.maNganhCon || cat.maNganh}>
+                                    {cat.tenNganhCon || cat.tenNganh}
+                                </Option>
                             ))}
                         </Select>
                     </Col>
@@ -216,8 +313,7 @@ const JobAlertManager = ({ currentUser }) => {
                     {alertsList.map((item) => {
                         const alertId = item.maAlert || item.id;
                         const isEnabled = item.trangThai !== undefined ? item.trangThai : item.isEnabled;
-                        // 🌟 Hiển thị tenNganhCon trả về trực tiếp từ API hoặc tra cứu theo maNganhCon
-                        const categoryName = item.tenNganhCon || categoriesList.find(c => c.maNganh === item.maNganhCon)?.tenNganh || 'Ngành nghề';
+                        const categoryName = item.tenNganhCon || categoriesList.find(c => (c.maNganhCon || c.maNganh) === item.maNganhCon)?.tenNganhCon || 'Ngành nghề';
                         const keywordText = item.tuKhoaKyNang || item.tuKhoa;
 
                         return (

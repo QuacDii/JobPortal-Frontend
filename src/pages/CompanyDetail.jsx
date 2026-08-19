@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, Button, Spin, Row, Col, Input, message } from 'antd';
-import { 
-    AuditOutlined, 
-    UsergroupAddOutlined, 
+import {
+    AuditOutlined,
+    UsergroupAddOutlined,
     EnvironmentOutlined,
     SearchOutlined,
     HeartOutlined,
@@ -78,13 +78,15 @@ const CompanyDetail = () => {
             const res = await apiClient.post(`/Jobs/${maViTri}/bookmark`, null, {
                 headers: { Authorization: `Bearer ${token}`, maUser: parseInt(userId) }
             });
-            const isBookmarked = res?.isBookmarked !== undefined ? res.isBookmarked : res?.data?.isBookmarked;
+            const result = res?.data !== undefined ? res.data : res;
+            const isBookmarked = result?.isBookmarked;
 
+            const targetId = Number(maViTri);
             if (isBookmarked) {
-                setBookmarkedIds(prev => [...prev, maViTri]);
+                setBookmarkedIds(prev => [...new Set([...prev.map(Number), targetId])]);
                 message.success("Đã lưu tin tuyển dụng!");
             } else {
-                setBookmarkedIds(prev => prev.filter(bId => bId !== maViTri));
+                setBookmarkedIds(prev => prev.map(Number).filter(bId => bId !== targetId));
                 message.info("Đã bỏ lưu tin!");
             }
         } catch (err) {
@@ -115,8 +117,8 @@ const CompanyDetail = () => {
         if (!kw) return true;
 
         const matchTieuDe = j.tieuDeChienDich?.toLowerCase().includes(kw);
-        const matchViTri = j.viTris?.some(v => 
-            v.title?.toLowerCase().includes(kw) || 
+        const matchViTri = j.viTris?.some(v =>
+            v.title?.toLowerCase().includes(kw) ||
             v.tenViTri?.toLowerCase().includes(kw)
         );
 
@@ -139,18 +141,18 @@ const CompanyDetail = () => {
                 </div>
 
                 <div className="company-tabs-bar">
-                    <Tabs 
-                        defaultActiveKey="2" 
+                    <Tabs
+                        defaultActiveKey="2"
                         items={[
-                            { 
-                                key: '1', 
-                                label: 'Tổng quan', 
+                            {
+                                key: '1',
+                                label: 'Tổng quan',
                                 children: (
                                     <Row gutter={24}>
                                         <Col xs={24} lg={16}>
                                             <div className="detail-section-card">
                                                 <h3 className="section-title">Giới thiệu công ty</h3>
-                                                <div 
+                                                <div
                                                     className="company-html-desc"
                                                     dangerouslySetInnerHTML={{ __html: company.moTa || 'Đang cập nhật bài giới thiệu công ty...' }}
                                                 />
@@ -195,11 +197,11 @@ const CompanyDetail = () => {
                                             </div>
                                         </Col>
                                     </Row>
-                                ) 
+                                )
                             },
-                            { 
-                                key: '2', 
-                                label: `Tin tuyển dụng (${jobs.length})`, 
+                            {
+                                key: '2',
+                                label: `Tin tuyển dụng (${jobs.length})`,
                                 children: (
                                     <div className="detail-section-card">
                                         <div className="jobs-tab-header">
@@ -220,9 +222,16 @@ const CompanyDetail = () => {
                                                 </div>
                                             ) : (
                                                 filteredJobs.map(job => {
-                                                    const vitri = job.viTris?.[0] || {};
-                                                    const maViTriId = job.maViTri || vitri.id || vitri.maViTri;
-                                                    const isBookmarked = bookmarkedIds.includes(maViTriId);
+                                                    const vitris = job.viTris || [];
+                                                    const allViTriIds = vitris.map(v => Number(v.id || v.maViTri)).filter(Boolean);
+                                                    if (job.maViTri) allViTriIds.push(Number(job.maViTri));
+
+                                                    // 🌟 2. KIỂM TRA ĐỒNG BỘ MỌI VỊ TRÍ CỦA CHIẾN DỊCH
+                                                    const bookmarkedViTriId = allViTriIds.find(id => bookmarkedIds.map(Number).includes(id));
+                                                    const isBookmarked = Boolean(bookmarkedViTriId);
+                                                    const targetBookmarkId = bookmarkedViTriId || allViTriIds[0] || job.maViTri;
+
+                                                    const vitri = vitris[0] || {};
 
                                                     return (
                                                         <div key={job.maTin} className="company-job-card" onClick={() => navigate(`/job/${job.maTin}`)}>
@@ -246,7 +255,7 @@ const CompanyDetail = () => {
                                                                     className="heart-icon-btn"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        toggleBookmark(maViTriId);
+                                                                        toggleBookmark(targetBookmarkId);
                                                                     }}
                                                                 >
                                                                     {isBookmarked ? (
@@ -262,9 +271,9 @@ const CompanyDetail = () => {
                                             )}
                                         </div>
                                     </div>
-                                ) 
+                                )
                             }
-                        ]} 
+                        ]}
                     />
                 </div>
             </div>

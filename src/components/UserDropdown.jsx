@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Popover, Avatar, Menu, Typography, Divider, Button, Tag, Tooltip } from 'antd';
+import { Popover, Avatar, Menu, Typography, Divider, Button, Tag, Tooltip, Modal } from 'antd';
 import './css/UserDropdown.css';
 import apiClient from '../api/apiClient';
 import {
@@ -16,7 +16,8 @@ import {
     MailOutlined,
     CheckCircleFilled,
     HeartOutlined,
-    SendOutlined
+    SendOutlined,
+    ExclamationCircleOutlined
 } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -171,8 +172,11 @@ const UserDropdown = ({ user, onLogout }) => {
 
             apiClient.get(`/User/profile/${userId}`)
                 .then(res => {
-                    const data = res.data || res;
-                    if (data?.isEmailVerified !== undefined) setIsEmailVerified(data.isEmailVerified);
+                    const data = res.data !== undefined ? res.data : res;
+                    const verified = data?.isEmailVerified ?? data?.emailConfirmed ?? data?.EmailConfirmed;
+                    if (verified !== undefined) {
+                        setIsEmailVerified(verified === true || verified === 'true');
+                    }
                 })
                 .catch(() => { });
         }
@@ -186,6 +190,26 @@ const UserDropdown = ({ user, onLogout }) => {
             localStorage.clear();
             window.location.href = '/';
         }
+    };
+
+    // 🌟 Xử lý chặn nếu chưa xác thực email khi bấm nâng cấp / gia hạn VIP
+    const handleUpgradeVipClick = () => {
+        if (!isEmailVerified) {
+            Modal.confirm({
+                title: 'Yêu cầu xác thực Email',
+                icon: <ExclamationCircleOutlined style={{ color: '#faad14' }} />,
+                content: 'Bạn cần xác thực địa chỉ email trước khi thực hiện nâng cấp hoặc gia hạn gói VIP để đảm bảo quyền lợi tài khoản. Bạn có muốn chuyển đến trang xác thực ngay bây giờ?',
+                okText: 'Xác thực ngay',
+                cancelText: 'Để sau',
+                okButtonProps: { style: { backgroundColor: '#1890ff', borderColor: '#1890ff' } },
+                onOk: () => {
+                    navigate('/verify-email');
+                }
+            });
+            return;
+        }
+
+        navigate('/upgrade-vip');
     };
 
     const menuItems = [
@@ -286,7 +310,7 @@ const UserDropdown = ({ user, onLogout }) => {
                             <Tooltip title="Email chưa xác thực - Bấm để xác thực ngay">
                                 <Tag
                                     color="warning"
-                                    onClick={() => navigate('/verify-email')} // Khớp <Route path="/verify-email" />[cite: 15]
+                                    onClick={() => navigate('/verify-email')}
                                     style={{ cursor: 'pointer', margin: 0, padding: '0 5px', fontSize: '10px', borderRadius: '4px' }}
                                 >
                                     Chưa xác thực
@@ -309,7 +333,7 @@ const UserDropdown = ({ user, onLogout }) => {
                         <Button
                             block
                             className="btn-3d-hover"
-                            onClick={() => navigate('/upgrade-vip')} // Khớp <Route path="/upgrade-vip" />[cite: 15]
+                            onClick={handleUpgradeVipClick}
                             style={{ background: 'rgba(250, 173, 20, 0.1)', color: '#faad14', fontWeight: 'bold', border: '1px solid #faad14', borderRadius: '8px', height: '40px' }}
                         >
                             Gia hạn gói VIP
@@ -320,7 +344,7 @@ const UserDropdown = ({ user, onLogout }) => {
                         block
                         className="btn-3d-hover"
                         icon={<CrownFilled />}
-                        onClick={() => navigate('/upgrade-vip')} // Khớp <Route path="/upgrade-vip" />[cite: 15]
+                        onClick={handleUpgradeVipClick}
                         style={{ background: 'linear-gradient(135deg, #faad14 0%, #ffc53d 100%)', color: '#000', fontWeight: 'bold', border: 'none', borderRadius: '8px', height: '40px', fontSize: '14px' }}
                     >
                         Nâng cấp tài khoản VIP

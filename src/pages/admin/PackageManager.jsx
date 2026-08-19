@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    Card, Table, Button, Modal, Form, Input, InputNumber, Select, message, 
-    Popconfirm, Typography, Row, Col, Radio, Switch, Tag, Space 
+import {
+    Card, Table, Button, Modal, Form, Input, InputNumber, Select, message,
+    Popconfirm, Typography, Row, Col, Radio, Switch, Tag, Space
 } from 'antd';
-import { 
-    PlusOutlined, DeleteOutlined, ShoppingOutlined, UndoOutlined, 
-    EditOutlined, CrownOutlined 
+import {
+    PlusOutlined, DeleteOutlined, ShoppingOutlined, UndoOutlined,
+    EditOutlined, CrownOutlined
 } from '@ant-design/icons';
 import apiClient from '../../api/apiClient';
 
 const { Title } = Typography;
 const { Option } = Select;
 
-// 🌟 DANH SÁCH ĐẶC QUYỀN MẶC ĐỊNH CHUẨN DỮ LIỆU TỪ BẢNG [dbo].[DacQuyen]
+// 🌟 DANH MỤC ĐẶC QUYỀN CHUẨN ĐỒNG BỘ VỚI HỆ THỐNG VÀ CSDL
 const DEFAULT_PRIVILEGES = [
     // 1: Nhà tuyển dụng (NTD)
     { maDacQuyen: 1, maCode: 'NTD_VIP_JOB', tenDacQuyen: 'Tự động đẩy tin / Nổi bật', doiTuongSuDung: 1 },
@@ -20,12 +20,14 @@ const DEFAULT_PRIVILEGES = [
     { maDacQuyen: 3, maCode: 'NTD_AI_MATCHING', tenDacQuyen: 'Sử dụng AI Phân tích & Gợi ý ứng viên', doiTuongSuDung: 1 },
 
     // 2: Ứng viên (UV)
-    { maDacQuyen: 4, maCode: 'UV_PREMIUM_TEMPLATE', tenDacQuyen: 'Mở khóa mẫu CV Cao cấp / VIP', doiTuongSuDung: 2 },
-    { maDacQuyen: 5, maCode: 'UV_AI_REVIEW', tenDacQuyen: 'AI Đánh giá & Gợi ý tối ưu CV', doiTuongSuDung: 2 },
+    { maDacQuyen: 4, maCode: 'UV_PREMIUM_CV', tenDacQuyen: 'Mở khóa mẫu CV Cao cấp / VIP', doiTuongSuDung: 2 },
     { maDacQuyen: 6, maCode: 'UV_UNLIMITED_CV', tenDacQuyen: 'Tạo & Quản lý CV không giới hạn', doiTuongSuDung: 2 },
     { maDacQuyen: 13, maCode: 'UV_REMOVE_WATERMARK', tenDacQuyen: 'Tải CV dạng PDF không dính Watermark', doiTuongSuDung: 2 },
-    { maDacQuyen: 14, maCode: 'UV_AI_WRITE_GOAL', tenDacQuyen: 'Trợ lý AI Gemini viết mục tiêu / nội dung CV', doiTuongSuDung: 2 }
+    { maDacQuyen: 14, maCode: 'UV_AI_WRITE', tenDacQuyen: 'Trợ lý AI Gemini viết mục tiêu / nội dung CV', doiTuongSuDung: 2 }
 ];
+
+// Danh sách các đặc quyền có thể cấu hình số lượt hoặc vô hạn
+const COUNTABLE_CODES = ['NTD_UNLOCK_CV', 'UV_AI_WRITE'];
 
 const PackageManager = () => {
     const [packages, setPackages] = useState([]);
@@ -39,12 +41,11 @@ const PackageManager = () => {
     const [isCandidate, setIsCandidate] = useState(false);
     const [hasDiscount, setHasDiscount] = useState(false);
 
-    // TẢI DỮ LIỆU GÓI DỊCH VỤ VÀ ĐẶC QUYỀN
     const fetchInitialData = async () => {
         setLoading(true);
         try {
             const [pkgRes, dacQuyenRes] = await Promise.all([
-                apiClient.get('/Service'),
+                apiClient.get('/Service/admin/packages').catch(() => apiClient.get('/Service')),
                 apiClient.get('/Service/privileges').catch(() => null)
             ]);
 
@@ -75,9 +76,10 @@ const PackageManager = () => {
             doiTuong: 'employer',
             loaiGoi: 2,
             hasDiscount: false,
-            soLuotXemCv: 1,
             donViThoiGian: 1,
-            dacQuyenIds: []
+            dacQuyenIds: [],
+            dacQuyenQuantities: {},
+            dacQuyenTypes: {}
         });
         setIsCandidate(false);
         setHasDiscount(false);
@@ -86,12 +88,29 @@ const PackageManager = () => {
 
     const openEditModal = (record) => {
         setEditingPackage(record);
-        
+
         const target = record.doiTuongSuDung ?? record.DoiTuongSuDung;
-        const isCand = target === 2 || record.soLuotXemCv === 0;
+        const isCand = target === 2;
         const discountExist = record.giaKhuyenMai && record.giaKhuyenMai > 0;
 
-        const selectedDacQuyens = (record.dacQuyens || record.DacQuyens || []).map(dq => dq.maDacQuyen || dq.MaDacQuyen);
+        const rawDacQuyens = record.dacQuyens || record.DacQuyens || [];
+        const selectedDacQuyens = rawDacQuyens.map(dq => dq.maDacQuyen || dq.MaDacQuyen);
+
+        const initialQuantities = {};
+        const initialTypes = {};
+
+        rawDacQuyens.forEach(dq => {
+            const dqId = dq.maDacQuyen || dq.MaDacQuyen;
+            const qty = dq.soLuong !== undefined ? dq.soLuong : dq.SoLuong;
+
+            if (qty === -1 || qty === null || qty === undefined) {
+                initialTypes[dqId] = 'unlimited';
+                initialQuantities[dqId] = 10;
+            } else {
+                initialTypes[dqId] = 'limited';
+                initialQuantities[dqId] = qty;
+            }
+        });
 
         setIsCandidate(isCand);
         setHasDiscount(discountExist);
@@ -103,9 +122,10 @@ const PackageManager = () => {
             giaTien: record.giaTien || record.GiaTien,
             hasDiscount: discountExist,
             giaKhuyenMai: discountExist ? (record.giaKhuyenMai || record.GiaKhuyenMai) : null,
-            soLuotXemCv: record.soLuotXemCv ?? record.SoLuotXemCv ?? 0,
             donViThoiGian: record.donViThoiGian || record.DonViThoiGian || 1,
-            dacQuyenIds: selectedDacQuyens
+            dacQuyenIds: selectedDacQuyens,
+            dacQuyenQuantities: initialQuantities,
+            dacQuyenTypes: initialTypes
         });
 
         setIsModalVisible(true);
@@ -115,12 +135,13 @@ const PackageManager = () => {
         if (changedValues.doiTuong) {
             const isCand = changedValues.doiTuong === 'candidate';
             setIsCandidate(isCand);
-            form.setFieldsValue({ 
-                soLuotXemCv: isCand ? 0 : 1,
-                dacQuyenIds: []
+            form.setFieldsValue({
+                dacQuyenIds: [],
+                dacQuyenQuantities: {},
+                dacQuyenTypes: {}
             });
         }
-        
+
         if (changedValues.hasDiscount !== undefined) {
             setHasDiscount(changedValues.hasDiscount);
             if (!changedValues.hasDiscount) {
@@ -132,7 +153,8 @@ const PackageManager = () => {
     const handleDelete = async (id) => {
         try {
             const res = await apiClient.delete(`/Service/${id}`);
-            message.success(res?.data?.message || 'Đã ngưng bán thành công!');
+            const resData = res?.data !== undefined ? res.data : res;
+            message.success(resData?.message || 'Đã ngưng bán thành công!');
             fetchInitialData();
         } catch (error) {
             message.error('Không thể thao tác lúc này!');
@@ -142,7 +164,8 @@ const PackageManager = () => {
     const handleRestore = async (id) => {
         try {
             const res = await apiClient.put(`/Service/${id}/restore`);
-            message.success(res?.data?.message || 'Đã mở bán lại thành công!');
+            const resData = res?.data !== undefined ? res.data : res;
+            message.success(resData?.message || 'Đã mở bán lại thành công!');
             fetchInitialData();
         } catch (error) {
             message.error('Không thể mở bán lại lúc này!');
@@ -151,15 +174,47 @@ const PackageManager = () => {
 
     const handleSubmit = async (values) => {
         try {
+            const types = values.dacQuyenTypes || {};
+            const quantities = values.dacQuyenQuantities || {};
+
+            const dacQuyenConfig = (values.dacQuyenIds || []).map(id => {
+                const dq = filteredPrivileges.find(p => (p.maDacQuyen || p.MaDacQuyen) === id);
+                const code = dq?.maCode || dq?.MaCode || '';
+
+                // 1. Đặc quyền thuần tính năng theo thời hạn gói -> soLuong = null
+                if (!COUNTABLE_CODES.includes(code)) {
+                    return {
+                        maDacQuyen: id,
+                        soLuong: null
+                    };
+                }
+
+                // 2. Đặc quyền mở khóa CV của NTD -> Bắt buộc nhập số lượt cụ thể
+                if (code === 'NTD_UNLOCK_CV') {
+                    return {
+                        maDacQuyen: id,
+                        soLuong: quantities[id] && quantities[id] > 0 ? quantities[id] : 50
+                    };
+                }
+
+                // 3. Các đặc quyền AI (NTD_AI_MATCHING, UV_AI_WRITE)
+                const isUnlimited = types[id] === 'unlimited' || types[id] === undefined;
+                return {
+                    maDacQuyen: id,
+                    soLuong: isUnlimited ? -1 : (quantities[id] && quantities[id] > 0 ? quantities[id] : 10)
+                };
+            });
+
             const payload = {
                 tenGoi: values.tenGoi,
                 loaiGoi: values.loaiGoi,
                 giaTien: values.giaTien,
                 giaKhuyenMai: values.hasDiscount ? values.giaKhuyenMai : null,
-                soLuotXemCv: isCandidate ? 0 : (values.soLuotXemCv || 0),
                 donViThoiGian: values.donViThoiGian,
-                doiTuongSuDung: values.doiTuong === 'candidate' ? 2 : 1, // 1 = NTD, 2 = Ứng viên
-                dacQuyenIds: values.dacQuyenIds || []
+                doiTuongSuDung: values.doiTuong === 'candidate' ? 2 : 1,
+                trangThai: true,
+                dacQuyenIds: values.dacQuyenIds || [],
+                dacQuyens: dacQuyenConfig
             };
 
             if (editingPackage) {
@@ -174,7 +229,8 @@ const PackageManager = () => {
             setIsModalVisible(false);
             fetchInitialData();
         } catch (error) {
-            message.error('Có lỗi xảy ra khi lưu dữ liệu!');
+            const serverMessage = error?.response?.data?.message || error?.message || 'Có lỗi xảy ra khi lưu dữ liệu!';
+            message.error(serverMessage);
         }
     };
 
@@ -184,7 +240,6 @@ const PackageManager = () => {
         return name.toLowerCase().includes(searchText.toLowerCase()) || id.toString().includes(searchText);
     });
 
-    // 🌟 ĐỐI CHIẾU CHÍNH XÁC VỚI DB: 1 = NTD, 2 = ỨNG VIÊN
     const currentTargetType = isCandidate ? 2 : 1;
     const filteredPrivileges = allPrivileges.filter(dq => {
         const target = dq.doiTuongSuDung ?? dq.DoiTuongSuDung;
@@ -193,47 +248,52 @@ const PackageManager = () => {
 
     const columns = [
         { title: 'ID', dataIndex: 'maGoi', key: 'maGoi', width: 60, align: 'center', render: (val, r) => val || r.MaGoi },
-        { 
-            title: 'Tên Gói', 
-            dataIndex: 'tenGoi', 
-            key: 'tenGoi', 
-            render: (text, r) => (
-                <div>
-                    <b style={{ fontSize: 14 }}>{text || r.TenGoi}</b>
-                    <div style={{ marginTop: 4 }}>
-                        {(r.dacQuyens || r.DacQuyens || []).map((dq, idx) => (
-                            <Tag key={idx} color="cyan" style={{ fontSize: 11, marginBottom: 2 }}>
-                                ✓ {dq.tenDacQuyen || dq.TenDacQuyen}
-                            </Tag>
-                        ))}
+        {
+            title: 'Tên Gói',
+            dataIndex: 'tenGoi',
+            key: 'tenGoi',
+            render: (text, r) => {
+                const rawList = r.dacQuyens || r.DacQuyens || [];
+                return (
+                    <div>
+                        <b style={{ fontSize: 14 }}>{text || r.TenGoi}</b>
+                        <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                            {rawList.map((dq, idx) => (
+                                <Tag key={idx} color="cyan" style={{ fontSize: 11, margin: 0 }}>
+                                    ✓ {dq.tenDacQuyen || dq.TenDacQuyen}
+                                    {dq.soLuong && dq.soLuong > 0 ? ` (${dq.soLuong} lượt)` : (dq.soLuong === -1 ? ' (Vô hạn)' : '')}
+                                </Tag>
+                            ))}
+                        </div>
                     </div>
-                </div>
-            ) 
+                );
+            }
         },
         {
             title: 'Dành cho',
             key: 'doiTuong',
             align: 'center',
-            width: 110,
+            width: 130,
             render: (_, record) => {
                 const target = record.doiTuongSuDung ?? record.DoiTuongSuDung;
-                const isCand = target === 2 || record.soLuotXemCv === 0;
-                return isCand ? <Tag color="green">Ứng viên</Tag> : <Tag color="blue">Nhà tuyển dụng</Tag>;
+                return target === 2 ? <Tag color="green">Ứng viên</Tag> : <Tag color="blue">Nhà tuyển dụng</Tag>;
             }
         },
-        { 
-            title: 'Chu kỳ', 
-            dataIndex: 'loaiGoi', 
+        {
+            title: 'Chu kỳ',
+            dataIndex: 'loaiGoi',
             key: 'loaiGoi',
-            width: 90,
+            width: 100,
             render: (val, r) => {
                 const type = val ?? r.LoaiGoi;
-                return type === 1 ? 'Tuần' : type === 2 ? 'Tháng' : 'Năm';
+                const unit = r.donViThoiGian ?? r.DonViThoiGian ?? 1;
+                const unitName = type === 1 ? 'Tuần' : type === 2 ? 'Tháng' : 'Năm';
+                return `${unit} ${unitName}`;
             }
         },
-        { 
-            title: 'Giá Tiền', 
-            dataIndex: 'giaTien', 
+        {
+            title: 'Giá Tiền',
+            dataIndex: 'giaTien',
             key: 'giaTien',
             width: 120,
             render: (val, r) => {
@@ -241,9 +301,9 @@ const PackageManager = () => {
                 return <span style={{ color: '#1677ff', fontWeight: 'bold' }}>{new Intl.NumberFormat('vi-VN').format(price)} đ</span>;
             }
         },
-        { 
-            title: 'Khuyến Mãi', 
-            dataIndex: 'giaKhuyenMai', 
+        {
+            title: 'Khuyến Mãi',
+            dataIndex: 'giaKhuyenMai',
             key: 'giaKhuyenMai',
             width: 120,
             render: (val, r) => {
@@ -290,7 +350,7 @@ const PackageManager = () => {
         <div style={{ padding: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                 <Title level={3} style={{ margin: 0 }}><ShoppingOutlined /> Quản lý Gói Dịch Vụ & Đặc Quyền</Title>
-                
+
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                     <Input.Search
                         placeholder="Tìm theo ID hoặc Tên gói..."
@@ -309,7 +369,6 @@ const PackageManager = () => {
                 <Table columns={columns} dataSource={filteredPackages} rowKey={(r) => r.maGoi || r.MaGoi} loading={loading} bordered />
             </Card>
 
-            {/* MODAL CẤU HÌNH GÓI & ĐẶC QUYỀN */}
             <Modal
                 title={editingPackage ? `Chỉnh sửa Gói #${editingPackage.maGoi || editingPackage.MaGoi}` : "Thêm Gói Dịch Vụ Mới"}
                 open={isModalVisible}
@@ -317,7 +376,7 @@ const PackageManager = () => {
                 onOk={() => form.submit()}
                 okText="Lưu Gói Dịch Vụ"
                 cancelText="Hủy"
-                width={700}
+                width={720}
             >
                 <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={handleValuesChange}>
                     <Form.Item name="doiTuong" label="Gói dịch vụ này dành cho:">
@@ -330,7 +389,7 @@ const PackageManager = () => {
                     <Row gutter={16}>
                         <Col span={14}>
                             <Form.Item name="tenGoi" label="Tên gói dịch vụ" rules={[{ required: true, message: 'Vui lòng nhập tên gói!' }]}>
-                                <Input placeholder="Ví dụ: Gói VIP 1 Tháng" />
+                                <Input placeholder="Ví dụ: Gói Doanh Nghiệp Pro AI" />
                             </Form.Item>
                         </Col>
                         <Col span={10}>
@@ -345,11 +404,10 @@ const PackageManager = () => {
                     </Row>
 
                     <Row gutter={16}>
-                        {/* 🌟 GIÁ GỐC: KHÔNG DÙNG MIN=1 ĐỂ BÁO LỖI KHI NHẬP SỐ ÂM HOẶC 0 */}
                         <Col span={8}>
-                            <Form.Item 
-                                name="giaTien" 
-                                label="Giá gốc (VNĐ)" 
+                            <Form.Item
+                                name="giaTien"
+                                label="Giá gốc (VNĐ)"
                                 rules={[
                                     { required: true, message: 'Vui lòng nhập giá gốc!' },
                                     {
@@ -362,27 +420,26 @@ const PackageManager = () => {
                                     }
                                 ]}
                             >
-                                <InputNumber 
-                                    style={{ width: '100%' }} 
+                                <InputNumber
+                                    style={{ width: '100%' }}
                                     placeholder="Nhập giá gốc..."
-                                    formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} 
-                                    parser={v => v.replace(/\$\s?|(,*)/g, '')} 
+                                    formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                                    parser={v => v.replace(/\$\s?|(,*)/g, '')}
                                 />
                             </Form.Item>
                         </Col>
-                        
+
                         <Col span={6} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                             <Form.Item name="hasDiscount" label="Khuyến mãi?" valuePropName="checked">
                                 <Switch checkedChildren="Có" unCheckedChildren="Không" />
                             </Form.Item>
                         </Col>
 
-                        {/* 🌟 GIÁ KHUYẾN MÃI: KHÔNG DÙNG MIN=1 ĐỂ BÁO LỖI KHI NHẬP SỐ ÂM */}
                         <Col span={10}>
                             {hasDiscount && (
-                                <Form.Item 
-                                    name="giaKhuyenMai" 
-                                    label="Giá khuyến mãi (VNĐ)" 
+                                <Form.Item
+                                    name="giaKhuyenMai"
+                                    label="Giá khuyến mãi (VNĐ)"
                                     dependencies={['giaTien']}
                                     rules={[
                                         { required: true, message: 'Vui lòng nhập giá khuyến mãi!' },
@@ -403,11 +460,11 @@ const PackageManager = () => {
                                         }),
                                     ]}
                                 >
-                                    <InputNumber 
-                                        style={{ width: '100%' }} 
-                                        placeholder="Nhập giáKM..."
-                                        formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} 
-                                        parser={v => v.replace(/\$\s?|(,*)/g, '')} 
+                                    <InputNumber
+                                        style={{ width: '100%' }}
+                                        placeholder="Nhập giá KM..."
+                                        formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                                        parser={v => v.replace(/\$\s?|(,*)/g, '')}
                                     />
                                 </Form.Item>
                             )}
@@ -415,32 +472,10 @@ const PackageManager = () => {
                     </Row>
 
                     <Row gutter={16}>
-                        {!isCandidate && (
-                            <Col span={12}>
-                                <Form.Item 
-                                    name="soLuotXemCv" 
-                                    label="Số lượt mở khóa CV NTD" 
-                                    rules={[
-                                        { required: true, message: 'Vui lòng nhập số lượt xem CV!' },
-                                        {
-                                            validator(_, value) {
-                                                if (value !== null && value !== undefined && value <= 0) {
-                                                    return Promise.reject(new Error('Số lượt mở CV phải lớn hơn 0!'));
-                                                }
-                                                return Promise.resolve();
-                                            }
-                                        }
-                                    ]}
-                                >
-                                    <InputNumber style={{ width: '100%' }} placeholder="Nhập số lượt..." />
-                                </Form.Item>
-                            </Col>
-                        )}
-                        
-                        <Col span={isCandidate ? 24 : 12}>
-                            <Form.Item 
-                                name="donViThoiGian" 
-                                label="Số lượng chu kỳ (Số Tuần/Tháng/Năm)" 
+                        <Col span={24}>
+                            <Form.Item
+                                name="donViThoiGian"
+                                label="Số lượng chu kỳ (Số Tuần/Tháng/Năm)"
                                 rules={[
                                     { required: true, message: 'Vui lòng nhập độ dài chu kỳ!' },
                                     {
@@ -458,9 +493,9 @@ const PackageManager = () => {
                         </Col>
                     </Row>
 
-                    {/* 🌟 CÁC ĐẶC QUYỀN ĐI KÈM CHUẨN XÁC DỮ LIỆU BẢNG DACQUYEN */}
-                    <Form.Item 
-                        name="dacQuyenIds" 
+                    {/* CHỌN ĐẶC QUYỀN */}
+                    <Form.Item
+                        name="dacQuyenIds"
                         label={<><CrownOutlined style={{ color: '#faad14' }} /> Danh sách Đặc quyền đính kèm gói</>}
                     >
                         <Select
@@ -469,6 +504,27 @@ const PackageManager = () => {
                             placeholder={`Chọn đặc quyền cho ${isCandidate ? 'Ứng viên' : 'Nhà tuyển dụng'}...`}
                             style={{ width: '100%' }}
                             optionFilterProp="children"
+                            onChange={(selectedIds) => {
+                                const currentQuantities = form.getFieldValue('dacQuyenQuantities') || {};
+                                const currentTypes = form.getFieldValue('dacQuyenTypes') || {};
+
+                                selectedIds.forEach(id => {
+                                    const dq = filteredPrivileges.find(p => (p.maDacQuyen || p.MaDacQuyen) === id);
+                                    const code = dq?.maCode || dq?.MaCode || '';
+
+                                    // Mặc định các đặc quyền AI luôn là Vô hạn
+                                    if (currentTypes[id] === undefined) {
+                                        currentTypes[id] = code === 'NTD_UNLOCK_CV' ? 'limited' : 'unlimited';
+                                    }
+                                    if (currentQuantities[id] === undefined) {
+                                        currentQuantities[id] = code === 'NTD_UNLOCK_CV' ? 50 : 10;
+                                    }
+                                });
+                                form.setFieldsValue({
+                                    dacQuyenQuantities: currentQuantities,
+                                    dacQuyenTypes: currentTypes
+                                });
+                            }}
                         >
                             {filteredPrivileges.map(dq => (
                                 <Option key={dq.maDacQuyen || dq.MaDacQuyen} value={dq.maDacQuyen || dq.MaDacQuyen}>
@@ -476,6 +532,123 @@ const PackageManager = () => {
                                 </Option>
                             ))}
                         </Select>
+                    </Form.Item>
+
+                    {/* 🌟 CẤU HÌNH HẠN MỨC: BỔ SUNG ĐẦY ĐỦ CÁC QUYỀN AI */}
+                    <Form.Item shouldUpdate={(prev, curr) =>
+                        prev.dacQuyenIds !== curr.dacQuyenIds ||
+                        prev.dacQuyenTypes !== curr.dacQuyenTypes
+                    }>
+                        {() => {
+                            const selectedIds = form.getFieldValue('dacQuyenIds') || [];
+                            const quantityPrivileges = filteredPrivileges.filter(dq =>
+                                selectedIds.includes(dq.maDacQuyen || dq.MaDacQuyen) &&
+                                COUNTABLE_CODES.includes(dq.maCode || dq.MaCode)
+                            );
+
+                            if (quantityPrivileges.length === 0) return null;
+
+                            const currentTypes = form.getFieldValue('dacQuyenTypes') || {};
+
+                            return (
+                                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
+                                    <div style={{ fontWeight: 600, marginBottom: '12px', color: '#1e293b' }}>
+                                        Cấu hình hạn mức sử dụng:
+                                    </div>
+                                    {quantityPrivileges.map(dq => {
+                                        const dqId = dq.maDacQuyen || dq.MaDacQuyen;
+                                        const code = dq.maCode || dq.MaCode;
+                                        const isEmployerCvUnlock = code === 'NTD_UNLOCK_CV';
+                                        const isUnlimited = !isEmployerCvUnlock && (currentTypes[dqId] === 'unlimited' || currentTypes[dqId] === undefined);
+
+                                        return (
+                                            <div key={dqId} style={{ marginBottom: '14px', paddingBottom: '12px', borderBottom: '1px dashed #e2e8f0' }}>
+                                                <div style={{ fontWeight: 500, color: '#334155', marginBottom: '8px' }}>
+                                                    {dq.tenDacQuyen || dq.TenDacQuyen} ({code})
+                                                    {isEmployerCvUnlock && <span style={{ color: '#ff4d4f', fontSize: '12px', marginLeft: '6px' }}>*(Bắt buộc nhập số lượt)*</span>}
+                                                </div>
+
+                                                {isEmployerCvUnlock ? (
+                                                    <Form.Item
+                                                        name={['dacQuyenQuantities', dqId]}
+                                                        initialValue={50}
+                                                        rules={[
+                                                            { required: true, message: 'Vui lòng nhập số lượt mở CV!' },
+                                                            {
+                                                                validator(_, value) {
+                                                                    if (value === null || value === undefined || value <= 0) {
+                                                                        return Promise.reject(new Error('Số lượt mở khóa CV phải lớn hơn 0!'));
+                                                                    }
+                                                                    return Promise.resolve();
+                                                                }
+                                                            }
+                                                        ]}
+                                                        style={{ marginBottom: 0 }}
+                                                    >
+                                                        <InputNumber
+                                                            min={1}
+                                                            style={{ width: '100%' }}
+                                                            placeholder="Nhập số lượt mở CV..."
+                                                            addonAfter="lượt mở CV"
+                                                        />
+                                                    </Form.Item>
+                                                ) : (
+                                                    <Row gutter={16} align="middle">
+                                                        <Col span={11}>
+                                                            <Form.Item
+                                                                name={['dacQuyenTypes', dqId]}
+                                                                initialValue="unlimited"
+                                                                style={{ marginBottom: 0 }}
+                                                            >
+                                                                <Radio.Group buttonStyle="solid" style={{ width: '100%' }}>
+                                                                    <Radio.Button value="unlimited" style={{ width: '50%', textAlign: 'center' }}>
+                                                                        Vô hạn
+                                                                    </Radio.Button>
+                                                                    <Radio.Button value="limited" style={{ width: '50%', textAlign: 'center' }}>
+                                                                        Số lượt
+                                                                    </Radio.Button>
+                                                                </Radio.Group>
+                                                            </Form.Item>
+                                                        </Col>
+                                                        <Col span={13}>
+                                                            {!isUnlimited ? (
+                                                                <Form.Item
+                                                                    name={['dacQuyenQuantities', dqId]}
+                                                                    initialValue={10}
+                                                                    rules={[
+                                                                        { required: true, message: 'Vui lòng nhập số lượt!' },
+                                                                        {
+                                                                            validator(_, value) {
+                                                                                if (value !== null && value !== undefined && value <= 0) {
+                                                                                    return Promise.reject(new Error('Số lượt phải > 0!'));
+                                                                                }
+                                                                                return Promise.resolve();
+                                                                            }
+                                                                        }
+                                                                    ]}
+                                                                    style={{ marginBottom: 0 }}
+                                                                >
+                                                                    <InputNumber
+                                                                        min={1}
+                                                                        style={{ width: '100%' }}
+                                                                        placeholder="Nhập số lượt..."
+                                                                        addonAfter="lượt"
+                                                                    />
+                                                                </Form.Item>
+                                                            ) : (
+                                                                <Tag color="gold" style={{ padding: '4px 12px', fontSize: '13px', borderRadius: '6px' }}>
+                                                                    ✓ Không giới hạn lượt sử dụng
+                                                                </Tag>
+                                                            )}
+                                                        </Col>
+                                                    </Row>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        }}
                     </Form.Item>
                 </Form>
             </Modal>

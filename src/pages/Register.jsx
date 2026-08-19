@@ -19,6 +19,14 @@ const Register = () => {
     const finalRoleValue = isEmployer ? 1 : 2; 
     const themeColor = isEmployer ? '#52c41a' : '#1677ff';
 
+    const handleRoleRedirect = (role) => {
+        if (role === 1 || role === '1') {
+            window.location.href = '/employer/dashboard';
+        } else {
+            window.location.href = '/';
+        }
+    };
+
     const onFinish = async (values) => {
         setLoading(true);
         try {
@@ -29,12 +37,14 @@ const Register = () => {
                 vaiTro: finalRoleValue
             });
 
-            if (response.success) {
+            const resData = response?.data !== undefined ? response.data : response;
+
+            if (resData.success) {
                 message.success('Đăng ký tài khoản thành công! Hãy đăng nhập ngay.');
                 navigate('/login');
             }
         } catch (error) {
-            const errorMsg = error.response?.data?.message || 'Đăng ký thất bại, vui lòng kiểm tra lại!';
+            const errorMsg = error.response?.data?.message || error?.message || 'Đăng ký thất bại, vui lòng kiểm tra lại!';
             message.error(errorMsg);
         } finally {
             setLoading(false);
@@ -50,10 +60,12 @@ const Register = () => {
                     vaiTro: finalRoleValue
                 });
 
-                if (response.success) {
-                    localStorage.setItem('token', response.token);
+                const resData = response?.data !== undefined ? response.data : response;
+
+                if (resData.success) {
+                    localStorage.setItem('token', resData.token);
                     message.success('Xác thực tài khoản Google thành công!');
-                    window.location.href = '/'; 
+                    handleRoleRedirect(finalRoleValue);
                 }
             } catch (error) {
                 message.error('Xác thực Google thất bại. Vui lòng thử lại sau.');
@@ -233,6 +245,7 @@ const Register = () => {
                                 <FacebookLogin
                                     appId="1594501296013131" 
                                     fields="name,email,picture"
+                                    scope="public_profile,email"
                                     callback={async (response) => {
                                         if (response.accessToken) {
                                             try {
@@ -241,10 +254,15 @@ const Register = () => {
                                                     vaiTro: finalRoleValue
                                                 });
                                                 
-                                                if (res.data.success) {
-                                                    message.success(res.data.message || 'Xác thực Facebook thành công!');
-                                                    localStorage.setItem('token', res.data.token);
-                                                    window.location.href = '/'; 
+                                                const data = res?.data !== undefined ? res.data : res;
+
+                                                if (data.success && data.token) {
+                                                    localStorage.setItem('token', data.token);
+                                                    if (data.requireUpdateEmail) {
+                                                        localStorage.setItem('requireEmailVerification', 'true');
+                                                    }
+                                                    message.success(data.message || 'Xác thực Facebook thành công!');
+                                                    handleRoleRedirect(finalRoleValue);
                                                 }
                                             } catch (error) {
                                                 message.error('Đăng nhập Facebook thất bại tại Server!');

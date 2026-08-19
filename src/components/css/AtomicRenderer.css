@@ -1,13 +1,12 @@
 /* =========================================
-   1. ĐỒNG BỘ FONT CHỮ ĐỘNG 
+   1. ĐỒNG BỘ FONT CHỮ MẶC ĐỊNH (KHÔNG ÉP !IMPORTANT ĐỂ CHO PHÉP ĐỔI FONT TỪNG KHỐI)
    ========================================= */
-.cv-macro-section-block,
-.cv-macro-section-block *:not(.anticon) {
-    font-family: var(--font-family, inherit) !important;
+.cv-macro-section-block {
+    font-family: var(--font-family, inherit);
 }
 
 /* =========================================
-   2. THANH CÔNG CỤ (TOOLBAR) & NÚT BẤM
+   2. THANH CÔNG CỤ MACRO (TOOLBAR ĐEN TRÊN KHỐI)
    ========================================= */
 .cv-macro-section-block > .cv-macro-toolbar { display: none !important; }
 .cv-macro-section-block:hover > .cv-macro-toolbar { display: flex !important; }
@@ -97,64 +96,11 @@
     box-shadow: none !important; outline: none !important;
 }
 
-:root body .cv-macro-section-block:not(.has-empty-required) *[style*="red"],
-:root body .cv-macro-section-block:not(.has-empty-required) *[style*="rgb(255, 77, 79)"] {
-    border-color: transparent !important; outline-color: transparent !important; background-color: transparent !important;
-}
-
-/* Khi không hover/focus thì tàng hình viền */
-:root body .cv-macro-section-block [contenteditable="true"]:not(:hover):not(:focus),
-:root body .cv-macro-section-block input:not(:hover):not(:focus), 
-:root body .cv-macro-section-block textarea:not(:hover):not(:focus), 
-:root body .cv-macro-section-block .ProseMirror:not(:hover):not(:focus) {
-    border-color: transparent !important; 
-    outline-color: transparent !important; 
-    outline: none !important;
-    background-color: transparent !important;
-    background-image: none !important;
-}
-
-/* Khi hover/focus thì hiện viền đứt nét để người dùng biết có thể sửa */
-:root body .cv-macro-section-block [contenteditable="true"]:hover, 
-:root body .cv-macro-section-block [contenteditable="true"]:focus,
-:root body .cv-macro-section-block input:hover, 
-:root body .cv-macro-section-block input:focus,
-:root body .cv-macro-section-block textarea:hover, 
-:root body .cv-macro-section-block textarea:focus,
-:root body .cv-macro-section-block .ProseMirror:hover, 
-:root body .cv-macro-section-block .ProseMirror:focus {
-    outline: 1px dashed currentColor !important; 
-    outline-offset: 2px !important; 
-    border-radius: 4px !important;
-    background-color: transparent !important; 
-    background-image: none !important; 
-    border-color: transparent !important;
-    cursor: text !important;
-}
-
-/* Cảnh báo đỏ khi thiếu trường bắt buộc */
-:root body .cv-macro-section-block.has-empty-required [contenteditable="true"]:not(.ProseMirror), 
-:root body .cv-macro-section-block.has-empty-required input, 
-:root body .cv-macro-section-block.has-empty-required .ProseMirror {
-    border-color: rgba(255, 77, 79, 0.99) !important; outline-color: rgba(255, 77, 79, 0.99) !important;
-    outline: 1px dashed rgba(255, 77, 79, 0.99) !important; outline-offset: 3px !important; border-radius: 3px !important; 
-    background-color: transparent !important;
-    background-image: linear-gradient(rgba(255, 77, 79, 0.05), rgba(255, 77, 79, 0.05)) !important;
-}
-
-:root body .cv-macro-section-block .rich-text-force-dynamic, 
-:root body .cv-macro-section-block .rich-text-force-dynamic:hover, 
-:root body .cv-macro-section-block .rich-text-force-dynamic:focus {
-    border: none !important; outline: none !important; background-color: transparent !important; background-image: none !important;
-}
-
 div.cv-macro-section-block:hover, div.cv-macro-section-block { outline: none !important; }
 
-.cv-macro-section-block [class*="toolbar"]:not(.cv-macro-toolbar), 
-.cv-macro-section-block [class*="action"]:not(.cv-macro-toolbar), 
-.cv-macro-section-block button:not(.cv-btn-item):not(.cv-btn-delete):not(.cv-btn-add):not(.ant-checkbox-wrapper):not(.ant-switch) {
-    display: none !important; opacity: 0 !important; visibility: hidden !important; pointer-events: none !important;
+.custom-cv-popover-wrapper .ant-popover-inner { 
+    background-color: #1f1f1f !important; 
+    border: 1px solid #333333 !important; 
+    border-radius: 6px !important; 
+    padding: 12px !important; 
 }
-
-.custom-cv-popover-wrapper .ant-popover-inner { background-color: #1f1f1f !important; border: 1px solid #333333 !important; border-radius: 6px !important; padding: 12px !important; }
-.rich-text-force-dynamic * { font-size: inherit !important; }

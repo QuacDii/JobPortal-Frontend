@@ -40,7 +40,7 @@ const CvTemplateManager = () => {
             const [tempRes, catRes, nganhRes] = await Promise.all([
                 apiClient.get('/MauCv?activeOnly=false'),
                 apiClient.get('/DanhMucMau'),
-                apiClient.get('/NganhNghe/danh-sach').catch(() => []) // Tải danh sách Ngành nghề
+                apiClient.get('/NganhNghe/danh-sach').catch(() => []) 
             ]);
 
             const tempPayload = tempRes.data !== undefined ? tempRes.data : tempRes;
@@ -115,7 +115,7 @@ const CvTemplateManager = () => {
                 duLieuMau: cleanJson(record.duLieuMau),
                 categoryIds: record.categoryIds || [],
                 danhSachMau: colorsArray,
-                tags: tagsArray // Tag Ngành nghề
+                tags: tagsArray 
             });
             setPreviewImage(img);
         } else {
